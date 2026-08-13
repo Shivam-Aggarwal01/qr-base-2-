@@ -1,0 +1,74 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --bg-alabaster: #F9F8F6;
+    --fg-charcoal: #1A1A1A;
+    --muted-taupe: #EBE5DE;
+    --muted-grey: #6C6863;
+    --accent-gold: #D4AF37;
+  }
+
+  body {
+    background-color: #F9F8F6;
+    color: #1A1A1A;
+    font-family: 'Inter', sans-serif;
+  }
+
+  h1, h2, h3, .font-serif {
+    font-family: 'Playfair Display', Georgia, serif;
+  }
+}
+
+/* Custom Luxury Architectural Utilities */
+.writing-mode-vertical {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+}
+
+/* Custom Architectural Gridlines */
+.grid-lines-bg {
+  background-image: linear-gradient(to right, rgba(26, 26, 26, 0.05) 1px, transparent 1px);
+  background-size: 25% 100%;
+}
+
+/* Paper Grain Texture */
+.paper-texture {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+}
+
+/* Custom Scrollbar for Luxury Aesthetic */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #EBE5DE;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1A1A1A;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D4AF37;
+}
+
+/* Sharp 0px Border Enforcements */
+* {
+  border-radius: 0px !important;
+}
+
+/* Underline Inputs */
+.input-underline {
+  border: none;
+  border-bottom: 1px solid rgba(26, 26, 26, 0.25);
+  background: transparent;
+  transition: border-color 0.3s ease;
+}
+
+.input-underline:focus {
+  outline: none;
+  border-bottom-color: #D4AF37;
+}
