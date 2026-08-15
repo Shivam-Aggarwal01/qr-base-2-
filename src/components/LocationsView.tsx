@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, MapPin, QrCode, Box, Layers, ArrowRight } from 'lucide-react';
 import { Location, CatalogItem, Asset, StockLevel } from '../types/inventory';
-import { InventoryStorage } from '../services/storage';
+import { createLocationInFirestore } from '../services/firebaseInventory';
 
 interface LocationsViewProps {
   locations: Location[];
@@ -24,14 +24,24 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
   const [locName, setLocName] = useState('');
   const [locCode, setLocCode] = useState('');
 
-  const handleAddLocation = (e: React.FormEvent) => {
+  const handleAddLocation = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!locName.trim()) return alert('Name required');
-    InventoryStorage.addLocation(locName.trim(), locCode.trim().toUpperCase());
-    setShowAddModal(false);
-    setLocName('');
-    setLocCode('');
-    onRefreshData();
+
+    try {
+      await createLocationInFirestore({
+        name: locName.trim(),
+        code: locCode.trim().toUpperCase() || `LOC-${locName.trim().replace(/\s+/g, '-').slice(0, 12).toUpperCase()}`
+      });
+
+      setShowAddModal(false);
+      setLocName('');
+      setLocCode('');
+      onRefreshData();
+    } catch (error) {
+      console.error('Failed to create location in Firestore:', error);
+      alert('Failed to create location. Check Firebase permissions.');
+    }
   };
 
   return (

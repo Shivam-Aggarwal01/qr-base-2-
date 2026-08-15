@@ -1,5 +1,10 @@
 import React, { useState, useEffect } from 'react';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { auth } from './firebase';
 import { InventoryStorage } from './services/storage';
+import { getUserProfile } from './services/firebaseInventory';
+import { readFirestoreState } from './services/firebaseCollections';
+import { FirebaseAuthPanel } from './components/FirebaseAuthPanel';
 import {
   User,
   CatalogItem,
@@ -29,6 +34,7 @@ import { NewRequestModal } from './components/NewRequestModal';
 export default function App() {
   const [users, setUsers] = useState<User[]>([]);
   const [activeUser, setActiveUser] = useState<User | null>(null);
+  const [firebaseUserProfile, setFirebaseUserProfile] = useState<User | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([]);
@@ -66,7 +72,24 @@ export default function App() {
   });
 
   // Load state from Storage
-  const refreshAllData = () => {
+  const refreshAllData = async () => {
+    try {
+      const firestoreState = await readFirestoreState();
+      if (firestoreState.catalogItems.length || firestoreState.locations.length || firestoreState.assets.length) {
+        setUsers(firestoreState.users || InventoryStorage.getUsers());
+        setLocations(firestoreState.locations || InventoryStorage.getLocations());
+        setCatalogItems(firestoreState.catalogItems || InventoryStorage.getCatalog());
+        setStockLevels(firestoreState.stockLevels || InventoryStorage.getStockLevels());
+        setAssets(firestoreState.assets || InventoryStorage.getAssets());
+        setAssignments(firestoreState.assignments || InventoryStorage.getAssignments());
+        setRequests(firestoreState.requests || InventoryStorage.getRequests());
+        setTransactions(firestoreState.transactions || InventoryStorage.getTransactions());
+        return;
+      }
+    } catch (error) {
+      console.warn('Firebase state unavailable, falling back to local storage.', error);
+    }
+
     const loadedUsers = InventoryStorage.getUsers();
     const loadedActive = InventoryStorage.getActiveUser();
     const loadedLocs = InventoryStorage.getLocations();
@@ -92,9 +115,28 @@ export default function App() {
     refreshAllData();
   }, []);
 
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        const profile = await getUserProfile(firebaseUser.uid);
+        if (profile) {
+          setFirebaseUserProfile(profile);
+          setActiveUser(profile);
+          return;
+        }
+      }
+
+      setFirebaseUserProfile(null);
+      setActiveUser(null);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
   const handleUserChange = (u: User) => {
     const newActive = InventoryStorage.setActiveUser(u.id);
     setActiveUser(newActive);
+    setFirebaseUserProfile(null);
   };
 
   const handleResetData = () => {
@@ -136,7 +178,26 @@ export default function App() {
     }
   };
 
-  if (!activeUser) return null;
+  const currentUser = firebaseUserProfile || activeUser;
+
+  const handleAuthSuccess = (user: User) => {
+    setFirebaseUserProfile(user);
+    setActiveUser(user);
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setFirebaseUserProfile(null);
+    setActiveUser(null);
+  };
+
+  if (!currentUser) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <FirebaseAuthPanel onAuthSuccess={handleAuthSuccess} />
+      </div>
+    );
+  }
 
   const pendingRequestsCount = requests.filter((r) => r.status === 'PENDING').length;
 
@@ -144,13 +205,14 @@ export default function App() {
     <div className="flex flex-col h-screen w-screen bg-[#f8fafc] text-slate-900 font-sans overflow-hidden antialiased select-none">
       {/* Top Navigation */}
       <Navbar
-        activeUser={activeUser}
+        activeUser={currentUser}
         users={users}
         onUserChange={handleUserChange}
         onOpenScanner={() => setIsScannerOpen(true)}
         onOpenNewRequest={() => setIsNewRequestOpen(true)}
         onSearch={handleGlobalSearch}
         onResetData={handleResetData}
+        onLogout={handleLogout}
       />
 
       {/* Main Body */}
@@ -207,7 +269,7 @@ export default function App() {
               requests={requests}
               catalogItems={catalogItems}
               users={users}
-              activeUser={activeUser}
+              activeUser={currentUser}
               onOpenNewRequest={() => setIsNewRequestOpen(true)}
               onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
@@ -285,7 +347,7 @@ export default function App() {
       <NewRequestModal
         isOpen={isNewRequestOpen}
         onClose={() => setIsNewRequestOpen(false)}
-        activeUser={activeUser}
+        activeUser={currentUser}
         catalogItems={catalogItems}
         onRefreshData={refreshAllData}
       />

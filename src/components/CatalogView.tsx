@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Plus, Search, QrCode, AlertTriangle, Box, Wrench, Package } from 'lucide-react';
 import { CatalogItem, Location, StockLevel, Asset, ItemType } from '../types/inventory';
 import { InventoryStorage } from '../services/storage';
+import { createCatalogItemInFirestore } from '../services/firebaseInventory';
 
 interface CatalogViewProps {
   catalogItems: CatalogItem[];
@@ -55,23 +56,30 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
     return true;
   });
 
-  const handleCreateCatalogItem = (e: React.FormEvent) => {
+  const handleCreateCatalogItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newItemCode.trim() || !newItemName.trim()) return alert('Code and Name are required');
 
-    InventoryStorage.saveCatalogItem({
-      item_code: newItemCode.trim().toUpperCase(),
-      name: newItemName.trim(),
-      type: newItemType,
-      description: newItemDesc,
-      unit: newItemUnit,
-      min_stock_alert: newItemMinStock
-    });
+    try {
+      await createCatalogItemInFirestore({
+        item_code: newItemCode.trim().toUpperCase(),
+        name: newItemName.trim(),
+        type: newItemType,
+        description: newItemDesc,
+        unit: newItemUnit,
+        min_stock_alert: newItemMinStock,
+        tracking_mode: newItemType === 'CONSUMABLE' ? null : 'INDIVIDUAL'
+      });
 
-    setShowAddModal(false);
-    setNewItemCode('');
-    setNewItemName('');
-    onRefreshData();
+      setShowAddModal(false);
+      setNewItemCode('');
+      setNewItemName('');
+      setNewItemDesc('');
+      onRefreshData();
+    } catch (error) {
+      console.error('Failed to create catalog item in Firestore:', error);
+      alert('Failed to create catalog item. Check Firebase permissions.');
+    }
   };
 
   const handleRestockSubmit = (e: React.FormEvent) => {

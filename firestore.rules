@@ -1,0 +1,76 @@
+rules_version = '2';
+service cloud.firestore {
+  function signedIn() {
+    return request.auth != null;
+  }
+
+  function roleOf() {
+    return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+  }
+
+  function isAdmin() {
+    return signedIn() && roleOf() == 'ADMIN';
+  }
+
+  function isStaff() {
+    return signedIn() && (roleOf() == 'ADMIN' || roleOf() == 'STUDENT_AMBASSADOR' || roleOf() == 'STUDENT_LEAD');
+  }
+
+  match /databases/{database}/documents {
+    match /users/{userId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.auth.uid == userId;
+      allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /catalog_items/{itemId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isStaff();
+    }
+
+    match /locations/{locationId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isStaff();
+    }
+
+    match /stock_levels/{stockId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isStaff();
+    }
+
+    match /assets/{assetId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isStaff();
+    }
+
+    match /asset_assignments/{assignmentId} {
+      allow read: if signedIn();
+      allow create, update, delete: if isAdmin() || isStaff();
+    }
+
+    match /requests/{requestId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
+      allow update: if signedIn() && (request.resource.data.user_id == request.auth.uid || isAdmin() || isStaff());
+      allow delete: if isAdmin();
+    }
+
+    match /requests/{requestId}/request_items/{requestItemId} {
+      allow read: if signedIn();
+      allow create, update, delete: if signedIn() && (isAdmin() || isStaff() || request.auth.uid == get(/databases/$(database)/documents/requests/$(requestId)).data.user_id);
+    }
+
+    match /inventory_transactions/{txId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (isAdmin() || isStaff());
+      allow update, delete: if isAdmin();
+    }
+
+    match /audit_logs/{logId} {
+      allow read: if signedIn();
+      allow create: if signedIn() && (isAdmin() || isStaff());
+      allow update, delete: if isAdmin();
+    }
+  }
+}

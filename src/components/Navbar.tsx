@@ -10,6 +10,7 @@ interface NavbarProps {
   onOpenNewRequest: () => void;
   onSearch: (query: string) => void;
   onResetData: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -19,7 +20,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenScanner,
   onOpenNewRequest,
   onSearch,
-  onResetData
+  onResetData,
+  onLogout
 }) => {
   const [searchVal, setSearchVal] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -146,6 +148,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               ))}
             </div>
+            {onLogout && (
+              <div className="px-3 pt-2 border-t border-[#1A1A1A]/10">
+                <button
+                  onClick={() => {
+                    onLogout();
+                    setShowUserDropdown(false);
+                  }}
+                  className="w-full px-3 py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

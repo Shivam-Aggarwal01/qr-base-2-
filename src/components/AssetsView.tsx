@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Search, QrCode, Box, Layers, ShieldCheck } from 'lucide-react';
 import { Asset, CatalogItem, Location, User, AssetStatus, AssetTrackingMode } from '../types/inventory';
-import { InventoryStorage } from '../services/storage';
+import { createAssetInFirestore } from '../services/firebaseInventory';
 
 interface AssetsViewProps {
   assets: Asset[];
@@ -53,26 +53,36 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     return true;
   });
 
-  const handleAddAssetSubmit = (e: React.FormEvent) => {
+  const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCatalogId || !newAssetCode.trim() || !newLocationId) {
       return alert('Item, Asset Code, and Storage Location are required');
     }
 
-    InventoryStorage.addAsset(
-      selectedCatalogId,
-      newAssetCode.trim().toUpperCase(),
-      newLocationId,
-      newSerialNum,
-      newNotes,
-      newTrackingMode,
-      newBoxCapacity
-    );
+    try {
+      await createAssetInFirestore({
+        asset_code: newAssetCode.trim().toUpperCase(),
+        catalog_item_id: selectedCatalogId,
+        serial_number: newSerialNum || null,
+        status: 'AVAILABLE',
+        location_id: newLocationId,
+        assigned_to_user_id: null,
+        tracking_mode: newTrackingMode,
+        is_box: newTrackingMode === 'BOX',
+        box_capacity: newTrackingMode === 'BOX' ? newBoxCapacity : 1,
+        available_in_box: newTrackingMode === 'BOX' ? newBoxCapacity : 1,
+        notes: newNotes || ''
+      });
 
-    setShowAddModal(false);
-    setNewAssetCode('');
-    setNewSerialNum('');
-    onRefreshData();
+      setShowAddModal(false);
+      setNewAssetCode('');
+      setNewSerialNum('');
+      setNewNotes('');
+      onRefreshData();
+    } catch (error) {
+      console.error('Failed to create asset in Firestore:', error);
+      alert('Failed to create asset. Check Firebase permissions.');
+    }
   };
 
   const getStatusBadge = (status: AssetStatus) => {
