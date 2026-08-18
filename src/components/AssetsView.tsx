@@ -41,7 +41,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
-      const cat = catalogItems.find((c) => c.id === asset.catalog_item_id);
+      const cat = catalogItems.find((c) => c.id === asset.catalog_item_id || c.item_code === asset.catalog_item_id);
       if (
         !asset.asset_code.toLowerCase().includes(q) &&
         !asset.serial_number?.toLowerCase().includes(q) &&

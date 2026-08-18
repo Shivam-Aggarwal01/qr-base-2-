@@ -12,17 +12,6 @@ import {
   TransactionType,
   RequestStatus
 } from '../types/inventory';
-import {
-  INITIAL_USERS,
-  INITIAL_LOCATIONS,
-  INITIAL_CATALOG,
-  INITIAL_STOCK,
-  INITIAL_ASSETS,
-  INITIAL_ASSIGNMENTS,
-  INITIAL_REQUESTS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_AUDIT_LOGS
-} from '../data/seedData';
 
 const STORAGE_KEYS = {
   USERS: 'lablogic_users_v1',
@@ -58,7 +47,7 @@ export class InventoryStorage {
 
   // --- Getters ---
   static getUsers(): User[] {
-    return this.load(STORAGE_KEYS.USERS, INITIAL_USERS);
+    return this.load(STORAGE_KEYS.USERS, [] as User[]);
   }
 
   static getActiveUser(): User {
@@ -68,59 +57,68 @@ export class InventoryStorage {
       const found = users.find((u) => u.id === savedId);
       if (found) return found;
     }
-    // Default to Dr. Aris Thorne (ADMIN) or first user
-    return users[0] || INITIAL_USERS[0];
+
+    return users[0] || {
+      id: 'guest-user',
+      user_code: 'GUEST',
+      name: 'Guest User',
+      email: 'guest@local.dev',
+      role: 'STUDENT',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
   }
 
   static setActiveUser(userId: string): User {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, userId);
     const users = this.getUsers();
-    return users.find((u) => u.id === userId) || users[0];
+    const found = users.find((u) => u.id === userId);
+    return found || this.getActiveUser();
   }
 
   static getLocations(): Location[] {
-    return this.load(STORAGE_KEYS.LOCATIONS, INITIAL_LOCATIONS);
+    return this.load(STORAGE_KEYS.LOCATIONS, [] as Location[]);
   }
 
   static getCatalog(): CatalogItem[] {
-    return this.load(STORAGE_KEYS.CATALOG, INITIAL_CATALOG);
+    return this.load(STORAGE_KEYS.CATALOG, [] as CatalogItem[]);
   }
 
   static getStockLevels(): StockLevel[] {
-    return this.load(STORAGE_KEYS.STOCK, INITIAL_STOCK);
+    return this.load(STORAGE_KEYS.STOCK, [] as StockLevel[]);
   }
 
   static getAssets(): Asset[] {
-    return this.load(STORAGE_KEYS.ASSETS, INITIAL_ASSETS);
+    return this.load(STORAGE_KEYS.ASSETS, [] as Asset[]);
   }
 
   static getAssignments(): AssetAssignment[] {
-    return this.load(STORAGE_KEYS.ASSIGNMENTS, INITIAL_ASSIGNMENTS);
+    return this.load(STORAGE_KEYS.ASSIGNMENTS, [] as AssetAssignment[]);
   }
 
   static getRequests(): Request[] {
-    return this.load(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
+    return this.load(STORAGE_KEYS.REQUESTS, [] as Request[]);
   }
 
   static getTransactions(): InventoryTransaction[] {
-    return this.load(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
+    return this.load(STORAGE_KEYS.TRANSACTIONS, [] as InventoryTransaction[]);
   }
 
   static getAuditLogs(): AuditLog[] {
-    return this.load(STORAGE_KEYS.AUDIT, INITIAL_AUDIT_LOGS);
+    return this.load(STORAGE_KEYS.AUDIT, [] as AuditLog[]);
   }
 
   // Reset demo state
   static resetAllData(): void {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
-    localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify(INITIAL_LOCATIONS));
-    localStorage.setItem(STORAGE_KEYS.CATALOG, JSON.stringify(INITIAL_CATALOG));
-    localStorage.setItem(STORAGE_KEYS.STOCK, JSON.stringify(INITIAL_STOCK));
-    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(INITIAL_ASSETS));
-    localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(INITIAL_ASSIGNMENTS));
-    localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(INITIAL_REQUESTS));
-    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(INITIAL_TRANSACTIONS));
-    localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(INITIAL_AUDIT_LOGS));
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.CATALOG, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.STOCK, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify([]));
   }
 
   // Audit logger
@@ -216,6 +214,19 @@ export class InventoryStorage {
     };
     this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...txs]);
     this.logAudit('ADJUST_STOCK', 'STOCK_LEVEL', stockItem.id);
+
+    // Optionally sync to Firestore (non-blocking)
+    try {
+      import('../services/firebaseCollections').then(async (module) => {
+        await module.updateDocument('stock_levels', stockItem!.id, {
+          quantity: stockItem!.quantity,
+          updated_at: now
+        });
+        console.log(`✅ Stock updated in Firestore: ${catalogItemId} -> ${stockItem!.quantity}`);
+      });
+    } catch (error) {
+      console.log('ℹ️ Stock update to Firestore skipped (local storage updated)');
+    }
   }
 
   // Issue Reusable Asset (or take units from a Box asset)
@@ -448,6 +459,30 @@ export class InventoryStorage {
     req.approved_by_user_id = activeUser.id;
     if (remarks) req.remarks = remarks;
     req.updated_at = now;
+
+    if (status === 'COMPLETED' || status === 'PARTIAL') {
+      const catalogItems = this.getCatalog();
+      const defaultStore = this.getLocations()[0]?.id || 'default-storage';
+
+      req.items?.forEach((item) => {
+        const catalogItem = catalogItems.find((catalog) => catalog.id === item.catalog_item_id);
+        const storagePlace = catalogItem?.storage_place || defaultStore;
+
+        if (item.requested_qty > 0) {
+          this.adjustStock(
+            item.catalog_item_id,
+            storagePlace,
+            -item.requested_qty,
+            'ISSUE',
+            `Issued via request ${req.request_number}`
+          );
+        }
+      });
+    }
+
+    if (status === 'CANCELLED') {
+      req.remarks = remarks || 'Request rejected and no stock was deducted.';
+    }
 
     this.save(STORAGE_KEYS.REQUESTS, requests);
     this.logAudit(`FULFILL_REQUEST_${status}`, 'REQUEST', requestId);

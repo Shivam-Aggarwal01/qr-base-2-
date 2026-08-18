@@ -36,8 +36,6 @@ export const UsersView: React.FC<UsersViewProps> = ({
         return 'bg-purple-100 text-purple-700';
       case 'STUDENT_AMBASSADOR':
         return 'bg-blue-100 text-blue-700';
-      case 'STUDENT_LEAD':
-        return 'bg-amber-100 text-amber-700';
       default:
         return 'bg-slate-100 text-slate-700';
     }

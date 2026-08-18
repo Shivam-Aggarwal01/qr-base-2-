@@ -10,7 +10,7 @@ import {
   setDoc,
   updateDoc
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { auth, db } from '../firebase';
 import type {
   Asset,
   AssetAssignment,
@@ -37,14 +37,63 @@ const collectionName = {
 
 export const firebaseCollections = collectionName;
 
+function requireSignedInUser(): void {
+  if (!auth.currentUser) {
+    throw new Error('Firestore access blocked: user is not signed in.');
+  }
+}
+
+function getMs(val: any): number {
+  if (!val) return 0;
+  if (typeof val.toMillis === 'function') return val.toMillis();
+  if (typeof val.toDate === 'function') return val.toDate().getTime();
+  if (val.seconds !== undefined) return val.seconds * 1000;
+  const time = new Date(val).getTime();
+  return isNaN(time) ? 0 : time;
+}
+
+function tsToString(val: any): string {
+  if (!val) return new Date().toISOString();
+  if (typeof val === 'string') return val;
+  if (typeof val.toDate === 'function') return val.toDate().toISOString();
+  if (val.seconds !== undefined) return new Date(val.seconds * 1000).toISOString();
+  return new Date().toISOString();
+}
+
 export async function getCollection<T>(name: string): Promise<T[]> {
   try {
-    const q = query(collection(db, name), orderBy('created_at', 'desc'));
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map((document) => ({
-      id: document.id,
-      ...(document.data() as T)
-    })) as T[];
+    requireSignedInUser();
+    const snapshot = await getDocs(collection(db, name));
+    console.log(`📂 Firestore read ${name}: ${snapshot.size} docs`);
+
+    const items = snapshot.docs.map((document) => {
+      const raw = document.data();
+
+      // Normalize: trim whitespace from all keys (fixes keys like 'name ')
+      const cleaned: Record<string, any> = {};
+      for (const [key, value] of Object.entries(raw)) {
+        cleaned[key.trim()] = value;
+      }
+
+      // Convert Firestore Timestamps to ISO strings
+      if (cleaned.created_at) cleaned.created_at = tsToString(cleaned.created_at);
+      if (cleaned.updated_at) cleaned.updated_at = tsToString(cleaned.updated_at);
+      if (cleaned.assigned_at) cleaned.assigned_at = tsToString(cleaned.assigned_at);
+      if (cleaned.returned_at) cleaned.returned_at = tsToString(cleaned.returned_at);
+
+      return {
+        ...cleaned,
+        id: document.id,  // Firestore doc ID MUST always win
+      };
+    }) as any[];
+
+    items.sort((a, b) => {
+      const timeA = getMs(a.created_at || a.assigned_at || a.updated_at);
+      const timeB = getMs(b.created_at || b.assigned_at || b.updated_at);
+      return timeB - timeA;
+    });
+
+    return items as T[];
   } catch (error) {
     console.warn(`Firestore read failed for ${name}:`, error);
     return [];
@@ -53,6 +102,7 @@ export async function getCollection<T>(name: string): Promise<T[]> {
 
 export async function getUserProfileFromFirestore(uid: string): Promise<User | null> {
   try {
+    requireSignedInUser();
     const snapshot = await getDoc(doc(db, 'users', uid));
     if (!snapshot.exists()) return null;
     return {
@@ -66,6 +116,7 @@ export async function getUserProfileFromFirestore(uid: string): Promise<User | n
 }
 
 export async function saveUserProfileToFirestore(user: User): Promise<void> {
+  requireSignedInUser();
   await setDoc(doc(db, 'users', user.id), {
     ...user,
     updated_at: new Date().toISOString(),
@@ -167,6 +218,7 @@ export async function createAuditLogFirestore(payload: {
 }
 
 export async function updateDocument<T>(collectionName: string, documentId: string, updates: Partial<T>): Promise<void> {
+  requireSignedInUser();
   const ref = doc(db, collectionName, documentId);
   await updateDoc(ref, {
     ...updates,
@@ -175,6 +227,19 @@ export async function updateDocument<T>(collectionName: string, documentId: stri
 }
 
 export async function readFirestoreState() {
+  if (!auth.currentUser) {
+    return {
+      catalogItems: [],
+      locations: [],
+      stockLevels: [],
+      assets: [],
+      assignments: [],
+      requests: [],
+      transactions: [],
+      users: []
+    };
+  }
+
   const [catalogItems, locations, stockLevels, assets, assignments, requests, transactions, users] = await Promise.all([
     getCollection<CatalogItem>('catalog_items'),
     getCollection<Location>('locations'),
@@ -196,4 +261,15 @@ export async function readFirestoreState() {
     transactions,
     users
   };
+}
+
+export async function createFirestoreDocument<T>(collectionName: string, data: T): Promise<string> {
+  const payload = {
+    ...data,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString()
+  };
+
+  const docRef = await addDoc(collection(db, collectionName), payload as Record<string, unknown>);
+  return docRef.id;
 }

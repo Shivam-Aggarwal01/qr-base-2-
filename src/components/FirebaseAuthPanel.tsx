@@ -6,7 +6,6 @@ import {
   logoutFromFirebase,
   type FirebaseUserProfile
 } from '../services/firebaseInventory';
-import type { UserRole } from '../types/inventory';
 
 interface FirebaseAuthPanelProps {
   onAuthSuccess?: (user: FirebaseUserProfile) => void;
@@ -17,7 +16,6 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ onAuthSucc
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<UserRole>('STUDENT');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [user, setUser] = useState<FirebaseUserProfile | null>(null);
@@ -28,7 +26,7 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ onAuthSucc
 
     try {
       const result = mode === 'signup'
-        ? await createFirebaseAccount(email, password, role, name)
+        ? await createFirebaseAccount(email, password, 'STUDENT', name)
         : await loginToFirebase(email, password);
 
       setUser(result);
@@ -116,22 +114,6 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ onAuthSucc
             />
           </div>
 
-          {mode === 'signup' && (
-            <div>
-              <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 mb-1">Role</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value as UserRole)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-800 outline-none focus:border-blue-500"
-              >
-                <option value="STUDENT">STUDENT</option>
-                <option value="STUDENT_LEAD">STUDENT_LEAD</option>
-                <option value="STUDENT_AMBASSADOR">STUDENT_AMBASSADOR</option>
-                <option value="ADMIN">ADMIN</option>
-              </select>
-            </div>
-          )}
-
           {error && (
             <div className="rounded-xl border border-red-200 bg-red-50 text-red-600 text-sm p-3">
               {error}
@@ -152,8 +134,12 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ onAuthSucc
               setError('');
               try {
                 const result = await loginWithGoogle();
-                setUser(result);
-                onAuthSuccess?.(result);
+                if (result) {
+                  setUser(result);
+                  onAuthSuccess?.(result);
+                } else {
+                  setError('Google sign-in was redirected. Complete the sign-in flow in the browser window.');
+                }
               } catch (err: any) {
                 setError(err?.message || 'Google sign-in failed.');
               } finally {

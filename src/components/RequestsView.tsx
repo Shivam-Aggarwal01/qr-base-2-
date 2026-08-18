@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { Plus, ClipboardList, Check, X, QrCode } from 'lucide-react';
+import { Plus, ClipboardList, Check, X, QrCode, AlertTriangle } from 'lucide-react';
 import { Request, CatalogItem, User, RequestStatus } from '../types/inventory';
+import { canApproveRequests } from '../services/authRoles';
+import { updateDocument } from '../services/firebaseCollections';
 import { InventoryStorage } from '../services/storage';
 import confetti from 'canvas-confetti';
 
@@ -26,20 +28,86 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   const [statusFilter, setStatusFilter] = useState<RequestStatus | 'ALL'>('ALL');
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
   const [fulfillmentRemarks, setFulfillmentRemarks] = useState('');
+  const [processingError, setProcessingError] = useState<string | null>(null);
+  const canProcessRequests = canApproveRequests(activeUser?.role);
+
+  const getDefaultApprovalRemarks = (req: Request) => {
+    const totalItems = req.items?.reduce((sum, item) => sum + (item.requested_qty || 0), 0) ?? 0;
+    return `Issued ${totalItems} item${totalItems === 1 ? '' : 's'} from stock and approved for ${req.request_number}.`;
+  };
+
+  const openProcessRequest = (req: Request) => {
+    setSelectedRequest(req);
+    setFulfillmentRemarks(getDefaultApprovalRemarks(req));
+  };
 
   const filteredRequests = requests.filter((r) => {
     if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
     return true;
   });
 
-  const handleFulfill = (req: Request, newStatus: RequestStatus) => {
-    InventoryStorage.fulfillRequest(req.id, newStatus, fulfillmentRemarks || 'Fulfill approved by personnel');
-    if (newStatus === 'COMPLETED') {
-      confetti({ particleCount: 30, spread: 50 });
+  const handleFulfill = async (req: Request, newStatus: RequestStatus) => {
+    setProcessingError(null);
+    try {
+      const finalRemark = fulfillmentRemarks.trim() || getDefaultApprovalRemarks(req);
+
+      console.log(`🔄 Approving request ${req.request_number} -> ${newStatus}`);
+
+      await updateDocument('requests', req.id, {
+        status: newStatus,
+        approved_by_user_id: activeUser.id,
+        remarks: finalRemark,
+        updated_at: new Date().toISOString()
+      });
+
+      // Handle stock adjustments AFTER request is updated
+      if (req.items && req.items.length > 0) {
+        for (const item of req.items) {
+          if (item.catalog_item_id && item.requested_qty) {
+            if (newStatus === 'COMPLETED') {
+              // Deduct stock when approved
+              console.log(`📉 Deducting ${item.requested_qty} units from ${item.catalog_item_id}`);
+              InventoryStorage.adjustStock(
+                item.catalog_item_id,
+                'default-location-1',
+                -Math.abs(item.requested_qty),
+                'ISSUE',
+                `Issued to requisition ${req.request_number}`
+              );
+            } else if (newStatus === 'CANCELLED' && req.status === 'COMPLETED') {
+              // Add stock back if returning a previously approved request
+              console.log(`📈 Returning ${item.requested_qty} units to ${item.catalog_item_id}`);
+              InventoryStorage.adjustStock(
+                item.catalog_item_id,
+                'default-location-1',
+                Math.abs(item.requested_qty),
+                'RETURN',
+                `Returned from requisition ${req.request_number}`
+              );
+            }
+          }
+        }
+      }
+
+      if (newStatus === 'COMPLETED') {
+        confetti({ particleCount: 30, spread: 50 });
+        console.log('✅ Request approved and stock adjusted');
+      }
+
+      // Close modal first
+      setSelectedRequest(null);
+      setFulfillmentRemarks('');
+
+      // Then refresh data immediately (no timeout - synchronous)
+      console.log('🔄 Refreshing inventory...');
+      onRefreshData();
+
+    } catch (error: any) {
+      console.error('Failed to process request:', error);
+      setProcessingError(
+        error?.message || 'Failed to process requisition. Check your Firebase rules and permissions.'
+      );
     }
-    setSelectedRequest(null);
-    setFulfillmentRemarks('');
-    onRefreshData();
   };
 
   const getStatusBadge = (status: RequestStatus) => {
@@ -133,9 +201,9 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                   >
                     <QrCode className="w-4 h-4 text-[#D4AF37]" /> QR Slip
                   </button>
-                  {req.status === 'PENDING' && (
+                  {req.status === 'PENDING' && canProcessRequests && (
                     <button
-                      onClick={() => setSelectedRequest(req)}
+                      onClick={() => openProcessRequest(req)}
                       className="px-4 py-2 bg-[#1A1A1A] text-[#D4AF37] border border-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#1A1A1A] text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
                     >
                       Process Slip
@@ -186,6 +254,12 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
             <h3 className="font-serif font-bold text-[#1A1A1A] text-lg border-b border-[#1A1A1A]/15 pb-2">
               Process Requisition Slip {selectedRequest.request_number}
             </h3>
+            {processingError && (
+              <div className="flex items-start gap-2 p-3 bg-red-50 border border-red-200 text-red-800 text-xs">
+                <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
+                <span>{processingError}</span>
+              </div>
+            )}
             <p className="text-xs text-[#6C6863]">
               Requisitioner: <span className="font-bold text-[#1A1A1A] font-serif">{users.find((u) => u.id === selectedRequest.user_id)?.name}</span>
             </p>
@@ -215,20 +289,26 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
 
             <div className="pt-2 flex gap-2">
               <button
-                onClick={() => setSelectedRequest(null)}
+                onClick={() => {
+                  setSelectedRequest(null);
+                  setFulfillmentRemarks('');
+                  setProcessingError(null);
+                }}
                 className="py-2.5 px-4 border border-[#1A1A1A] text-[#1A1A1A] text-xs font-mono font-bold uppercase"
               >
                 Close
               </button>
               <button
                 onClick={() => handleFulfill(selectedRequest, 'CANCELLED')}
-                className="flex-1 py-2.5 border border-red-800 text-red-800 hover:bg-red-800 hover:text-white text-xs font-mono font-bold uppercase transition-colors"
+                disabled={!!processingError}
+                className="flex-1 py-2.5 border border-red-800 text-red-800 hover:bg-red-800 hover:text-white text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50"
               >
                 Reject
               </button>
               <button
                 onClick={() => handleFulfill(selectedRequest, 'COMPLETED')}
-                className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-mono font-bold uppercase transition-colors"
+                disabled={!!processingError}
+                className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-mono font-bold uppercase transition-colors disabled:opacity-50"
               >
                 Approve & Issue
               </button>

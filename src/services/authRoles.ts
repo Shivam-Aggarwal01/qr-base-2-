@@ -1,9 +1,8 @@
 import type { UserRole } from '../types/inventory';
 
 export const ROLE_PRIORITY: Record<UserRole, number> = {
-  ADMIN: 4,
-  STUDENT_AMBASSADOR: 3,
-  STUDENT_LEAD: 3,
+  ADMIN: 3,
+  STUDENT_AMBASSADOR: 2,
   STUDENT: 1
 };
 
@@ -15,6 +14,18 @@ export function hasMinimumRole(
   return ROLE_PRIORITY[currentRole] >= ROLE_PRIORITY[minimumRole];
 }
 
+export function isStudent(role: UserRole | null | undefined): boolean {
+  return role === 'STUDENT';
+}
+
+export function isAmbassador(role: UserRole | null | undefined): boolean {
+  return role === 'STUDENT_AMBASSADOR';
+}
+
+export function isAdmin(role: UserRole | null | undefined): boolean {
+  return role === 'ADMIN';
+}
+
 export function canIssueInventory(role: UserRole | null | undefined): boolean {
   return hasMinimumRole(role, 'STUDENT');
 }
@@ -24,7 +35,7 @@ export function canApproveRequests(role: UserRole | null | undefined): boolean {
 }
 
 export function canManageCatalog(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'ADMIN');
+  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
 }
 
 export function canManageUsers(role: UserRole | null | undefined): boolean {

@@ -27,7 +27,10 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
       const asset = assets.find((a) => a.id === tx.asset_id);
-      const cat = catalogItems.find((c) => c.id === (tx.catalog_item_id || asset?.catalog_item_id));
+      const cat = catalogItems.find((c) => 
+        c.id === (tx.catalog_item_id || asset?.catalog_item_id) ||
+        c.item_code === (tx.catalog_item_id || asset?.catalog_item_id)
+      );
       const user = users.find((u) => u.id === tx.issued_to_user_id || u.id === tx.processed_by_user_id);
       if (
         !cat?.name.toLowerCase().includes(q) &&
@@ -45,7 +48,10 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
     const headers = ['Transaction ID', 'Type', 'Item/Asset Code', 'Item Name', 'Quantity', 'From Location', 'To Location', 'User', 'Processed By', 'Remarks', 'Timestamp'];
     const rows = filteredTxs.map((tx) => {
       const asset = assets.find((a) => a.id === tx.asset_id);
-      const cat = catalogItems.find((c) => c.id === (tx.catalog_item_id || asset?.catalog_item_id));
+      const cat = catalogItems.find((c) => 
+        c.id === (tx.catalog_item_id || asset?.catalog_item_id) ||
+        c.item_code === (tx.catalog_item_id || asset?.catalog_item_id)
+      );
       const fromLoc = locations.find((l) => l.id === tx.from_location_id)?.name || '';
       const toLoc = locations.find((l) => l.id === tx.to_location_id)?.name || '';
       const user = users.find((u) => u.id === tx.issued_to_user_id)?.name || '';
@@ -158,7 +164,10 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
             <tbody className="divide-y divide-slate-50">
               {filteredTxs.map((tx) => {
                 const asset = assets.find((a) => a.id === tx.asset_id);
-                const cat = catalogItems.find((c) => c.id === (tx.catalog_item_id || asset?.catalog_item_id));
+                 const cat = catalogItems.find((c) => 
+                   c.id === (tx.catalog_item_id || asset?.catalog_item_id) ||
+                   c.item_code === (tx.catalog_item_id || asset?.catalog_item_id)
+                 );
                 const fromLoc = locations.find((l) => l.id === tx.from_location_id);
                 const toLoc = locations.find((l) => l.id === tx.to_location_id);
                 const user = users.find((u) => u.id === tx.issued_to_user_id);

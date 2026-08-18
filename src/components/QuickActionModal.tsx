@@ -48,7 +48,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
   // 1. ASSET QUICK ACTIONS (Supports Box-based Reusables + Individual Standalone Tools)
   const renderAssetActions = (asset: Asset) => {
-    const catalogItem = catalogItems.find((c) => c.id === asset.catalog_item_id);
+    const catalogItem = catalogItems.find((c) => c.id === asset.catalog_item_id || c.item_code === asset.catalog_item_id);
     const assignedUser = users.find((u) => u.id === asset.assigned_to_user_id);
     const location = locations.find((l) => l.id === asset.location_id);
     const isBox = asset.is_box || asset.tracking_mode === 'BOX' || (asset.box_capacity && asset.box_capacity > 1);
@@ -435,7 +435,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
   // 2. CATALOG ITEM ACTIONS
   const renderCatalogActions = (cat: CatalogItem) => {
-    const stockLevels = InventoryStorage.getStockLevels().filter((s) => s.catalog_item_id === cat.id);
+    const stockLevels = InventoryStorage.getStockLevels().filter((s) => s.catalog_item_id === cat.id || s.catalog_item_id === cat.item_code);
     const totalQty = stockLevels.reduce((acc, curr) => acc + curr.quantity, 0);
 
     const handleStockSubmit = (type: 'RECEIVE' | 'ISSUE') => {
@@ -562,7 +562,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               <p className="text-xs text-[#6C6863] italic">No assets stored in this location.</p>
             ) : (
               assetsInLoc.map((a) => {
-                const cat = catalogItems.find((c) => c.id === a.catalog_item_id);
+                const cat = catalogItems.find((c) => c.id === a.catalog_item_id || c.item_code === a.catalog_item_id);
                 return (
                   <div key={a.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs">
                     <div>
@@ -586,7 +586,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               <p className="text-xs text-[#6C6863] italic">No bulk stock in this location.</p>
             ) : (
               stockInLoc.map((s) => {
-                const cat = catalogItems.find((c) => c.id === s.catalog_item_id);
+                const cat = catalogItems.find((c) => c.id === s.catalog_item_id || c.item_code === s.catalog_item_id);
                 return (
                   <div key={s.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs">
                     <span className="font-bold text-[#1A1A1A]">{cat?.name}</span>
@@ -637,7 +637,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">Requested Component Items</h5>
           <div className="space-y-2">
             {req.items?.map((item) => {
-              const cat = catalogItems.find((c) => c.id === item.catalog_item_id);
+              const cat = catalogItems.find((c) => c.id === item.catalog_item_id || c.item_code === item.catalog_item_id);
               return (
                 <div key={item.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs font-semibold">
                   <span>{cat?.name || 'Item'}</span>
@@ -707,7 +707,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             ) : (
               userAssignments.map((asg) => {
                 const asset = InventoryStorage.getAssets().find((a) => a.id === asg.asset_id);
-                const cat = catalogItems.find((c) => c.id === asset?.catalog_item_id);
+                const cat = catalogItems.find((c) => c.id === asset?.catalog_item_id || c.item_code === asset?.catalog_item_id);
                 return (
                   <div key={asg.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between">
                     <div>

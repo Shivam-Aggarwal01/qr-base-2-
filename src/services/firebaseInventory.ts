@@ -3,6 +3,7 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User as FirebaseUser
 } from 'firebase/auth';
@@ -18,6 +19,7 @@ import {
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
 import type { User, UserRole } from '../types/inventory';
+import { resolveRoleFromEmail } from './roleConfig';
 
 export const COLLECTIONS = {
   USERS: 'users',
@@ -39,6 +41,7 @@ export function mapFirebaseUserToLabUser(
   role: UserRole = 'STUDENT'
 ): User {
   const email = firebaseUser.email ?? 'lab-user@local.demo';
+  const resolvedRole = resolveRoleFromEmail(email) || role;
   const baseName = firebaseUser.displayName ?? email.split('@')[0] ?? 'Lab User';
 
   return {
@@ -46,7 +49,7 @@ export function mapFirebaseUserToLabUser(
     user_code: `STU-${Date.now().toString().slice(-6)}`,
     name: baseName,
     email,
-    role,
+    role: resolvedRole,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString()
   };
@@ -58,10 +61,25 @@ export async function getUserProfile(uid: string): Promise<User | null> {
 
   if (!snapshot.exists()) return null;
 
-  return {
+  const current = snapshot.data() as User;
+  const email = current.email ?? '';
+  const resolvedRole = resolveRoleFromEmail(email) || current.role || 'STUDENT';
+  const normalizedProfile: User = {
     id: snapshot.id,
-    ...(snapshot.data() as Omit<User, 'id'>)
+    ...current,
+    email,
+    role: resolvedRole,
+    updated_at: new Date().toISOString()
   };
+
+  if (current.role !== resolvedRole || current.email !== email) {
+    await setDoc(userRef, {
+      ...normalizedProfile,
+      updated_at: serverTimestamp()
+    }, { merge: true });
+  }
+
+  return normalizedProfile;
 }
 
 export async function ensureUserProfile(
@@ -70,16 +88,31 @@ export async function ensureUserProfile(
 ): Promise<User> {
   const userRef = doc(db, COLLECTIONS.USERS, firebaseUser.uid);
   const snapshot = await getDoc(userRef);
+  const email = firebaseUser.email ?? 'lab-user@local.demo';
+  const resolvedRole = resolveRoleFromEmail(email) || role;
 
   if (snapshot.exists()) {
     const current = snapshot.data() as User;
-    return {
+    const finalRole = resolveRoleFromEmail(current.email ?? email) || current.role || resolvedRole;
+    const normalizedProfile: User = {
       id: snapshot.id,
-      ...current
+      ...current,
+      email: current.email ?? email,
+      role: finalRole,
+      updated_at: new Date().toISOString()
     };
+
+    if (current.role !== finalRole || current.email !== normalizedProfile.email) {
+      await setDoc(userRef, {
+        ...normalizedProfile,
+        updated_at: serverTimestamp()
+      }, { merge: true });
+    }
+
+    return normalizedProfile;
   }
 
-  const profile = mapFirebaseUserToLabUser(firebaseUser, role);
+  const profile = mapFirebaseUserToLabUser(firebaseUser, resolvedRole);
   await setDoc(userRef, {
     ...profile,
     created_at: serverTimestamp(),
@@ -97,8 +130,9 @@ export async function createFirebaseAccount(
 ): Promise<User> {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
   const user = userCredential.user;
+  const resolvedRole = resolveRoleFromEmail(email) || role;
 
-  const baseProfile = mapFirebaseUserToLabUser(user, role);
+  const baseProfile = mapFirebaseUserToLabUser(user, resolvedRole);
   const profile: User = {
     ...baseProfile,
     name: displayName || baseProfile.name,
@@ -122,13 +156,28 @@ export async function loginToFirebase(email: string, password: string): Promise<
   return profile;
 }
 
-export async function loginWithGoogle(): Promise<User> {
+export async function loginWithGoogle(): Promise<User | null> {
   const provider = new GoogleAuthProvider();
-  const result = await signInWithPopup(auth, provider);
-  const firebaseUser = result.user;
+  provider.setCustomParameters({
+    prompt: 'select_account'
+  });
 
-  const profile = await ensureUserProfile(firebaseUser, 'STUDENT');
-  return profile;
+  try {
+    const result = await signInWithPopup(auth, provider);
+    const profile = await ensureUserProfile(result.user, 'STUDENT');
+    return profile;
+  } catch (error: any) {
+    const isPopupBlocked = error?.code === 'auth/popup-blocked'
+      || error?.code === 'auth/cancelled-popup-request'
+      || error?.code === 'auth/popup-closed-by-user';
+
+    if (isPopupBlocked) {
+      await signInWithRedirect(auth, provider);
+      return null;
+    }
+
+    throw error;
+  }
 }
 
 export async function logoutFromFirebase(): Promise<void> {
@@ -152,24 +201,43 @@ export async function createCatalogItemInFirestore(
     unit?: string;
     tracking_mode?: 'BOX' | 'INDIVIDUAL';
     min_stock_alert?: number;
+    storage_place?: string | null;
   }
-): Promise<User | null> {
-  const docRef = await addDoc(collection(db, COLLECTIONS.CATALOG_ITEMS), {
-    id: '',
-    ...payload,
-    description: payload.description ?? '',
-    unit: payload.unit ?? 'pcs',
-    tracking_mode: payload.tracking_mode ?? null,
-    min_stock_alert: payload.min_stock_alert ?? 10,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
-  });
+): Promise<void> {
+  try {
+    console.log('🔐 Current auth:', {
+      uid: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified
+    });
 
-  await updateDoc(doc(db, COLLECTIONS.CATALOG_ITEMS, docRef.id), {
-    id: docRef.id
-  });
+    const docRef = await addDoc(collection(db, COLLECTIONS.CATALOG_ITEMS), {
+      id: '',
+      ...payload,
+      description: payload.description ?? '',
+      unit: payload.unit ?? 'pcs',
+      tracking_mode: payload.tracking_mode ?? null,
+      min_stock_alert: payload.min_stock_alert ?? 10,
+      storage_place: payload.storage_place ?? null,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp()
+    });
 
-  return null;
+    console.log('✅ Document created with ID:', docRef.id);
+
+    await updateDoc(doc(db, COLLECTIONS.CATALOG_ITEMS, docRef.id), {
+      id: docRef.id
+    });
+
+    console.log('✅ Document ID field updated');
+  } catch (error: any) {
+    console.error('❌ Firestore error details:', {
+      code: error?.code,
+      message: error?.message,
+      fullError: error
+    });
+    throw error;
+  }
 }
 
 export async function createLocationInFirestore(payload: { name: string; code?: string }): Promise<void> {
@@ -211,16 +279,7 @@ export async function createAssetInFirestore(payload: {
   });
 }
 
-export async function createFirestoreDocument<T>(collectionName: string, data: T): Promise<string> {
-  const payload = {
-    ...data,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
-  };
 
-  const docRef = await addDoc(collection(db, collectionName), payload as Record<string, unknown>);
-  return docRef.id;
-}
 
 export async function updateFirestoreDocument(
   collectionName: string,

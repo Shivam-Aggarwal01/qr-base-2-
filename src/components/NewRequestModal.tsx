@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { X, Plus, Trash2, Send, Package } from 'lucide-react';
 import { CatalogItem, User } from '../types/inventory';
-import { InventoryStorage } from '../services/storage';
+import { createRequestFirestore, updateDocument } from '../services/firebaseCollections';
 import confetti from 'canvas-confetti';
 
 interface NewRequestModalProps {
@@ -42,14 +42,29 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
     setRequestItems(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!purpose.trim()) return alert('Please enter project purpose');
     if (requestItems.some((i) => !i.catalog_item_id || i.requested_qty <= 0)) {
       return alert('Please select valid catalog items and quantities');
     }
 
-    InventoryStorage.createRequest(activeUser.id, purpose, requestItems, remarks);
+    const requestNumber = `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+    await createRequestFirestore({
+      request_number: requestNumber,
+      user_id: activeUser.id,
+      purpose,
+      status: 'PENDING',
+      remarks: remarks || '',
+      items: requestItems.map((item, idx) => ({
+        id: `reqi-${Date.now()}-${idx}`,
+        request_id: requestNumber,
+        catalog_item_id: item.catalog_item_id,
+        requested_qty: item.requested_qty
+      }))
+    });
+
     confetti({ particleCount: 30, spread: 50 });
     onRefreshData();
     onClose();

@@ -56,7 +56,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Low stock calculation
   const lowStockCatalogItems = catalogItems.filter((item) => {
     const itemStock = stockLevels
-      .filter((s) => s.catalog_item_id === item.id)
+      .filter((s) => s.catalog_item_id === item.id || s.catalog_item_id === item.item_code)
       .reduce((sum, s) => sum + s.quantity, 0);
     return item.min_stock_alert ? itemStock <= item.min_stock_alert : itemStock < 10;
   });
@@ -204,8 +204,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </thead>
               <tbody className="divide-y divide-[#1A1A1A]/10">
                 {transactions.slice(0, 6).map((tx) => {
-                  const asset = assets.find((a) => a.id === tx.asset_id);
-                  const catalogItem = catalogItems.find((c) => c.id === (tx.catalog_item_id || asset?.catalog_item_id));
+                  const asset = assets.find((a) => a.id === tx.asset_id || a.asset_code === tx.asset_id);
+                  const catalogItem = catalogItems.find((c) => 
+                    c.id === (tx.catalog_item_id || asset?.catalog_item_id) ||
+                    c.item_code === (tx.catalog_item_id || asset?.catalog_item_id)
+                  );
                   const user = users.find((u) => u.id === tx.issued_to_user_id || u.id === tx.processed_by_user_id);
                   const loc = locations.find((l) => l.id === (tx.to_location_id || tx.from_location_id));
 
@@ -266,7 +269,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="space-y-3 max-h-72 overflow-y-auto">
               {boxAssets.map((box) => {
-                const cat = catalogItems.find((c) => c.id === box.catalog_item_id);
+                const cat = catalogItems.find((c) => c.id === box.catalog_item_id || c.item_code === box.catalog_item_id);
                 const avail = box.available_in_box ?? box.box_capacity ?? 10;
                 const cap = box.box_capacity ?? 15;
 
@@ -307,7 +310,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="space-y-2.5 max-h-60 overflow-y-auto">
               {fixedAssets.map((asset) => {
-                const cat = catalogItems.find((c) => c.id === asset.catalog_item_id);
+                const cat = catalogItems.find((c) => c.id === asset.catalog_item_id || c.item_code === asset.catalog_item_id);
                 return (
                   <div key={asset.id} className="p-3 bg-[#F9F8F6] border border-[#1A1A1A]/10 flex items-center justify-between">
                     <div>

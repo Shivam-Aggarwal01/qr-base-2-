@@ -4,16 +4,25 @@ service cloud.firestore {
     return request.auth != null;
   }
 
-  function roleOf() {
-    return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+  function role() {
+    return request.auth.token.role;
+  }
+
+  function userRole() {
+    return signedIn() ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : null;
   }
 
   function isAdmin() {
-    return signedIn() && roleOf() == 'ADMIN';
+    return signedIn() && (role() == 'ADMIN' || userRole() == 'ADMIN');
   }
 
-  function isStaff() {
-    return signedIn() && (roleOf() == 'ADMIN' || roleOf() == 'STUDENT_AMBASSADOR' || roleOf() == 'STUDENT_LEAD');
+  function isAmbassador() {
+    return signedIn() && (
+      role() == 'ADMIN' ||
+      role() == 'STUDENT_AMBASSADOR' ||
+      userRole() == 'ADMIN' ||
+      userRole() == 'STUDENT_AMBASSADOR'
+    );
   }
 
   match /databases/{database}/documents {
@@ -26,50 +35,54 @@ service cloud.firestore {
 
     match /catalog_items/{itemId} {
       allow read: if signedIn();
-      allow create, update, delete: if isAdmin() || isStaff();
+      allow create, update, delete: if signedIn();
     }
 
     match /locations/{locationId} {
       allow read: if signedIn();
-      allow create, update, delete: if isAdmin() || isStaff();
+      allow create, update, delete: if isAdmin() || isAmbassador();
     }
 
     match /stock_levels/{stockId} {
       allow read: if signedIn();
-      allow create, update, delete: if isAdmin() || isStaff();
+      allow create, update, delete: if signedIn();
     }
 
     match /assets/{assetId} {
       allow read: if signedIn();
-      allow create, update, delete: if isAdmin() || isStaff();
+      allow create, update, delete: if isAdmin() || isAmbassador();
     }
 
     match /asset_assignments/{assignmentId} {
       allow read: if signedIn();
-      allow create, update, delete: if isAdmin() || isStaff();
+      allow create, update, delete: if isAdmin() || isAmbassador();
     }
 
     match /requests/{requestId} {
       allow read: if signedIn();
-      allow create: if signedIn() && request.resource.data.user_id == request.auth.uid;
-      allow update: if signedIn() && (request.resource.data.user_id == request.auth.uid || isAdmin() || isStaff());
-      allow delete: if isAdmin();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if signedIn();
     }
 
     match /requests/{requestId}/request_items/{requestItemId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn() && (isAdmin() || isStaff() || request.auth.uid == get(/databases/$(database)/documents/requests/$(requestId)).data.user_id);
+      allow create, update, delete: if signedIn() && (
+        isAdmin() ||
+        isAmbassador() ||
+        request.auth.uid == get(/databases/$(database)/documents/requests/$(requestId)).data.user_id
+      );
     }
 
     match /inventory_transactions/{txId} {
       allow read: if signedIn();
-      allow create: if signedIn() && (isAdmin() || isStaff());
+      allow create: if signedIn() && (isAdmin() || isAmbassador());
       allow update, delete: if isAdmin();
     }
 
     match /audit_logs/{logId} {
       allow read: if signedIn();
-      allow create: if signedIn() && (isAdmin() || isStaff());
+      allow create: if signedIn() && (isAdmin() || isAmbassador());
       allow update, delete: if isAdmin();
     }
   }

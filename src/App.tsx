@@ -2,9 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
 import { InventoryStorage } from './services/storage';
-import { getUserProfile } from './services/firebaseInventory';
+import { ensureUserProfile, getUserProfile } from './services/firebaseInventory';
 import { readFirestoreState } from './services/firebaseCollections';
 import { FirebaseAuthPanel } from './components/FirebaseAuthPanel';
+import { resolveRoleFromEmail } from './services/roleConfig';
 import {
   User,
   CatalogItem,
@@ -25,6 +26,7 @@ import { RequestsView } from './components/RequestsView';
 import { LocationsView } from './components/LocationsView';
 import { ActivityView } from './components/ActivityView';
 import { UsersView } from './components/UsersView';
+import { isStudent } from './services/authRoles';
 import { BatchQRLabelsModal } from './components/BatchQRLabelsModal';
 import { QRScannerModal } from './components/QRScannerModal';
 import { QRGeneratorModal } from './components/QRGeneratorModal';
@@ -73,42 +75,58 @@ export default function App() {
 
   // Load state from Storage
   const refreshAllData = async () => {
-    try {
-      const firestoreState = await readFirestoreState();
-      if (firestoreState.catalogItems.length || firestoreState.locations.length || firestoreState.assets.length) {
-        setUsers(firestoreState.users || InventoryStorage.getUsers());
-        setLocations(firestoreState.locations || InventoryStorage.getLocations());
-        setCatalogItems(firestoreState.catalogItems || InventoryStorage.getCatalog());
-        setStockLevels(firestoreState.stockLevels || InventoryStorage.getStockLevels());
-        setAssets(firestoreState.assets || InventoryStorage.getAssets());
-        setAssignments(firestoreState.assignments || InventoryStorage.getAssignments());
-        setRequests(firestoreState.requests || InventoryStorage.getRequests());
-        setTransactions(firestoreState.transactions || InventoryStorage.getTransactions());
-        return;
-      }
-    } catch (error) {
-      console.warn('Firebase state unavailable, falling back to local storage.', error);
+    console.log('🔄 Refreshing all data... currentUser:', auth.currentUser?.email);
+    
+    if (!auth.currentUser) {
+      console.log('⚠️ No auth user, loading from local storage');
+      const fallbackUsers = InventoryStorage.getUsers();
+      setUsers(fallbackUsers);
+      setActiveUser(fallbackUsers[0] ?? null);
+      setLocations(InventoryStorage.getLocations());
+      setCatalogItems(InventoryStorage.getCatalog());
+      setStockLevels(InventoryStorage.getStockLevels());
+      setAssets(InventoryStorage.getAssets());
+      setAssignments(InventoryStorage.getAssignments());
+      setRequests(InventoryStorage.getRequests());
+      setTransactions(InventoryStorage.getTransactions());
+      return;
     }
 
-    const loadedUsers = InventoryStorage.getUsers();
-    const loadedActive = InventoryStorage.getActiveUser();
-    const loadedLocs = InventoryStorage.getLocations();
-    const loadedCat = InventoryStorage.getCatalog();
-    const loadedStock = InventoryStorage.getStockLevels();
-    const loadedAssets = InventoryStorage.getAssets();
-    const loadedAsg = InventoryStorage.getAssignments();
-    const loadedReq = InventoryStorage.getRequests();
-    const loadedTx = InventoryStorage.getTransactions();
+    try {
+      const firestoreState = await readFirestoreState();
+      
+      console.log('📊 Firestore data loaded:', {
+        catalogItems: firestoreState.catalogItems?.length || 0,
+        locations: firestoreState.locations?.length || 0,
+        stockLevels: firestoreState.stockLevels?.length || 0,
+        assets: firestoreState.assets?.length || 0,
+        requests: firestoreState.requests?.length || 0,
+        transactions: firestoreState.transactions?.length || 0,
+        users: firestoreState.users?.length || 0,
+      });
 
-    setUsers(loadedUsers);
-    setActiveUser(loadedActive);
-    setLocations(loadedLocs);
-    setCatalogItems(loadedCat);
-    setStockLevels(loadedStock);
-    setAssets(loadedAssets);
-    setAssignments(loadedAsg);
-    setRequests(loadedReq);
-    setTransactions(loadedTx);
+      // Use Firestore data directly — it is the source of truth
+      setCatalogItems(firestoreState.catalogItems || []);
+      setLocations(firestoreState.locations || []);
+      setStockLevels(firestoreState.stockLevels || []);
+      setAssets(firestoreState.assets || []);
+      setAssignments(firestoreState.assignments || []);
+      setRequests(firestoreState.requests || []);
+      setTransactions(firestoreState.transactions || []);
+      setUsers(firestoreState.users || []);
+    } catch (error) {
+      console.error('❌ Firebase state unavailable, using local fallback state.', error);
+      const fallbackUsers = InventoryStorage.getUsers();
+      setUsers(fallbackUsers);
+      setActiveUser(fallbackUsers[0] ?? null);
+      setLocations(InventoryStorage.getLocations());
+      setCatalogItems(InventoryStorage.getCatalog());
+      setStockLevels(InventoryStorage.getStockLevels());
+      setAssets(InventoryStorage.getAssets());
+      setAssignments(InventoryStorage.getAssignments());
+      setRequests(InventoryStorage.getRequests());
+      setTransactions(InventoryStorage.getTransactions());
+    }
   };
 
   useEffect(() => {
@@ -118,16 +136,25 @@ export default function App() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
-        const profile = await getUserProfile(firebaseUser.uid);
-        if (profile) {
-          setFirebaseUserProfile(profile);
-          setActiveUser(profile);
+        const existingProfile = await getUserProfile(firebaseUser.uid);
+        if (existingProfile) {
+          setFirebaseUserProfile(existingProfile);
+          setActiveUser(existingProfile);
+          await refreshAllData();
           return;
         }
+
+        const fallbackRole = resolveRoleFromEmail(firebaseUser.email ?? '') || 'STUDENT';
+        const fallbackProfile = await ensureUserProfile(firebaseUser, fallbackRole);
+        setFirebaseUserProfile(fallbackProfile);
+        setActiveUser(fallbackProfile);
+        await refreshAllData();
+        return;
       }
 
       setFirebaseUserProfile(null);
       setActiveUser(null);
+      await refreshAllData();
     });
 
     return () => unsubscribe();
@@ -179,6 +206,13 @@ export default function App() {
   };
 
   const currentUser = firebaseUserProfile || activeUser;
+  const isStudentUser = isStudent(currentUser?.role);
+
+  useEffect(() => {
+    if (isStudentUser && currentView !== 'requests' && currentView !== 'dashboard') {
+      setCurrentView('requests');
+    }
+  }, [isStudentUser, currentView]);
 
   const handleAuthSuccess = (user: User) => {
     setFirebaseUserProfile(user);
@@ -223,6 +257,7 @@ export default function App() {
           onSelectView={setCurrentView}
           pendingRequestsCount={pendingRequestsCount}
           onOpenScanner={() => setIsScannerOpen(true)}
+          userRole={currentUser?.role}
         />
 
         {/* Center Content View */}
@@ -248,6 +283,7 @@ export default function App() {
               stockLevels={stockLevels}
               locations={locations}
               assets={assets}
+              userRole={currentUser?.role}
               onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
             />
