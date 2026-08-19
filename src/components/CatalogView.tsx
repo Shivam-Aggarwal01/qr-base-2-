@@ -1,13 +1,15 @@
 import React, { useState } from 'react';
 import { Plus, Search, QrCode, AlertTriangle, Box, Wrench, Package } from 'lucide-react';
-import { CatalogItem, Location, StockLevel, Asset, ItemType } from '../types/inventory';
+import { CatalogItem, Location, StockLevel, Asset, ItemType, UserRole } from '../types/inventory';
 import { InventoryStorage } from '../services/storage';
+import { createCatalogItemInFirestore } from '../services/firebaseInventory';
 
 interface CatalogViewProps {
   catalogItems: CatalogItem[];
   stockLevels: StockLevel[];
   locations: Location[];
   assets: Asset[];
+  userRole?: UserRole;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
   onRefreshData: () => void;
 }
@@ -17,6 +19,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   stockLevels,
   locations,
   assets,
+  userRole,
   onOpenQRGenerator,
   onRefreshData
 }) => {
@@ -32,6 +35,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   const [newItemDesc, setNewItemDesc] = useState('');
   const [newItemUnit, setNewItemUnit] = useState('pcs');
   const [newItemMinStock, setNewItemMinStock] = useState(10);
+  const [newItemStoragePlace, setNewItemStoragePlace] = useState('');
 
   // Restock Modal
   const [showRestockModal, setShowRestockModal] = useState(false);
@@ -43,11 +47,11 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
     if (selectedType !== 'ALL' && item.type !== selectedType) return false;
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
-      if (!item.name.toLowerCase().includes(q) && !item.item_code.toLowerCase().includes(q)) return false;
+      if (!(item.name || '').toLowerCase().includes(q) && !(item.item_code || '').toLowerCase().includes(q)) return false;
     }
     if (onlyLowStock) {
       const totalStock = stockLevels
-        .filter((s) => s.catalog_item_id === item.id)
+        .filter((s) => s.catalog_item_id === item.id || s.catalog_item_id === item.item_code)
         .reduce((sum, s) => sum + s.quantity, 0);
       const minStock = item.min_stock_alert ?? 10;
       if (totalStock > minStock) return false;
@@ -55,40 +59,176 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
     return true;
   });
 
-  const handleCreateCatalogItem = (e: React.FormEvent) => {
+  const handleCreateCatalogItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newItemCode.trim() || !newItemName.trim()) return alert('Code and Name are required');
+    console.log('🔍 Form submitted. userRole:', userRole);
+    
+    if (!newItemCode.trim() || !newItemName.trim()) {
+      alert('Code and Name are required');
+      return;
+    }
 
-    InventoryStorage.saveCatalogItem({
-      item_code: newItemCode.trim().toUpperCase(),
-      name: newItemName.trim(),
-      type: newItemType,
-      description: newItemDesc,
-      unit: newItemUnit,
-      min_stock_alert: newItemMinStock
-    });
+    if (!userRole || (userRole !== 'ADMIN' && userRole !== 'STUDENT_AMBASSADOR')) {
+      alert(`Only admins and student ambassadors can add items. Your role: ${userRole || 'NOT SET'}`);
+      return;
+    }
 
-    setShowAddModal(false);
-    setNewItemCode('');
-    setNewItemName('');
-    onRefreshData();
+    try {
+      const payload = {
+        item_code: newItemCode.trim().toUpperCase(),
+        name: newItemName.trim(),
+        type: newItemType,
+        description: newItemDesc,
+        unit: newItemUnit,
+        min_stock_alert: newItemMinStock,
+        storage_place: newItemStoragePlace.trim() || locations[0]?.name || null,
+        tracking_mode: newItemType === 'CONSUMABLE' ? undefined : ('INDIVIDUAL' as const)
+      };
+
+      console.log('📤 Sending to Firebase:', payload);
+      await createCatalogItemInFirestore(payload);
+      console.log('✅ Firebase write succeeded');
+      
+      // Also add to local state immediately to avoid filter issues
+      const newItem = {
+        id: `cat-${Date.now()}`,
+        item_code: payload.item_code,
+        name: payload.name,
+        type: payload.type,
+        description: payload.description || '',
+        unit: payload.unit || 'pcs',
+        min_stock_alert: payload.min_stock_alert || 10,
+        storage_place: payload.storage_place || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      
+      // Try to create a stock level entry
+      try {
+        const { createFirestoreDocument } = await import('../services/firebaseCollections');
+        await createFirestoreDocument('stock_levels', {
+          catalog_item_id: payload.item_code,
+          location_id: 'default-location-1',
+          quantity: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+        console.log('✅ Created stock level entry');
+      } catch (stockError) {
+        console.warn('⚠️ Stock level creation skipped:', stockError);
+      }
+
+      alert(`✓ Successfully created ${newItemCode} in Firebase catalog.`);
+
+      setShowAddModal(false);
+      setNewItemCode('');
+      setNewItemName('');
+      setNewItemDesc('');
+      setNewItemStoragePlace('');
+      onRefreshData();
+    } catch (error: any) {
+      console.error('❌ Firebase write failed:', error?.message || error);
+      try {
+        console.log('💾 Falling back to local storage...');
+        InventoryStorage.saveCatalogItem({
+          item_code: newItemCode.trim().toUpperCase(),
+          name: newItemName.trim(),
+          type: newItemType,
+          description: newItemDesc,
+          unit: newItemUnit,
+          min_stock_alert: newItemMinStock,
+          storage_place: newItemStoragePlace.trim() || locations[0]?.name || null
+        });
+
+        // Also save stock level locally
+        const tempId = `stk-${Date.now()}`;
+        InventoryStorage.adjustStock(
+          newItemCode.trim().toUpperCase(),
+          'default-location-1',
+          0,
+          'RECEIVE',
+          'Initial stock entry'
+        );
+
+        setShowAddModal(false);
+        setNewItemCode('');
+        setNewItemName('');
+        setNewItemDesc('');
+        setNewItemStoragePlace('');
+        onRefreshData();
+        alert(`✓ Saved locally (Firebase blocked: ${error?.message || 'permission denied'})`);
+      } catch (localError: any) {
+        console.error('❌ Local save also failed:', localError?.message);
+        alert(`✗ Failed to save. Error: ${localError?.message || 'unknown error'}`);
+      }
+    }
   };
 
-  const handleRestockSubmit = (e: React.FormEvent) => {
+  const handleRestockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCatalogItem || !targetLocId) return alert('Please select a target location');
+    if (!selectedCatalogItem || !targetLocId) {
+      alert('Please select a target location');
+      return;
+    }
 
-    InventoryStorage.adjustStock(
-      selectedCatalogItem.id,
-      targetLocId,
-      restockQty,
-      'RECEIVE',
-      `Restocked ${restockQty} ${selectedCatalogItem.unit}`
-    );
+    try {
+      console.log(`📈 Restocking: +${restockQty} to ${selectedCatalogItem.id}`);
+      
+      // Update local storage
+      InventoryStorage.adjustStock(
+        selectedCatalogItem.id,
+        targetLocId,
+        restockQty,
+        'RECEIVE',
+        `Restocked ${restockQty} ${selectedCatalogItem.unit}`
+      );
 
-    setShowRestockModal(false);
-    setSelectedCatalogItem(null);
-    onRefreshData();
+      // Also create/update in Firestore
+      const { createFirestoreDocument, updateDocument } = await import('../services/firebaseCollections');
+      
+      try {
+        // Try to find existing stock in Firestore by fetching all
+        const { getCollection } = await import('../services/firebaseCollections');
+        const allStocks = await getCollection<{
+          id: string;
+          catalog_item_id: string;
+          location_id: string;
+          quantity: number;
+        }>('stock_levels');
+        const existingStock = allStocks.find(
+          (s: any) => s.catalog_item_id === selectedCatalogItem.id && s.location_id === targetLocId
+        );
+
+        if (existingStock) {
+          // Update existing stock
+          await updateDocument('stock_levels', existingStock.id, {
+            quantity: existingStock.quantity + restockQty,
+            updated_at: new Date().toISOString()
+          });
+          console.log(`✅ Updated stock in Firestore: ${existingStock.id}`);
+        } else {
+          // Create new stock entry
+          await createFirestoreDocument('stock_levels', {
+            catalog_item_id: selectedCatalogItem.id,
+            location_id: targetLocId,
+            quantity: restockQty,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+          console.log(`✅ Created new stock entry in Firestore`);
+        }
+      } catch (fbError) {
+        console.warn('⚠️ Firestore update skipped (local storage updated):', fbError);
+      }
+
+      alert(`✓ Added ${restockQty} ${selectedCatalogItem.unit} to stock`);
+      setShowRestockModal(false);
+      setSelectedCatalogItem(null);
+      onRefreshData();
+    } catch (error: any) {
+      console.error('❌ Restock failed:', error);
+      alert(`Error: ${error?.message || 'Failed to restock'}`);
+    }
   };
 
   const getItemTypeBadge = (type: ItemType) => {
@@ -167,10 +307,15 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       {/* Catalog Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map((item) => {
-          const itemStocks = stockLevels.filter((s) => s.catalog_item_id === item.id);
-          const totalStock = itemStocks.reduce((a, b) => a + b.quantity, 0);
+          // Match stock by both ID and item_code (in case it was saved either way)
+          const itemStocks = stockLevels.filter((s) => 
+            s.catalog_item_id === item.id || s.catalog_item_id === item.item_code
+          );
+          const totalStock = itemStocks.reduce((a, b) => a + (b.quantity || 0), 0);
           const minStock = item.min_stock_alert ?? 10;
           const isLowStock = totalStock <= minStock;
+
+          console.log(`📊 Stock for ${item.item_code}:`, { totalStock, itemStocks: itemStocks.length });
 
           // For Reusables and Tools, count physical assets
           const itemAssets = assets.filter((a) => a.catalog_item_id === item.id);
@@ -317,6 +462,17 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   value={newItemMinStock}
                   onChange={(e) => setNewItemMinStock(Number(e.target.value))}
                   className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs font-mono font-bold outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-mono uppercase text-[#6C6863]">Storage Place</label>
+                <input
+                  type="text"
+                  value={newItemStoragePlace}
+                  onChange={(e) => setNewItemStoragePlace(e.target.value)}
+                  placeholder="e.g. Shelf A / Cabinet B / Room 204"
+                  className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs outline-none"
                 />
               </div>
 

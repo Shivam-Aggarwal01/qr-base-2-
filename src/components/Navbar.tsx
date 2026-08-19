@@ -10,6 +10,7 @@ interface NavbarProps {
   onOpenNewRequest: () => void;
   onSearch: (query: string) => void;
   onResetData: () => void;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -19,7 +20,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenScanner,
   onOpenNewRequest,
   onSearch,
-  onResetData
+  onResetData,
+  onLogout
 }) => {
   const [searchVal, setSearchVal] = useState('');
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -113,19 +115,23 @@ export const Navbar: React.FC<NavbarProps> = ({
         {showUserDropdown && (
           <div className="absolute right-0 top-16 w-80 bg-[#F9F8F6] border border-[#1A1A1A] shadow-2xl py-2 z-50">
             <div className="px-4 py-2 border-b border-[#1A1A1A]/10 flex items-center justify-between">
-              <span className="text-[10px] font-mono text-[#6C6863] uppercase tracking-[0.2em]">Switch Active User</span>
-              <button
-                onClick={() => {
-                  onResetData();
-                  setShowUserDropdown(false);
-                }}
-                className="text-[10px] text-red-700 hover:text-red-900 flex items-center gap-1 font-mono uppercase font-bold cursor-pointer"
-              >
-                <RefreshCw className="w-3 h-3" /> Reset Demo
-              </button>
+              <span className="text-[10px] font-mono text-[#6C6863] uppercase tracking-[0.2em]">
+                {activeUser.role === 'STUDENT' ? 'Account' : 'Switch Active User'}
+              </span>
+              {activeUser.role !== 'STUDENT' && (
+                <button
+                  onClick={() => {
+                    onResetData();
+                    setShowUserDropdown(false);
+                  }}
+                  className="text-[10px] text-red-700 hover:text-red-900 flex items-center gap-1 font-mono uppercase font-bold cursor-pointer"
+                >
+                  <RefreshCw className="w-3 h-3" /> Reset Demo
+                </button>
+              )}
             </div>
             <div className="max-h-64 overflow-y-auto divide-y divide-[#1A1A1A]/10">
-              {users.map((u) => (
+              {(activeUser.role === 'STUDENT' ? [activeUser] : users).map((u) => (
                 <button
                   key={u.id}
                   onClick={() => {
@@ -146,6 +152,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </button>
               ))}
             </div>
+            {onLogout && (
+              <div className="px-3 pt-2 border-t border-[#1A1A1A]/10">
+                <button
+                  onClick={() => {
+                    onLogout();
+                    setShowUserDropdown(false);
+                  }}
+                  className="w-full px-3 py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                >
+                  Logout
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

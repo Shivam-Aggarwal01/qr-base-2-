@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Plus, Trash2, Send, Package } from 'lucide-react';
 import { CatalogItem, User } from '../types/inventory';
-import { InventoryStorage } from '../services/storage';
+import { createRequestFirestore, updateDocument } from '../services/firebaseCollections';
 import confetti from 'canvas-confetti';
 
 interface NewRequestModalProps {
@@ -10,6 +10,7 @@ interface NewRequestModalProps {
   activeUser: User;
   catalogItems: CatalogItem[];
   onRefreshData: () => void;
+  initialItems?: { catalog_item_id: string; requested_qty: number }[];
 }
 
 export const NewRequestModal: React.FC<NewRequestModalProps> = ({
@@ -17,13 +18,26 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   onClose,
   activeUser,
   catalogItems,
-  onRefreshData
+  onRefreshData,
+  initialItems
 }) => {
   const [purpose, setPurpose] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [requestItems, setRequestItems] = useState<{ catalog_item_id: string; requested_qty: number }[]>([
-    { catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1 }
-  ]);
+  const getInitialItems = () => {
+    if (initialItems && initialItems.length > 0) return initialItems;
+    return [{ catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1 }];
+  };
+
+  const [requestItems, setRequestItems] = useState<{ catalog_item_id: string; requested_qty: number }[]>(getInitialItems());
+
+  // When the modal opens (or the prefilled items change), reset the form items.
+  useEffect(() => {
+    if (!isOpen) return;
+    setPurpose('');
+    setRemarks('');
+    setRequestItems(getInitialItems());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialItems, catalogItems]);
 
   if (!isOpen) return null;
 
@@ -42,14 +56,29 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
     setRequestItems(updated);
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!purpose.trim()) return alert('Please enter project purpose');
     if (requestItems.some((i) => !i.catalog_item_id || i.requested_qty <= 0)) {
       return alert('Please select valid catalog items and quantities');
     }
 
-    InventoryStorage.createRequest(activeUser.id, purpose, requestItems, remarks);
+    const requestNumber = `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+
+    await createRequestFirestore({
+      request_number: requestNumber,
+      user_id: activeUser.id,
+      purpose,
+      status: 'PENDING',
+      remarks: remarks || '',
+      items: requestItems.map((item, idx) => ({
+        id: `reqi-${Date.now()}-${idx}`,
+        request_id: requestNumber,
+        catalog_item_id: item.catalog_item_id,
+        requested_qty: item.requested_qty
+      }))
+    });
+
     confetti({ particleCount: 30, spread: 50 });
     onRefreshData();
     onClose();

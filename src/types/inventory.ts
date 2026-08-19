@@ -29,6 +29,7 @@ export interface CatalogItem {
   unit: string;
   tracking_mode?: AssetTrackingMode;
   min_stock_alert?: number;
+  storage_place?: string | null;
   created_at: string;
   updated_at: string;
 }

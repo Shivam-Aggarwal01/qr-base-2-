@@ -12,17 +12,6 @@ import {
   TransactionType,
   RequestStatus
 } from '../types/inventory';
-import {
-  INITIAL_USERS,
-  INITIAL_LOCATIONS,
-  INITIAL_CATALOG,
-  INITIAL_STOCK,
-  INITIAL_ASSETS,
-  INITIAL_ASSIGNMENTS,
-  INITIAL_REQUESTS,
-  INITIAL_TRANSACTIONS,
-  INITIAL_AUDIT_LOGS
-} from '../data/seedData';
 
 const STORAGE_KEYS = {
   USERS: 'lablogic_users_v1',
@@ -58,7 +47,7 @@ export class InventoryStorage {
 
   // --- Getters ---
   static getUsers(): User[] {
-    return this.load(STORAGE_KEYS.USERS, INITIAL_USERS);
+    return this.load(STORAGE_KEYS.USERS, [] as User[]);
   }
 
   static getActiveUser(): User {
@@ -68,59 +57,68 @@ export class InventoryStorage {
       const found = users.find((u) => u.id === savedId);
       if (found) return found;
     }
-    // Default to Dr. Aris Thorne (ADMIN) or first user
-    return users[0] || INITIAL_USERS[0];
+
+    return users[0] || {
+      id: 'guest-user',
+      user_code: 'GUEST',
+      name: 'Guest User',
+      email: 'guest@local.dev',
+      role: 'STUDENT',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
   }
 
   static setActiveUser(userId: string): User {
     localStorage.setItem(STORAGE_KEYS.ACTIVE_USER, userId);
     const users = this.getUsers();
-    return users.find((u) => u.id === userId) || users[0];
+    const found = users.find((u) => u.id === userId);
+    return found || this.getActiveUser();
   }
 
   static getLocations(): Location[] {
-    return this.load(STORAGE_KEYS.LOCATIONS, INITIAL_LOCATIONS);
+    return this.load(STORAGE_KEYS.LOCATIONS, [] as Location[]);
   }
 
   static getCatalog(): CatalogItem[] {
-    return this.load(STORAGE_KEYS.CATALOG, INITIAL_CATALOG);
+    return this.load(STORAGE_KEYS.CATALOG, [] as CatalogItem[]);
   }
 
   static getStockLevels(): StockLevel[] {
-    return this.load(STORAGE_KEYS.STOCK, INITIAL_STOCK);
+    return this.load(STORAGE_KEYS.STOCK, [] as StockLevel[]);
   }
 
   static getAssets(): Asset[] {
-    return this.load(STORAGE_KEYS.ASSETS, INITIAL_ASSETS);
+    return this.load(STORAGE_KEYS.ASSETS, [] as Asset[]);
   }
 
   static getAssignments(): AssetAssignment[] {
-    return this.load(STORAGE_KEYS.ASSIGNMENTS, INITIAL_ASSIGNMENTS);
+    return this.load(STORAGE_KEYS.ASSIGNMENTS, [] as AssetAssignment[]);
   }
 
   static getRequests(): Request[] {
-    return this.load(STORAGE_KEYS.REQUESTS, INITIAL_REQUESTS);
+    return this.load(STORAGE_KEYS.REQUESTS, [] as Request[]);
   }
 
   static getTransactions(): InventoryTransaction[] {
-    return this.load(STORAGE_KEYS.TRANSACTIONS, INITIAL_TRANSACTIONS);
+    return this.load(STORAGE_KEYS.TRANSACTIONS, [] as InventoryTransaction[]);
   }
 
   static getAuditLogs(): AuditLog[] {
-    return this.load(STORAGE_KEYS.AUDIT, INITIAL_AUDIT_LOGS);
+    return this.load(STORAGE_KEYS.AUDIT, [] as AuditLog[]);
   }
 
   // Reset demo state
   static resetAllData(): void {
-    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(INITIAL_USERS));
-    localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify(INITIAL_LOCATIONS));
-    localStorage.setItem(STORAGE_KEYS.CATALOG, JSON.stringify(INITIAL_CATALOG));
-    localStorage.setItem(STORAGE_KEYS.STOCK, JSON.stringify(INITIAL_STOCK));
-    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify(INITIAL_ASSETS));
-    localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify(INITIAL_ASSIGNMENTS));
-    localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(INITIAL_REQUESTS));
-    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(INITIAL_TRANSACTIONS));
-    localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify(INITIAL_AUDIT_LOGS));
+    localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.LOCATIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.CATALOG, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.STOCK, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.ASSETS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.ASSIGNMENTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify([]));
+    localStorage.setItem(STORAGE_KEYS.AUDIT, JSON.stringify([]));
   }
 
   // Audit logger
@@ -143,7 +141,7 @@ export class InventoryStorage {
   static saveCatalogItem(item: Partial<CatalogItem> & { name: string; item_code: string; type: CatalogItem['type'] }): CatalogItem {
     const items = this.getCatalog();
     const now = new Date().toISOString();
-    let savedItem: CatalogItem;
+    let savedItem: CatalogItem | undefined;
 
     if (item.id) {
       items.forEach((c, idx) => {
@@ -167,9 +165,13 @@ export class InventoryStorage {
       items.unshift(savedItem);
     }
 
+    if (!savedItem) {
+      throw new Error(`Catalog item not found for update: ${item.id}`);
+    }
+
     this.save(STORAGE_KEYS.CATALOG, items);
     this.logAudit(item.id ? 'UPDATE_CATALOG_ITEM' : 'CREATE_CATALOG_ITEM', 'CATALOG_ITEM', savedItem.id);
-    return savedItem!;
+    return savedItem;
   }
 
   // Stock Adjustment / Receive / Restock
@@ -216,6 +218,19 @@ export class InventoryStorage {
     };
     this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...txs]);
     this.logAudit('ADJUST_STOCK', 'STOCK_LEVEL', stockItem.id);
+
+    // Optionally sync to Firestore (non-blocking)
+    try {
+      import('../services/firebaseCollections').then(async (module) => {
+        await module.updateDocument('stock_levels', stockItem!.id, {
+          quantity: stockItem!.quantity,
+          updated_at: now
+        });
+        console.log(`✅ Stock updated in Firestore: ${catalogItemId} -> ${stockItem!.quantity}`);
+      });
+    } catch (error) {
+      console.log('ℹ️ Stock update to Firestore skipped (local storage updated)');
+    }
   }
 
   // Issue Reusable Asset (or take units from a Box asset)
@@ -449,6 +464,30 @@ export class InventoryStorage {
     if (remarks) req.remarks = remarks;
     req.updated_at = now;
 
+    if (status === 'COMPLETED' || status === 'PARTIAL') {
+      const catalogItems = this.getCatalog();
+      const defaultStore = this.getLocations()[0]?.id || 'default-storage';
+
+      req.items?.forEach((item) => {
+        const catalogItem = catalogItems.find((catalog) => catalog.id === item.catalog_item_id);
+        const storagePlace = catalogItem?.storage_place || defaultStore;
+
+        if (item.requested_qty > 0) {
+          this.adjustStock(
+            item.catalog_item_id,
+            storagePlace,
+            -item.requested_qty,
+            'ISSUE',
+            `Issued via request ${req.request_number}`
+          );
+        }
+      });
+    }
+
+    if (status === 'CANCELLED') {
+      req.remarks = remarks || 'Request rejected and no stock was deducted.';
+    }
+
     this.save(STORAGE_KEYS.REQUESTS, requests);
     this.logAudit(`FULFILL_REQUEST_${status}`, 'REQUEST', requestId);
     return req;
@@ -532,4 +571,56 @@ export class InventoryStorage {
 
     return { type: 'unknown', entity: null, rawCode: cleanData };
   }
+}
+
+export type QRParseEntities = {
+  assets?: Asset[];
+  catalog?: CatalogItem[];
+  locations?: Location[];
+  requests?: Request[];
+  users?: User[];
+};
+
+// Overload-like helper: keeps existing call sites working, but allows
+// QR parsing to use the in-memory Firestore state.
+export function parseQRCodeFromEntities(qrData: string, entities: QRParseEntities) {
+  const cleanData = qrData.trim();
+  const assets = entities.assets ?? InventoryStorage.getAssets();
+  const catalog = entities.catalog ?? InventoryStorage.getCatalog();
+  const locations = entities.locations ?? InventoryStorage.getLocations();
+  const requests = entities.requests ?? InventoryStorage.getRequests();
+  const users = entities.users ?? InventoryStorage.getUsers();
+
+  // 1. Check Asset Code or Serial Number
+  const foundAsset = assets.find(
+    (a) => a.asset_code.toLowerCase() === cleanData.toLowerCase() || a.serial_number?.toLowerCase() === cleanData.toLowerCase()
+  );
+  if (foundAsset) return { type: 'asset' as const, entity: foundAsset, rawCode: cleanData };
+
+  // 2. Check Catalog Item Code
+  const foundCatalog = catalog.find((c) => c.item_code.toLowerCase() === cleanData.toLowerCase());
+  if (foundCatalog) return { type: 'catalog' as const, entity: foundCatalog, rawCode: cleanData };
+
+  // 3. Check Location Code or Name
+  const foundLoc = locations.find(
+    (l) => l.code?.toLowerCase() === cleanData.toLowerCase() || l.name.toLowerCase() === cleanData.toLowerCase()
+  );
+  if (foundLoc) return { type: 'location' as const, entity: foundLoc, rawCode: cleanData };
+
+  // 4. Check Request Number
+  const foundReq = requests.find((r) => r.request_number.toLowerCase() === cleanData.toLowerCase());
+  if (foundReq) return { type: 'request' as const, entity: foundReq, rawCode: cleanData };
+
+  // 5. Check User Code
+  const foundUser = users.find((u) => u.user_code.toLowerCase() === cleanData.toLowerCase());
+  if (foundUser) return { type: 'user' as const, entity: foundUser, rawCode: cleanData };
+
+  // Search loose match
+  const fuzzyAsset = assets.find((a) => cleanData.toLowerCase().includes(a.asset_code.toLowerCase()));
+  if (fuzzyAsset) return { type: 'asset' as const, entity: fuzzyAsset, rawCode: cleanData };
+
+  const fuzzyCatalog = catalog.find((c) => cleanData.toLowerCase().includes(c.item_code.toLowerCase()));
+  if (fuzzyCatalog) return { type: 'catalog' as const, entity: fuzzyCatalog, rawCode: cleanData };
+
+  return { type: 'unknown' as const, entity: null, rawCode: cleanData };
 }

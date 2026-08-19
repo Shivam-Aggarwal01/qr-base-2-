@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { X, Check, AlertTriangle, QrCode, UserCheck, Package, Layers, ArrowUpRight, ShieldCheck, CornerDownLeft } from 'lucide-react';
-import { Asset, CatalogItem, Location, Request, User, AssetStatus } from '../types/inventory';
+import { Asset, CatalogItem, Location, Request, User, AssetStatus, StockLevel, InventoryTransaction } from '../types/inventory';
 import { InventoryStorage } from '../services/storage';
+import { canApproveRequests, canIssueInventory, canReturnOrRepairItems } from '../services/authRoles';
+import { updateDocument } from '../services/firebaseCollections';
 import confetti from 'canvas-confetti';
 
 interface QuickActionModalProps {
@@ -15,6 +17,11 @@ interface QuickActionModalProps {
   users: User[];
   locations: Location[];
   catalogItems: CatalogItem[];
+  assets: Asset[];
+  stockLevels: StockLevel[];
+  requests: Request[];
+  activeUser: User;
+  onOpenNewRequest: (items: { catalog_item_id: string; requested_qty: number }[]) => void;
   onRefreshData: () => void;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
 }
@@ -26,6 +33,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   users,
   locations,
   catalogItems,
+  assets,
+  stockLevels,
+  requests,
+  activeUser,
+  onOpenNewRequest,
   onRefreshData,
   onOpenQRGenerator
 }) => {
@@ -36,6 +48,30 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const [boxQtyInput, setBoxQtyInput] = useState<number>(1);
   const [remarksInput, setRemarksInput] = useState<string>('');
   const [statusInput, setStatusInput] = useState<AssetStatus>('DAMAGED');
+
+  const role = activeUser?.role;
+  const canApprove = canApproveRequests(role);
+  const canIssue = canIssueInventory(role);
+  const canReturnOrRepair = canReturnOrRepairItems(role);
+
+  const isStudent = role === 'STUDENT';
+
+  const myPendingRequestForCatalogItem = (catalogItemId: string): Request | null => {
+    if (!activeUser || activeUser.role !== 'STUDENT') return null;
+    return (
+      requests.find(
+        (r) =>
+          r.user_id === activeUser.id &&
+          (r.status === 'PENDING' || r.status === 'PARTIAL') &&
+          r.items?.some((it) => it.catalog_item_id === catalogItemId)
+      ) ?? null
+    );
+  };
+
+  const openRequestForCatalogItem = (catalogItemId: string, requested_qty: number) => {
+    onOpenNewRequest([{ catalog_item_id: catalogItemId, requested_qty }]);
+    onClose();
+  };
 
   if (!isOpen || !qrData) return null;
 
@@ -48,13 +84,109 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
   // 1. ASSET QUICK ACTIONS (Supports Box-based Reusables + Individual Standalone Tools)
   const renderAssetActions = (asset: Asset) => {
-    const catalogItem = catalogItems.find((c) => c.id === asset.catalog_item_id);
+    const catalogItem = catalogItems.find((c) => c.id === asset.catalog_item_id || c.item_code === asset.catalog_item_id);
     const assignedUser = users.find((u) => u.id === asset.assigned_to_user_id);
     const location = locations.find((l) => l.id === asset.location_id);
     const isBox = asset.is_box || asset.tracking_mode === 'BOX' || (asset.box_capacity && asset.box_capacity > 1);
 
     const availableInBox = asset.available_in_box ?? asset.box_capacity ?? 10;
     const boxCap = asset.box_capacity ?? 15;
+
+    // Student QR action: they can request the catalog item, but they cannot issue/return or change status.
+    if (isStudent) {
+      const requestCatalogItemId = catalogItem?.id;
+      const existingRequest = requestCatalogItemId ? myPendingRequestForCatalogItem(requestCatalogItemId) : null;
+      const requestBlockedByAssetStatus = asset.status === 'DISPOSED' || asset.status === 'LOST';
+
+      return (
+        <div className="space-y-6">
+          <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
+            <div className="flex justify-between items-start gap-3">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
+                    {isBox ? 'BOX BATCH ASSET' : 'INDIVIDUAL TRACKED ASSET'}
+                  </span>
+                  {isBox && (
+                    <span className="bg-[#D4AF37] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5">
+                      Storage Box
+                    </span>
+                  )}
+                </div>
+                <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1 truncate">
+                  {catalogItem?.name || asset.asset_code}
+                </h4>
+                <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5 break-words">{asset.asset_code}</p>
+                {asset.serial_number && (
+                  <p className="text-[11px] text-[#6C6863] font-mono mt-0.5">SERIAL: {asset.serial_number}</p>
+                )}
+              </div>
+
+              <div className="text-right shrink-0">
+                <span
+                  className={`text-[10px] px-3 py-1 font-bold uppercase tracking-widest border ${
+                    asset.status === 'AVAILABLE'
+                      ? 'border-emerald-700 bg-emerald-50 text-emerald-800'
+                      : asset.status === 'ISSUED'
+                      ? 'border-blue-700 bg-blue-50 text-blue-800'
+                      : asset.status === 'UNDER_REPAIR'
+                      ? 'border-amber-700 bg-amber-50 text-amber-800'
+                      : 'border-red-700 bg-red-50 text-red-800'
+                  }`}
+                >
+                  {asset.status.replace('_', ' ')}
+                </span>
+                <p className="text-xs text-[#6C6863] mt-2 font-medium">
+                  {asset.status === 'ISSUED' && !isBox ? `Held by: ${assignedUser?.name || 'Student'}` : `Location: ${location?.name || 'Unassigned'}`}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {existingRequest ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
+                Already requested in {existingRequest.request_number} ({existingRequest.status})
+              </div>
+            ) : requestBlockedByAssetStatus ? (
+              <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-xl font-mono">
+                This asset cannot be issued right now ({asset.status}).
+              </div>
+            ) : (
+              <div className="p-3 bg-white border border-[#1A1A1A]/10 text-xs rounded-xl">
+                Request this catalog item (quantity: 1) and track approval in <span className="font-bold">Requests</span>.
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                disabled={!requestCatalogItemId || !!existingRequest || requestBlockedByAssetStatus}
+                onClick={() => openRequestForCatalogItem(requestCatalogItemId || '', 1)}
+                className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 disabled:hover:bg-[#1A1A1A]"
+              >
+                {existingRequest ? 'Request Submitted' : 'Request This Item'}
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  onOpenQRGenerator(
+                    asset.asset_code,
+                    catalogItem?.name || asset.asset_code,
+                    `SN: ${asset.serial_number || 'N/A'}`
+                  )
+                }
+                className="px-4 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#D4AF37] hover:text-[#1A1A1A] text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Print Label
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     const handleIssueSubmit = (e: React.FormEvent) => {
       e.preventDefault();
@@ -435,8 +567,82 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
   // 2. CATALOG ITEM ACTIONS
   const renderCatalogActions = (cat: CatalogItem) => {
-    const stockLevels = InventoryStorage.getStockLevels().filter((s) => s.catalog_item_id === cat.id);
-    const totalQty = stockLevels.reduce((acc, curr) => acc + curr.quantity, 0);
+    const catStockLevels = stockLevels.filter((s) => s.catalog_item_id === cat.id || s.catalog_item_id === cat.item_code);
+    const totalQty = catStockLevels.reduce((acc, curr) => acc + (curr.quantity || 0), 0);
+
+    // Student QR action: request the catalog item, don't mutate stock.
+    if (isStudent) {
+      const existingRequest = myPendingRequestForCatalogItem(cat.id);
+      const alreadyRequested = !!existingRequest;
+
+      return (
+        <div className="space-y-6">
+          <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
+            <div>
+              <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">CATALOG ITEM ({cat.type})</span>
+              <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">{cat.name}</h4>
+              <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5">{cat.item_code}</p>
+              <p className="text-xs text-[#6C6863] mt-1.5">{cat.description}</p>
+            </div>
+            <div className="text-right">
+              <span className="font-serif text-3xl font-bold text-[#1A1A1A]">{totalQty}</span>
+              <span className="text-xs text-[#6C6863] font-mono font-bold ml-1">{cat.unit}</span>
+              <p className="text-[10px] font-mono uppercase text-[#6C6863] tracking-widest mt-1">Available (by storage bins)</p>
+            </div>
+          </div>
+
+          <div className="border border-[#1A1A1A]/10 p-4 bg-white space-y-2">
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">Storage Location Breakdown</p>
+            {catStockLevels.length === 0 ? (
+              <p className="text-xs text-[#6C6863] italic">No active stock assigned to bins.</p>
+            ) : (
+              catStockLevels.map((sl) => {
+                const loc = locations.find((l) => l.id === sl.location_id);
+                return (
+                  <div key={sl.id} className="flex justify-between items-center text-xs py-1.5 border-b border-[#1A1A1A]/5 last:border-0">
+                    <span className="font-medium text-[#1A1A1A]">{loc?.name || 'Storage Bin'}</span>
+                    <span className="font-mono font-bold text-[#1A1A1A]">
+                      {sl.quantity} {cat.unit}
+                    </span>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="space-y-3">
+            {alreadyRequested ? (
+              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
+                Already requested in {existingRequest?.request_number} ({existingRequest?.status})
+              </div>
+            ) : (
+              <div className="p-3 bg-white border border-[#1A1A1A]/10 text-xs rounded-xl">
+                Request this item and track approval in <span className="font-bold">Requests</span>.
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-1">
+              <button
+                type="button"
+                disabled={alreadyRequested}
+                onClick={() => openRequestForCatalogItem(cat.id, 1)}
+                className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50"
+              >
+                {alreadyRequested ? 'Request Submitted' : 'Request This Item'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onOpenQRGenerator(cat.item_code, cat.name, `Type: ${cat.type}`)}
+                className="px-4 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#D4AF37] hover:text-[#1A1A1A] text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
+              >
+                Print Label
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     const handleStockSubmit = (type: 'RECEIVE' | 'ISSUE') => {
       if (!selectedLoc) return alert('Select storage bin');
@@ -465,10 +671,10 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         {/* Stock Breakdown */}
         <div className="border border-[#1A1A1A]/10 p-4 bg-white space-y-2">
           <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">Storage Location Breakdown</p>
-          {stockLevels.length === 0 ? (
+          {catStockLevels.length === 0 ? (
             <p className="text-xs text-[#6C6863] italic">No active stock assigned to bins.</p>
           ) : (
-            stockLevels.map((sl) => {
+            catStockLevels.map((sl) => {
               const loc = locations.find((l) => l.id === sl.location_id);
               return (
                 <div key={sl.id} className="flex justify-between items-center text-xs py-1.5 border-b border-[#1A1A1A]/5 last:border-0">
@@ -533,8 +739,70 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
   // 3. LOCATION ACTIONS
   const renderLocationActions = (loc: Location) => {
-    const assetsInLoc = InventoryStorage.getAssets().filter((a) => a.location_id === loc.id);
-    const stockInLoc = InventoryStorage.getStockLevels().filter((s) => s.location_id === loc.id);
+    const assetsInLoc = assets.filter((a) => a.location_id === loc.id);
+    const stockInLoc = stockLevels.filter((s) => s.location_id === loc.id);
+
+    // Student QR action: show consumable stock + request buttons. Students cannot mutate inventory.
+    if (isStudent) {
+      const consumablesInLoc = stockInLoc
+        .map((s) => {
+          const cat = catalogItems.find((c) => c.id === s.catalog_item_id || c.item_code === s.catalog_item_id);
+          return { stock: s, catalogItem: cat };
+        })
+        .filter((x) => x.catalogItem && x.catalogItem.type === 'CONSUMABLE') as { stock: StockLevel; catalogItem: CatalogItem }[];
+
+      return (
+        <div className="space-y-5">
+          <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
+            <div>
+              <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">STORAGE LOCATION</span>
+              <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">{loc.name}</h4>
+              <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5">{loc.code || loc.id}</p>
+            </div>
+            <button
+              onClick={() => onOpenQRGenerator(loc.code || loc.name, loc.name, 'Storage Location')}
+              className="p-2.5 bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-[#D4AF37] transition-colors cursor-pointer"
+              type="button"
+            >
+              <QrCode className="w-4 h-4 text-[#D4AF37]" /> Print QR
+            </button>
+          </div>
+
+          <div>
+            <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
+              Consumables in Location ({consumablesInLoc.length})
+            </h5>
+            <div className="max-h-52 overflow-y-auto space-y-2">
+              {consumablesInLoc.length === 0 ? (
+                <p className="text-xs text-[#6C6863] italic">No bulk stock in this location.</p>
+              ) : (
+                consumablesInLoc.map(({ stock, catalogItem }) => {
+                  const existing = myPendingRequestForCatalogItem(catalogItem.id);
+                  const alreadyRequested = !!existing;
+                  return (
+                    <div key={stock.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs gap-3">
+                      <div className="min-w-0">
+                        <p className="font-bold text-[#1A1A1A] truncate">{catalogItem.name}</p>
+                        <p className="text-[10px] font-mono text-[#6C6863]">{stock.quantity} {catalogItem.unit}</p>
+                      </div>
+                      <button
+                        type="button"
+                        disabled={alreadyRequested}
+                        onClick={() => openRequestForCatalogItem(catalogItem.id, 1)}
+                        className="shrink-0 px-3 py-2 bg-[#1A1A1A] text-white text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-[#D4AF37] transition-colors cursor-pointer disabled:opacity-50"
+                      >
+                        {alreadyRequested ? 'Requested' : 'Request'}
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-5">
@@ -548,6 +816,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <button
             onClick={() => onOpenQRGenerator(loc.code || loc.name, loc.name, 'Storage Location')}
             className="p-2.5 bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-[#D4AF37] transition-colors"
+            type="button"
           >
             <QrCode className="w-4 h-4 text-[#D4AF37]" /> Print QR
           </button>
@@ -562,7 +831,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               <p className="text-xs text-[#6C6863] italic">No assets stored in this location.</p>
             ) : (
               assetsInLoc.map((a) => {
-                const cat = catalogItems.find((c) => c.id === a.catalog_item_id);
+                const cat = catalogItems.find((c) => c.id === a.catalog_item_id || c.item_code === a.catalog_item_id);
                 return (
                   <div key={a.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs">
                     <div>
@@ -586,7 +855,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               <p className="text-xs text-[#6C6863] italic">No bulk stock in this location.</p>
             ) : (
               stockInLoc.map((s) => {
-                const cat = catalogItems.find((c) => c.id === s.catalog_item_id);
+                const cat = catalogItems.find((c) => c.id === s.catalog_item_id || c.item_code === s.catalog_item_id);
                 return (
                   <div key={s.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs">
                     <span className="font-bold text-[#1A1A1A]">{cat?.name}</span>
@@ -605,8 +874,21 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const renderRequestActions = (req: Request) => {
     const student = users.find((u) => u.id === req.user_id);
 
-    const handleFulfill = (status: 'COMPLETED' | 'CANCELLED') => {
-      InventoryStorage.fulfillRequest(req.id, status, remarksInput || `Fulfilling request via scan`);
+    const handleFulfill = async (status: 'COMPLETED' | 'CANCELLED') => {
+      const finalRemark = remarksInput.trim() || `Fulfilling request via scan`;
+
+      // QR-based staff actions should still persist to Firestore so students see updated statuses.
+      if (canApprove) {
+        await updateDocument('requests', req.id, {
+          status,
+          approved_by_user_id: activeUser.id,
+          remarks: finalRemark,
+          updated_at: new Date().toISOString()
+        });
+      }
+
+      // Keep existing local inventory behavior (stock/transactions) for now.
+      InventoryStorage.fulfillRequest(req.id, status, finalRemark);
       triggerSuccess();
     };
 
@@ -637,7 +919,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">Requested Component Items</h5>
           <div className="space-y-2">
             {req.items?.map((item) => {
-              const cat = catalogItems.find((c) => c.id === item.catalog_item_id);
+              const cat = catalogItems.find((c) => c.id === item.catalog_item_id || c.item_code === item.catalog_item_id);
               return (
                 <div key={item.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs font-semibold">
                   <span>{cat?.name || 'Item'}</span>
@@ -648,7 +930,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           </div>
         </div>
 
-        {req.status === 'PENDING' && (
+        {req.status === 'PENDING' && canApprove && (
           <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
             <input
               type="text"
@@ -673,6 +955,14 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             </div>
           </div>
         )}
+
+        {req.status === 'PENDING' && !canApprove && (
+          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
+            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
+              Waiting for authorized staff to approve and issue this request.
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -682,6 +972,28 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     const userAssignments = InventoryStorage.getAssignments().filter(
       (a) => a.assigned_to_user_id === user.id && !a.returned_at
     );
+
+    if (isStudent) {
+      return (
+        <div className="space-y-5">
+          <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
+            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
+            <div>
+              <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">LAB MEMBER PROFILE</span>
+              <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">{user.name}</h4>
+              <p className="text-xs font-mono text-[#6C6863] mt-0.5">{user.user_code} • {user.email}</p>
+            </div>
+            <span className="text-[10px] px-3 py-1 font-mono uppercase tracking-widest border border-[#1A1A1A] bg-[#1A1A1A] text-white">
+              {user.role}
+            </span>
+          </div>
+
+          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
+            Students cannot issue/return assets from a member QR code.
+          </div>
+        </div>
+      );
+    }
 
     return (
       <div className="space-y-5">
@@ -707,7 +1019,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             ) : (
               userAssignments.map((asg) => {
                 const asset = InventoryStorage.getAssets().find((a) => a.id === asg.asset_id);
-                const cat = catalogItems.find((c) => c.id === asset?.catalog_item_id);
+                const cat = catalogItems.find((c) => c.id === asset?.catalog_item_id || c.item_code === asset?.catalog_item_id);
                 return (
                   <div key={asg.id} className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between">
                     <div>

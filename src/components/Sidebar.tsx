@@ -16,29 +16,37 @@ interface SidebarProps {
   onSelectView: (view: ViewMode) => void;
   pendingRequestsCount: number;
   onOpenScanner: () => void;
+  userRole?: 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT_LEAD' | 'STUDENT';
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onSelectView,
   pendingRequestsCount,
-  onOpenScanner
+  onOpenScanner,
+  userRole = 'STUDENT'
 }) => {
-  const menuItems = [
-    { id: 'dashboard' as ViewMode, label: 'Dashboard', icon: LayoutDashboard },
-    { id: 'inventory' as ViewMode, label: 'Inventory', icon: Box },
-    { id: 'assets' as ViewMode, label: 'Assets', icon: Layers },
-    {
-      id: 'requests' as ViewMode,
-      label: 'Requests',
-      icon: ClipboardList,
-      badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined
-    },
-    { id: 'locations' as ViewMode, label: 'Locations', icon: MapPin },
-    { id: 'activity' as ViewMode, label: 'Activity', icon: History },
-    { id: 'qr-sheet' as ViewMode, label: 'QR Labels', icon: QrCode },
-    { id: 'users' as ViewMode, label: 'User Directory', icon: Users }
-  ];
+  const isStudent = userRole === 'STUDENT';
+  const menuItems = isStudent
+    ? [
+        { id: 'requests' as ViewMode, label: 'Requests', icon: ClipboardList, badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined },
+        { id: 'dashboard' as ViewMode, label: 'Dashboard', icon: LayoutDashboard }
+      ]
+    : [
+        { id: 'dashboard' as ViewMode, label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'inventory' as ViewMode, label: 'Inventory', icon: Box },
+        { id: 'assets' as ViewMode, label: 'Assets', icon: Layers },
+        {
+          id: 'requests' as ViewMode,
+          label: 'Requests',
+          icon: ClipboardList,
+          badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined
+        },
+        { id: 'locations' as ViewMode, label: 'Locations', icon: MapPin },
+        { id: 'activity' as ViewMode, label: 'Activity', icon: History },
+        { id: 'qr-sheet' as ViewMode, label: 'QR Labels', icon: QrCode },
+        { id: 'users' as ViewMode, label: 'User Directory', icon: Users }
+      ];
 
   return (
     <aside className="w-64 bg-[#1A1A1A] text-white p-6 flex flex-col justify-between shrink-0 h-full overflow-y-auto border-r border-[#1A1A1A] relative select-none">
