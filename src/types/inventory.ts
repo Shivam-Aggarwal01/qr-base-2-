@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT';
+export type UserRole = 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT_LEAD' | 'STUDENT';
 
 export type ItemType = 'CONSUMABLE' | 'REUSABLE' | 'TOOL';
 

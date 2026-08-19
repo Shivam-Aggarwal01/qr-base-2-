@@ -82,7 +82,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         unit: newItemUnit,
         min_stock_alert: newItemMinStock,
         storage_place: newItemStoragePlace.trim() || locations[0]?.name || null,
-        tracking_mode: newItemType === 'CONSUMABLE' ? null : 'INDIVIDUAL'
+        tracking_mode: newItemType === 'CONSUMABLE' ? undefined : ('INDIVIDUAL' as const)
       };
 
       console.log('📤 Sending to Firebase:', payload);
@@ -189,7 +189,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       try {
         // Try to find existing stock in Firestore by fetching all
         const { getCollection } = await import('../services/firebaseCollections');
-        const allStocks = await getCollection('stock_levels');
+        const allStocks = await getCollection<{
+          id: string;
+          catalog_item_id: string;
+          location_id: string;
+          quantity: number;
+        }>('stock_levels');
         const existingStock = allStocks.find(
           (s: any) => s.catalog_item_id === selectedCatalogItem.id && s.location_id === targetLocId
         );

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { X, Plus, Trash2, Send, Package } from 'lucide-react';
 import { CatalogItem, User } from '../types/inventory';
 import { createRequestFirestore, updateDocument } from '../services/firebaseCollections';
@@ -10,6 +10,7 @@ interface NewRequestModalProps {
   activeUser: User;
   catalogItems: CatalogItem[];
   onRefreshData: () => void;
+  initialItems?: { catalog_item_id: string; requested_qty: number }[];
 }
 
 export const NewRequestModal: React.FC<NewRequestModalProps> = ({
@@ -17,13 +18,26 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   onClose,
   activeUser,
   catalogItems,
-  onRefreshData
+  onRefreshData,
+  initialItems
 }) => {
   const [purpose, setPurpose] = useState('');
   const [remarks, setRemarks] = useState('');
-  const [requestItems, setRequestItems] = useState<{ catalog_item_id: string; requested_qty: number }[]>([
-    { catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1 }
-  ]);
+  const getInitialItems = () => {
+    if (initialItems && initialItems.length > 0) return initialItems;
+    return [{ catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1 }];
+  };
+
+  const [requestItems, setRequestItems] = useState<{ catalog_item_id: string; requested_qty: number }[]>(getInitialItems());
+
+  // When the modal opens (or the prefilled items change), reset the form items.
+  useEffect(() => {
+    if (!isOpen) return;
+    setPurpose('');
+    setRemarks('');
+    setRequestItems(getInitialItems());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialItems, catalogItems]);
 
   if (!isOpen) return null;
 

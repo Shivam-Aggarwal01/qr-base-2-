@@ -138,7 +138,7 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ onAuthSucc
                   setUser(result);
                   onAuthSuccess?.(result);
                 } else {
-                  setError('Google sign-in was redirected. Complete the sign-in flow in the browser window.');
+                  setError('Redirecting to Google to finish sign-in...');
                 }
               } catch (err: any) {
                 setError(err?.message || 'Google sign-in failed.');

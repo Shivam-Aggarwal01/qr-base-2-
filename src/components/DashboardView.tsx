@@ -6,9 +6,7 @@ import {
   ArrowRight,
   QrCode,
   CheckCircle2,
-  PackageCheck,
-  Box,
-  Wrench
+  Package
 } from 'lucide-react';
 import {
   Asset,
@@ -20,7 +18,7 @@ import {
   StockLevel,
   ViewMode
 } from '../types/inventory';
-import { InventoryStorage } from '../services/storage';
+import { isStudent } from '../services/authRoles';
 
 interface DashboardViewProps {
   assets: Asset[];
@@ -30,9 +28,26 @@ interface DashboardViewProps {
   transactions: InventoryTransaction[];
   users: User[];
   stockLevels: StockLevel[];
+  currentUser?: User | null;
   onSelectView: (view: ViewMode) => void;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
   onRefreshData: () => void;
+  onOpenNewRequest?: () => void;
+}
+
+function getStatusBadge(status: string) {
+  switch (status) {
+    case 'PENDING':
+      return 'border-amber-700 bg-amber-50 text-amber-800';
+    case 'PARTIAL':
+      return 'border-blue-700 bg-blue-50 text-blue-800';
+    case 'COMPLETED':
+      return 'border-emerald-700 bg-emerald-50 text-emerald-800';
+    case 'CANCELLED':
+      return 'border-red-700 bg-red-50 text-red-800';
+    default:
+      return 'border-[#1A1A1A]/30 bg-[#EBE5DE] text-[#1A1A1A]';
+  }
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -43,10 +58,155 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   transactions,
   users,
   stockLevels,
+  currentUser,
   onSelectView,
   onOpenQRGenerator,
-  onRefreshData
+  onRefreshData,
+  onOpenNewRequest
 }) => {
+  const studentMode = isStudent(currentUser?.role);
+
+  if (studentMode && currentUser) {
+    const myRequests = requests.filter((r) => r.user_id === currentUser.id);
+    const myPending = myRequests.filter((r) => r.status === 'PENDING');
+    const myPartial = myRequests.filter((r) => r.status === 'PARTIAL');
+    const myCompleted = myRequests.filter((r) => r.status === 'COMPLETED');
+    const myAssigned = assets.filter(
+      (a) => a.assigned_to_user_id === currentUser.id && a.status === 'ISSUED'
+    );
+
+    return (
+      <div className="flex-1 space-y-8 p-8 overflow-y-auto max-w-7xl mx-auto w-full paper-texture">
+        <div className="border-b border-[#1A1A1A]/15 pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div>
+            <span className="text-[10px] font-mono tracking-[0.25em] uppercase text-[#6C6863]">
+              STUDENT PORTAL
+            </span>
+            <h1 className="font-serif text-3xl font-bold text-[#1A1A1A] mt-1">
+              My Lab <span className="font-serif italic font-normal text-[#D4AF37]">Requests</span>
+            </h1>
+            <p className="text-xs text-[#6C6863] mt-1 font-serif">
+              Request items and check whether they are pending, issued, or completed.
+            </p>
+          </div>
+          {onOpenNewRequest && (
+            <button
+              onClick={onOpenNewRequest}
+              className="flex items-center gap-2 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-colors cursor-pointer border border-[#1A1A1A]"
+            >
+              Request Item
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="bg-white p-6 border border-[#1A1A1A]/20 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-amber-600" />
+            <span className="text-[10px] font-mono font-bold text-[#6C6863] uppercase tracking-[0.2em]">
+              Pending Requests
+            </span>
+            <h2 className="font-serif text-5xl font-bold text-[#1A1A1A] mt-3">{myPending.length}</h2>
+            <p className="text-xs font-mono text-[#6C6863] mt-3">Awaiting staff review</p>
+          </div>
+          <div className="bg-white p-6 border border-[#1A1A1A]/20 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-blue-700" />
+            <span className="text-[10px] font-mono font-bold text-[#6C6863] uppercase tracking-[0.2em]">
+              Partial / In Progress
+            </span>
+            <h2 className="font-serif text-5xl font-bold text-[#1A1A1A] mt-3">{myPartial.length}</h2>
+            <p className="text-xs font-mono text-[#6C6863] mt-3">Some items still outstanding</p>
+          </div>
+          <div className="bg-white p-6 border border-[#1A1A1A]/20 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-emerald-700" />
+            <span className="text-[10px] font-mono font-bold text-[#6C6863] uppercase tracking-[0.2em]">
+              Assigned To Me
+            </span>
+            <h2 className="font-serif text-5xl font-bold text-[#1A1A1A] mt-3">{myAssigned.length}</h2>
+            <p className="text-xs font-mono text-[#6C6863] mt-3">Reusable items currently issued to you</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+          <div className="lg:col-span-8 bg-white border border-[#1A1A1A]/20 shadow-sm overflow-hidden">
+            <div className="px-6 py-5 border-b border-[#1A1A1A]/15 flex items-center justify-between bg-[#F9F8F6]">
+              <div>
+                <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">MY SLIPS</span>
+                <h3 className="font-serif font-bold text-[#1A1A1A] text-lg">Request Status</h3>
+              </div>
+              <button
+                onClick={() => onSelectView('requests')}
+                className="text-xs font-mono font-bold uppercase text-[#1A1A1A] hover:text-[#D4AF37] flex items-center gap-1 cursor-pointer"
+              >
+                View all <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
+            {myRequests.length === 0 ? (
+              <div className="p-8 text-center space-y-2">
+                <ClipboardList className="w-8 h-8 text-[#D4AF37] mx-auto" />
+                <p className="text-sm font-serif text-[#1A1A1A]">You have not requested any items yet.</p>
+                <p className="text-xs text-[#6C6863]">Scan a QR code or raise a requisition slip to get started.</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-[#1A1A1A]/10">
+                {myRequests.slice(0, 8).map((req) => (
+                  <div key={req.id} className="px-6 py-4 flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xs font-mono font-bold text-[#D4AF37]">{req.request_number}</p>
+                        <span className={`text-[9px] px-2 py-0.5 border font-mono font-bold uppercase tracking-widest ${getStatusBadge(req.status)}`}>
+                          {req.status}
+                        </span>
+                      </div>
+                      <p className="text-sm font-serif font-bold text-[#1A1A1A] mt-1 truncate">"{req.purpose}"</p>
+                      <p className="text-[11px] text-[#6C6863] mt-1">
+                        {(req.items ?? []).map((item) => {
+                          const cat = catalogItems.find((c) => c.id === item.catalog_item_id);
+                          return `${item.requested_qty} × ${cat?.name || 'Item'}`;
+                        }).join(' · ') || 'No line items'}
+                      </p>
+                    </div>
+                    <p className="text-[10px] font-mono text-[#6C6863] shrink-0">
+                      {new Date(req.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="px-6 py-3 text-[10px] font-mono text-[#6C6863] border-t border-[#1A1A1A]/10">
+              {myCompleted.length} completed of {myRequests.length} total requests
+            </p>
+          </div>
+
+          <div className="lg:col-span-4 bg-white border border-[#1A1A1A]/20 shadow-sm p-6 space-y-4">
+            <div className="flex items-center justify-between border-b border-[#1A1A1A]/10 pb-3">
+              <div>
+                <span className="text-[9px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">LOANS</span>
+                <h3 className="font-serif font-bold text-[#1A1A1A] text-base">Items With Me</h3>
+              </div>
+              <Package className="w-4 h-4 text-[#D4AF37]" />
+            </div>
+            {myAssigned.length === 0 ? (
+              <p className="text-xs text-[#6C6863] italic">No reusable equipment is currently assigned to you.</p>
+            ) : (
+              <div className="space-y-2.5 max-h-80 overflow-y-auto">
+                {myAssigned.map((asset) => {
+                  const cat = catalogItems.find((c) => c.id === asset.catalog_item_id || c.item_code === asset.catalog_item_id);
+                  return (
+                    <div key={asset.id} className="p-3 bg-[#F9F8F6] border border-[#1A1A1A]/10">
+                      <p className="text-xs font-serif font-bold text-[#1A1A1A]">{cat?.name || 'Asset'}</p>
+                      <p className="text-[10px] font-mono text-[#D4AF37]">{asset.asset_code}</p>
+                      <p className="text-[10px] font-mono text-[#6C6863] mt-1">Status: ISSUED</p>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Stats
   const activeLoans = assets.filter((a) => a.status === 'ISSUED');
   const pendingRequests = requests.filter((r) => r.status === 'PENDING');

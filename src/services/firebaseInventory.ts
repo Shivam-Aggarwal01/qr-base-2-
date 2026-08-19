@@ -2,6 +2,7 @@ import {
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
+  getRedirectResult,
   signInWithPopup,
   signInWithRedirect,
   signOut,
@@ -61,7 +62,7 @@ export async function getUserProfile(uid: string): Promise<User | null> {
 
   if (!snapshot.exists()) return null;
 
-  const current = snapshot.data() as User;
+  const current = snapshot.data() as Omit<User, 'id'>;
   const email = current.email ?? '';
   const resolvedRole = resolveRoleFromEmail(email) || current.role || 'STUDENT';
   const normalizedProfile: User = {
@@ -92,7 +93,7 @@ export async function ensureUserProfile(
   const resolvedRole = resolveRoleFromEmail(email) || role;
 
   if (snapshot.exists()) {
-    const current = snapshot.data() as User;
+    const current = snapshot.data() as Omit<User, 'id'>;
     const finalRole = resolveRoleFromEmail(current.email ?? email) || current.role || resolvedRole;
     const normalizedProfile: User = {
       id: snapshot.id,
@@ -156,6 +157,12 @@ export async function loginToFirebase(email: string, password: string): Promise<
   return profile;
 }
 
+export async function completeGoogleRedirect(): Promise<User | null> {
+  const result = await getRedirectResult(auth);
+  if (!result?.user) return null;
+  return ensureUserProfile(result.user, 'STUDENT');
+}
+
 export async function loginWithGoogle(): Promise<User | null> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({
@@ -164,14 +171,16 @@ export async function loginWithGoogle(): Promise<User | null> {
 
   try {
     const result = await signInWithPopup(auth, provider);
-    const profile = await ensureUserProfile(result.user, 'STUDENT');
-    return profile;
+    return ensureUserProfile(result.user, 'STUDENT');
   } catch (error: any) {
-    const isPopupBlocked = error?.code === 'auth/popup-blocked'
+    const shouldUseRedirect =
+      error?.code === 'auth/popup-blocked'
       || error?.code === 'auth/cancelled-popup-request'
-      || error?.code === 'auth/popup-closed-by-user';
+      || error?.code === 'auth/popup-closed-by-user'
+      || error?.code === 'auth/internal-error'
+      || /Cross-Origin-Opener-Policy|window\.closed|window\.close/i.test(String(error?.message || ''));
 
-    if (isPopupBlocked) {
+    if (shouldUseRedirect) {
       await signInWithRedirect(auth, provider);
       return null;
     }

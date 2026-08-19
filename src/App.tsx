@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { auth } from './firebase';
-import { InventoryStorage } from './services/storage';
-import { ensureUserProfile, getUserProfile } from './services/firebaseInventory';
+import { InventoryStorage, parseQRCodeFromEntities } from './services/storage';
+import { ensureUserProfile, getUserProfile, completeGoogleRedirect } from './services/firebaseInventory';
 import { readFirestoreState } from './services/firebaseCollections';
 import { FirebaseAuthPanel } from './components/FirebaseAuthPanel';
 import { resolveRoleFromEmail } from './services/roleConfig';
@@ -51,6 +51,10 @@ export default function App() {
   // Modals
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
+  const [newRequestPrefillItems, setNewRequestPrefillItems] = useState<{
+    catalog_item_id: string;
+    requested_qty: number;
+  }[]>([]);
 
   // QR Generator Modal State
   const [qrGenData, setQrGenData] = useState<{
@@ -134,6 +138,10 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    void completeGoogleRedirect().catch((error) => {
+      console.warn('Google redirect sign-in did not complete:', error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         const existingProfile = await getUserProfile(firebaseUser.uid);
@@ -182,8 +190,19 @@ export default function App() {
     });
   };
 
+  const openNewRequest = (prefillItems?: { catalog_item_id: string; requested_qty: number }[]) => {
+    setNewRequestPrefillItems(prefillItems ?? []);
+    setIsNewRequestOpen(true);
+  };
+
   const handleScanResult = (code: string) => {
-    const parsed = InventoryStorage.parseQRCode(code);
+    const parsed = parseQRCodeFromEntities(code, {
+      assets,
+      catalog: catalogItems,
+      locations,
+      requests,
+      users
+    });
     setQuickActionData({
       isOpen: true,
       qrResult: parsed
@@ -193,14 +212,19 @@ export default function App() {
   const handleGlobalSearch = (query: string) => {
     if (!query.trim()) return;
     // Check if query directly matches a QR code
-    const parsed = InventoryStorage.parseQRCode(query);
+    const parsed = parseQRCodeFromEntities(query, {
+      assets,
+      catalog: catalogItems,
+      locations,
+      requests,
+      users
+    });
     if (parsed.type !== 'unknown') {
       setQuickActionData({
         isOpen: true,
         qrResult: parsed
       });
-    } else {
-      // Default navigate to inventory filter
+    } else if (!isStudent(currentUser?.role)) {
       setCurrentView('inventory');
     }
   };
@@ -233,7 +257,9 @@ export default function App() {
     );
   }
 
-  const pendingRequestsCount = requests.filter((r) => r.status === 'PENDING').length;
+  const pendingRequestsCount = isStudentUser
+    ? requests.filter((r) => r.status === 'PENDING' && r.user_id === currentUser.id).length
+    : requests.filter((r) => r.status === 'PENDING').length;
 
   return (
     <div className="flex flex-col h-screen w-screen bg-[#f8fafc] text-slate-900 font-sans overflow-hidden antialiased select-none">
@@ -243,7 +269,7 @@ export default function App() {
         users={users}
         onUserChange={handleUserChange}
         onOpenScanner={() => setIsScannerOpen(true)}
-        onOpenNewRequest={() => setIsNewRequestOpen(true)}
+        onOpenNewRequest={() => openNewRequest()}
         onSearch={handleGlobalSearch}
         onResetData={handleResetData}
         onLogout={handleLogout}
@@ -271,9 +297,11 @@ export default function App() {
               transactions={transactions}
               users={users}
               stockLevels={stockLevels}
+              currentUser={currentUser}
               onSelectView={setCurrentView}
               onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
+              onOpenNewRequest={() => openNewRequest()}
             />
           )}
 
@@ -376,6 +404,11 @@ export default function App() {
         users={users}
         locations={locations}
         catalogItems={catalogItems}
+        stockLevels={stockLevels}
+        assets={assets}
+        requests={requests}
+        activeUser={currentUser}
+        onOpenNewRequest={(items) => openNewRequest(items)}
         onRefreshData={refreshAllData}
         onOpenQRGenerator={handleOpenQRGenerator}
       />
@@ -385,6 +418,7 @@ export default function App() {
         onClose={() => setIsNewRequestOpen(false)}
         activeUser={currentUser}
         catalogItems={catalogItems}
+        initialItems={newRequestPrefillItems.length ? newRequestPrefillItems : undefined}
         onRefreshData={refreshAllData}
       />
     </div>

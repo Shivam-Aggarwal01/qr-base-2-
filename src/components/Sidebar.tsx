@@ -16,7 +16,7 @@ interface SidebarProps {
   onSelectView: (view: ViewMode) => void;
   pendingRequestsCount: number;
   onOpenScanner: () => void;
-  userRole?: 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT';
+  userRole?: 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT_LEAD' | 'STUDENT';
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({

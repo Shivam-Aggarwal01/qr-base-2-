@@ -141,7 +141,7 @@ export class InventoryStorage {
   static saveCatalogItem(item: Partial<CatalogItem> & { name: string; item_code: string; type: CatalogItem['type'] }): CatalogItem {
     const items = this.getCatalog();
     const now = new Date().toISOString();
-    let savedItem: CatalogItem;
+    let savedItem: CatalogItem | undefined;
 
     if (item.id) {
       items.forEach((c, idx) => {
@@ -165,9 +165,13 @@ export class InventoryStorage {
       items.unshift(savedItem);
     }
 
+    if (!savedItem) {
+      throw new Error(`Catalog item not found for update: ${item.id}`);
+    }
+
     this.save(STORAGE_KEYS.CATALOG, items);
     this.logAudit(item.id ? 'UPDATE_CATALOG_ITEM' : 'CREATE_CATALOG_ITEM', 'CATALOG_ITEM', savedItem.id);
-    return savedItem!;
+    return savedItem;
   }
 
   // Stock Adjustment / Receive / Restock
@@ -567,4 +571,56 @@ export class InventoryStorage {
 
     return { type: 'unknown', entity: null, rawCode: cleanData };
   }
+}
+
+export type QRParseEntities = {
+  assets?: Asset[];
+  catalog?: CatalogItem[];
+  locations?: Location[];
+  requests?: Request[];
+  users?: User[];
+};
+
+// Overload-like helper: keeps existing call sites working, but allows
+// QR parsing to use the in-memory Firestore state.
+export function parseQRCodeFromEntities(qrData: string, entities: QRParseEntities) {
+  const cleanData = qrData.trim();
+  const assets = entities.assets ?? InventoryStorage.getAssets();
+  const catalog = entities.catalog ?? InventoryStorage.getCatalog();
+  const locations = entities.locations ?? InventoryStorage.getLocations();
+  const requests = entities.requests ?? InventoryStorage.getRequests();
+  const users = entities.users ?? InventoryStorage.getUsers();
+
+  // 1. Check Asset Code or Serial Number
+  const foundAsset = assets.find(
+    (a) => a.asset_code.toLowerCase() === cleanData.toLowerCase() || a.serial_number?.toLowerCase() === cleanData.toLowerCase()
+  );
+  if (foundAsset) return { type: 'asset' as const, entity: foundAsset, rawCode: cleanData };
+
+  // 2. Check Catalog Item Code
+  const foundCatalog = catalog.find((c) => c.item_code.toLowerCase() === cleanData.toLowerCase());
+  if (foundCatalog) return { type: 'catalog' as const, entity: foundCatalog, rawCode: cleanData };
+
+  // 3. Check Location Code or Name
+  const foundLoc = locations.find(
+    (l) => l.code?.toLowerCase() === cleanData.toLowerCase() || l.name.toLowerCase() === cleanData.toLowerCase()
+  );
+  if (foundLoc) return { type: 'location' as const, entity: foundLoc, rawCode: cleanData };
+
+  // 4. Check Request Number
+  const foundReq = requests.find((r) => r.request_number.toLowerCase() === cleanData.toLowerCase());
+  if (foundReq) return { type: 'request' as const, entity: foundReq, rawCode: cleanData };
+
+  // 5. Check User Code
+  const foundUser = users.find((u) => u.user_code.toLowerCase() === cleanData.toLowerCase());
+  if (foundUser) return { type: 'user' as const, entity: foundUser, rawCode: cleanData };
+
+  // Search loose match
+  const fuzzyAsset = assets.find((a) => cleanData.toLowerCase().includes(a.asset_code.toLowerCase()));
+  if (fuzzyAsset) return { type: 'asset' as const, entity: fuzzyAsset, rawCode: cleanData };
+
+  const fuzzyCatalog = catalog.find((c) => cleanData.toLowerCase().includes(c.item_code.toLowerCase()));
+  if (fuzzyCatalog) return { type: 'catalog' as const, entity: fuzzyCatalog, rawCode: cleanData };
+
+  return { type: 'unknown' as const, entity: null, rawCode: cleanData };
 }

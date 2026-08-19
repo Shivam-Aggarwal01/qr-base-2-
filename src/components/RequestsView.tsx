@@ -30,6 +30,9 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   const [fulfillmentRemarks, setFulfillmentRemarks] = useState('');
   const [processingError, setProcessingError] = useState<string | null>(null);
   const canProcessRequests = canApproveRequests(activeUser?.role);
+  const visibleRequests = activeUser?.role === 'STUDENT'
+    ? requests.filter((r) => r.user_id === activeUser.id)
+    : requests;
 
   const getDefaultApprovalRemarks = (req: Request) => {
     const totalItems = req.items?.reduce((sum, item) => sum + (item.requested_qty || 0), 0) ?? 0;
@@ -41,7 +44,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     setFulfillmentRemarks(getDefaultApprovalRemarks(req));
   };
 
-  const filteredRequests = requests.filter((r) => {
+  const filteredRequests = visibleRequests.filter((r) => {
     if (statusFilter !== 'ALL' && r.status !== statusFilter) return false;
     return true;
   });

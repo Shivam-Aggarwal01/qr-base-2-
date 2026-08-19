@@ -20,9 +20,16 @@ service cloud.firestore {
     return signedIn() && (
       role() == 'ADMIN' ||
       role() == 'STUDENT_AMBASSADOR' ||
+      role() == 'STUDENT_LEAD' ||
       userRole() == 'ADMIN' ||
-      userRole() == 'STUDENT_AMBASSADOR'
+      userRole() == 'STUDENT_AMBASSADOR' ||
+      userRole() == 'STUDENT_LEAD'
     );
+  }
+
+  // Staff who can approve and issue/return inventory.
+  function isStaff() {
+    return isAmbassador();
   }
 
   match /databases/{database}/documents {
@@ -35,7 +42,7 @@ service cloud.firestore {
 
     match /catalog_items/{itemId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow create, update, delete: if isStaff();
     }
 
     match /locations/{locationId} {
@@ -45,7 +52,7 @@ service cloud.firestore {
 
     match /stock_levels/{stockId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn();
+      allow create, update, delete: if isStaff();
     }
 
     match /assets/{assetId} {
@@ -59,19 +66,33 @@ service cloud.firestore {
     }
 
     match /requests/{requestId} {
-      allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if signedIn();
-      allow delete: if signedIn();
+      allow read: if signedIn() && (
+        // Students can only see their own requests.
+        request.auth.uid == resource.data.user_id ||
+        // Staff can see all requests.
+        isStaff()
+      );
+
+      // Students can submit their own requests only.
+      allow create: if signedIn() && request.auth.uid == request.resource.data.user_id;
+
+      // Only staff can approve/complete/cancel and otherwise mutate request state.
+      allow update: if signedIn() && isStaff();
+
+      // Only admins should be able to delete requests.
+      allow delete: if signedIn() && isAdmin();
     }
 
     match /requests/{requestId}/request_items/{requestItemId} {
       allow read: if signedIn();
-      allow create, update, delete: if signedIn() && (
-        isAdmin() ||
-        isAmbassador() ||
-        request.auth.uid == get(/databases/$(database)/documents/requests/$(requestId)).data.user_id
+      allow create: if signedIn() && (
+        // Owner can create items as part of their request.
+        request.auth.uid == get(/databases/$(database)/documents/requests/$(requestId)).data.user_id ||
+        isStaff()
       );
+
+      // Only staff should be able to update/delete request items.
+      allow update, delete: if signedIn() && isStaff();
     }
 
     match /inventory_transactions/{txId} {

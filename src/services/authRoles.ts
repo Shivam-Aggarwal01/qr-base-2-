@@ -2,6 +2,7 @@ import type { UserRole } from '../types/inventory';
 
 export const ROLE_PRIORITY: Record<UserRole, number> = {
   ADMIN: 3,
+  STUDENT_LEAD: 2,
   STUDENT_AMBASSADOR: 2,
   STUDENT: 1
 };
@@ -27,7 +28,8 @@ export function isAdmin(role: UserRole | null | undefined): boolean {
 }
 
 export function canIssueInventory(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'STUDENT');
+  // Students can browse/scan and request items, but they must not issue inventory.
+  return hasMinimumRole(role, 'STUDENT_LEAD');
 }
 
 export function canApproveRequests(role: UserRole | null | undefined): boolean {
