@@ -1,8 +1,11 @@
-import React, { useEffect, useState } from 'react';
-import { X, Plus, Trash2, Send, Package } from 'lucide-react';
-import { CatalogItem, User } from '../types/inventory';
-import { createRequestFirestore, updateDocument } from '../services/firebaseCollections';
-import confetti from 'canvas-confetti';
+import React, { useEffect, useState } from "react";
+import { X, Plus, Trash2, Send, Package } from "lucide-react";
+import { CatalogItem, User } from "../types/inventory";
+import {
+  createRequestFirestore,
+  updateDocument,
+} from "../services/firebaseCollections";
+import confetti from "canvas-confetti";
 
 interface NewRequestModalProps {
   isOpen: boolean;
@@ -19,22 +22,25 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   activeUser,
   catalogItems,
   onRefreshData,
-  initialItems
+  initialItems,
 }) => {
-  const [purpose, setPurpose] = useState('');
-  const [remarks, setRemarks] = useState('');
+  const [purpose, setPurpose] = useState("");
+  const [remarks, setRemarks] = useState("");
   const getInitialItems = () => {
     if (initialItems && initialItems.length > 0) return initialItems;
-    return [{ catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1 }];
+    return [{ catalog_item_id: catalogItems[0]?.id || "", requested_qty: 1 }];
   };
 
-  const [requestItems, setRequestItems] = useState<{ catalog_item_id: string; requested_qty: number }[]>(getInitialItems());
+  const [requestItems, setRequestItems] =
+    useState<{ catalog_item_id: string; requested_qty: number }[]>(
+      getInitialItems(),
+    );
 
   // When the modal opens (or the prefilled items change), reset the form items.
   useEffect(() => {
     if (!isOpen) return;
-    setPurpose('');
-    setRemarks('');
+    setPurpose("");
+    setRemarks("");
     setRequestItems(getInitialItems());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialItems, catalogItems]);
@@ -42,7 +48,10 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   if (!isOpen) return null;
 
   const handleAddItem = () => {
-    setRequestItems([...requestItems, { catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1 }]);
+    setRequestItems([
+      ...requestItems,
+      { catalog_item_id: catalogItems[0]?.id || "", requested_qty: 1 },
+    ]);
   };
 
   const handleRemoveItem = (index: number) => {
@@ -50,7 +59,11 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
     setRequestItems(requestItems.filter((_, idx) => idx !== index));
   };
 
-  const handleItemChange = (index: number, field: 'catalog_item_id' | 'requested_qty', value: any) => {
+  const handleItemChange = (
+    index: number,
+    field: "catalog_item_id" | "requested_qty",
+    value: any,
+  ) => {
     const updated = [...requestItems];
     updated[index] = { ...updated[index], [field]: value };
     setRequestItems(updated);
@@ -58,25 +71,25 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!purpose.trim()) return alert('Please enter project purpose');
+    if (!purpose.trim()) return alert("Please enter project purpose");
     if (requestItems.some((i) => !i.catalog_item_id || i.requested_qty <= 0)) {
-      return alert('Please select valid catalog items and quantities');
+      return alert("Please select valid catalog items and quantities");
     }
 
-    const requestNumber = `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+    const requestNumber = `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`;
 
     await createRequestFirestore({
       request_number: requestNumber,
       user_id: activeUser.id,
       purpose,
-      status: 'PENDING',
-      remarks: remarks || '',
+      status: "PENDING",
+      remarks: remarks || "",
       items: requestItems.map((item, idx) => ({
         id: `reqi-${Date.now()}-${idx}`,
         request_id: requestNumber,
         catalog_item_id: item.catalog_item_id,
-        requested_qty: item.requested_qty
-      }))
+        requested_qty: item.requested_qty,
+      })),
     });
 
     confetti({ particleCount: 30, spread: 50 });
@@ -94,8 +107,12 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
               <Package className="w-4 h-4" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-lg">New Material Request</h3>
-              <p className="text-[10px] text-slate-400">Request lab components or equipment</p>
+              <h3 className="font-bold text-slate-900 text-lg">
+                New Material Request
+              </h3>
+              <p className="text-[10px] text-slate-400">
+                Request lab components or equipment
+              </p>
             </div>
           </div>
           <button
@@ -109,9 +126,13 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="text-xs font-bold text-slate-700">Student / Requestor</label>
+            <label className="text-xs font-bold text-slate-700">
+              Student / Requestor
+            </label>
             <div className="mt-1 p-2.5 bg-slate-100 rounded-xl text-xs font-semibold text-slate-800 flex justify-between items-center">
-              <span>{activeUser.name} ({activeUser.user_code})</span>
+              <span>
+                {activeUser.name} ({activeUser.user_code})
+              </span>
               <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-md uppercase">
                 {activeUser.role}
               </span>
@@ -119,7 +140,9 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700">Project / Lab Purpose</label>
+            <label className="text-xs font-bold text-slate-700">
+              Project / Lab Purpose
+            </label>
             <input
               type="text"
               required
@@ -133,7 +156,9 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
           {/* Requested Items List */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-slate-700">Requested Items & Quantities</label>
+              <label className="text-xs font-bold text-slate-700">
+                Requested Items & Quantities
+              </label>
               <button
                 type="button"
                 onClick={handleAddItem}
@@ -148,7 +173,9 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                 <div key={idx} className="flex gap-2 items-center">
                   <select
                     value={item.catalog_item_id}
-                    onChange={(e) => handleItemChange(idx, 'catalog_item_id', e.target.value)}
+                    onChange={(e) =>
+                      handleItemChange(idx, "catalog_item_id", e.target.value)
+                    }
                     className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     {catalogItems.map((cat) => (
@@ -161,7 +188,13 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                     type="number"
                     min="1"
                     value={item.requested_qty}
-                    onChange={(e) => handleItemChange(idx, 'requested_qty', Number(e.target.value))}
+                    onChange={(e) =>
+                      handleItemChange(
+                        idx,
+                        "requested_qty",
+                        Number(e.target.value),
+                      )
+                    }
                     className="w-20 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none text-center"
                   />
                   {requestItems.length > 1 && (
@@ -179,7 +212,9 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700">Remarks / Deadline (Optional)</label>
+            <label className="text-xs font-bold text-slate-700">
+              Remarks / Deadline (Optional)
+            </label>
             <input
               type="text"
               value={remarks}

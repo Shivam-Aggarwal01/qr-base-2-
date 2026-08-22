@@ -1,37 +1,29 @@
-import type { UserRole } from '../types/inventory';
+import type { UserRole } from "../types/inventory";
 
-// Add or remove emails here. There is no fixed limit on how many admins or ambassadors you can have.
-// Everyone else will automatically fall back to STUDENT.
+// Admins can then assign other users (STUDENT, STUDENT_AMBASSADOR, STUDENT_LEAD) in the Users directory.
 export const ADMIN_EMAILS: string[] = [
-  'shivamafterall111@gmail.com'
+  "shivamafterall111@gmail.com",
+  "mohitdavar2004@gmail.com",
 ];
-
-export const AMBASSADOR_EMAILS: string[] = [
-  'ambassador1@college.edu',
-  'ambassador2@college.edu'
-];
-
 
 export function normalizeEmail(email?: string | null): string {
-  return (email ?? '').trim().toLowerCase();
+  return (email ?? "").trim().toLowerCase();
 }
 
-
-export function resolveRoleFromEmail(email?: string | null): UserRole | undefined {
+export function resolveRoleFromEmail(
+  email?: string | null,
+): UserRole | undefined {
   const normalized = normalizeEmail(email);
-
   if (!normalized) {
     return undefined;
   }
-
-
-  if (ADMIN_EMAILS.some((allowedEmail) => normalizeEmail(allowedEmail) === normalized)) {
-    return 'ADMIN';
+  if (
+    ADMIN_EMAILS.some(
+      (allowedEmail) => normalizeEmail(allowedEmail) === normalized,
+    )
+  ) {
+    return "ADMIN";
   }
-
-  if (AMBASSADOR_EMAILS.some((allowedEmail) => normalizeEmail(allowedEmail) === normalized)) {
-    return 'STUDENT_AMBASSADOR';
-  }
-
+  // All other users will just fall back to whatever is set for them in the db or "STUDENT" upon first registration.
   return undefined;
 }

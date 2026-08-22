@@ -1,8 +1,23 @@
-import React, { useState } from 'react';
-import { Plus, Search, QrCode, AlertTriangle, Box, Wrench, Package } from 'lucide-react';
-import { CatalogItem, Location, StockLevel, Asset, ItemType, UserRole } from '../types/inventory';
-import { InventoryStorage } from '../services/storage';
-import { createCatalogItemInFirestore } from '../services/firebaseInventory';
+import React, { useState } from "react";
+import {
+  Plus,
+  Search,
+  QrCode,
+  AlertTriangle,
+  Box,
+  Wrench,
+  Package,
+} from "lucide-react";
+import {
+  CatalogItem,
+  Location,
+  StockLevel,
+  Asset,
+  ItemType,
+  UserRole,
+} from "../types/inventory";
+import { InventoryStorage } from "../services/storage";
+import { createCatalogItemInFirestore } from "../services/firebaseInventory";
 
 interface CatalogViewProps {
   catalogItems: CatalogItem[];
@@ -21,37 +36,46 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   assets,
   userRole,
   onOpenQRGenerator,
-  onRefreshData
+  onRefreshData,
 }) => {
-  const [selectedType, setSelectedType] = useState<ItemType | 'ALL'>('ALL');
-  const [searchFilter, setSearchFilter] = useState('');
+  const [selectedType, setSelectedType] = useState<ItemType | "ALL">("ALL");
+  const [searchFilter, setSearchFilter] = useState("");
   const [onlyLowStock, setOnlyLowStock] = useState(false);
 
   // New Item Modal
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newItemCode, setNewItemCode] = useState('');
-  const [newItemName, setNewItemName] = useState('');
-  const [newItemType, setNewItemType] = useState<ItemType>('CONSUMABLE');
-  const [newItemDesc, setNewItemDesc] = useState('');
-  const [newItemUnit, setNewItemUnit] = useState('pcs');
+  const [newItemCode, setNewItemCode] = useState("");
+  const [newItemName, setNewItemName] = useState("");
+  const [newItemType, setNewItemType] = useState<ItemType>("CONSUMABLE");
+  const [newItemDesc, setNewItemDesc] = useState("");
+  const [newItemUnit, setNewItemUnit] = useState("pcs");
   const [newItemMinStock, setNewItemMinStock] = useState(10);
-  const [newItemStoragePlace, setNewItemStoragePlace] = useState('');
+  const [newItemStoragePlace, setNewItemStoragePlace] = useState("");
 
   // Restock Modal
   const [showRestockModal, setShowRestockModal] = useState(false);
-  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
-  const [targetLocId, setTargetLocId] = useState('');
+  const [selectedCatalogItem, setSelectedCatalogItem] =
+    useState<CatalogItem | null>(null);
+  const [targetLocId, setTargetLocId] = useState("");
   const [restockQty, setRestockQty] = useState(10);
 
   const filteredItems = catalogItems.filter((item) => {
-    if (selectedType !== 'ALL' && item.type !== selectedType) return false;
+    if (selectedType !== "ALL" && item.type !== selectedType) return false;
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
-      if (!(item.name || '').toLowerCase().includes(q) && !(item.item_code || '').toLowerCase().includes(q)) return false;
+      if (
+        !(item.name || "").toLowerCase().includes(q) &&
+        !(item.item_code || "").toLowerCase().includes(q)
+      )
+        return false;
     }
     if (onlyLowStock) {
       const totalStock = stockLevels
-        .filter((s) => s.catalog_item_id === item.id || s.catalog_item_id === item.item_code)
+        .filter(
+          (s) =>
+            s.catalog_item_id === item.id ||
+            s.catalog_item_id === item.item_code,
+        )
         .reduce((sum, s) => sum + s.quantity, 0);
       const minStock = item.min_stock_alert ?? 10;
       if (totalStock > minStock) return false;
@@ -61,15 +85,20 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
   const handleCreateCatalogItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log('🔍 Form submitted. userRole:', userRole);
-    
+    console.log("🔍 Form submitted. userRole:", userRole);
+
     if (!newItemCode.trim() || !newItemName.trim()) {
-      alert('Code and Name are required');
+      alert("Code and Name are required");
       return;
     }
 
-    if (!userRole || (userRole !== 'ADMIN' && userRole !== 'STUDENT_AMBASSADOR')) {
-      alert(`Only admins and student ambassadors can add items. Your role: ${userRole || 'NOT SET'}`);
+    if (
+      !userRole ||
+      (userRole !== "ADMIN" && userRole !== "STUDENT_AMBASSADOR")
+    ) {
+      alert(
+        `Only admins and student ambassadors can add items. Your role: ${userRole || "NOT SET"}`,
+      );
       return;
     }
 
@@ -82,54 +111,41 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         unit: newItemUnit,
         min_stock_alert: newItemMinStock,
         storage_place: newItemStoragePlace.trim() || locations[0]?.name || null,
-        tracking_mode: newItemType === 'CONSUMABLE' ? undefined : ('INDIVIDUAL' as const)
+        tracking_mode:
+          newItemType === "CONSUMABLE" ? undefined : ("INDIVIDUAL" as const),
       };
 
-      console.log('📤 Sending to Firebase:', payload);
+      console.log("📤 Sending to Firebase:", payload);
       await createCatalogItemInFirestore(payload);
-      console.log('✅ Firebase write succeeded');
-      
-      // Also add to local state immediately to avoid filter issues
-      const newItem = {
-        id: `cat-${Date.now()}`,
-        item_code: payload.item_code,
-        name: payload.name,
-        type: payload.type,
-        description: payload.description || '',
-        unit: payload.unit || 'pcs',
-        min_stock_alert: payload.min_stock_alert || 10,
-        storage_place: payload.storage_place || null,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      // Try to create a stock level entry
+      console.log("✅ Firebase write succeeded");
+
       try {
-        const { createFirestoreDocument } = await import('../services/firebaseCollections');
-        await createFirestoreDocument('stock_levels', {
+        const { createFirestoreDocument } =
+          await import("../services/firebaseCollections");
+        await createFirestoreDocument("stock_levels", {
           catalog_item_id: payload.item_code,
-          location_id: 'default-location-1',
+          location_id: "default-location-1",
           quantity: 0,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         });
-        console.log('✅ Created stock level entry');
+        console.log("✅ Created stock level entry");
       } catch (stockError) {
-        console.warn('⚠️ Stock level creation skipped:', stockError);
+        console.warn("⚠️ Stock level creation skipped:", stockError);
       }
 
       alert(`✓ Successfully created ${newItemCode} in Firebase catalog.`);
 
       setShowAddModal(false);
-      setNewItemCode('');
-      setNewItemName('');
-      setNewItemDesc('');
-      setNewItemStoragePlace('');
+      setNewItemCode("");
+      setNewItemName("");
+      setNewItemDesc("");
+      setNewItemStoragePlace("");
       onRefreshData();
     } catch (error: any) {
-      console.error('❌ Firebase write failed:', error?.message || error);
+      console.error("❌ Firebase write failed:", error?.message || error);
       try {
-        console.log('💾 Falling back to local storage...');
+        console.log("💾 Falling back to local storage...");
         InventoryStorage.saveCatalogItem({
           item_code: newItemCode.trim().toUpperCase(),
           name: newItemName.trim(),
@@ -137,29 +153,32 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
           description: newItemDesc,
           unit: newItemUnit,
           min_stock_alert: newItemMinStock,
-          storage_place: newItemStoragePlace.trim() || locations[0]?.name || null
+          storage_place:
+            newItemStoragePlace.trim() || locations[0]?.name || null,
         });
 
-        // Also save stock level locally
-        const tempId = `stk-${Date.now()}`;
         InventoryStorage.adjustStock(
           newItemCode.trim().toUpperCase(),
-          'default-location-1',
+          "default-location-1",
           0,
-          'RECEIVE',
-          'Initial stock entry'
+          "RECEIVE",
+          "Initial stock entry",
         );
 
         setShowAddModal(false);
-        setNewItemCode('');
-        setNewItemName('');
-        setNewItemDesc('');
-        setNewItemStoragePlace('');
+        setNewItemCode("");
+        setNewItemName("");
+        setNewItemDesc("");
+        setNewItemStoragePlace("");
         onRefreshData();
-        alert(`✓ Saved locally (Firebase blocked: ${error?.message || 'permission denied'})`);
+        alert(
+          `✓ Saved locally (Firebase blocked: ${error?.message || "permission denied"})`,
+        );
       } catch (localError: any) {
-        console.error('❌ Local save also failed:', localError?.message);
-        alert(`✗ Failed to save. Error: ${localError?.message || 'unknown error'}`);
+        console.error("❌ Local save also failed:", localError?.message);
+        alert(
+          `✗ Failed to save. Error: ${localError?.message || "unknown error"}`,
+        );
       }
     }
   };
@@ -167,58 +186,55 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   const handleRestockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCatalogItem || !targetLocId) {
-      alert('Please select a target location');
+      alert("Please select a target location");
       return;
     }
 
     try {
       console.log(`📈 Restocking: +${restockQty} to ${selectedCatalogItem.id}`);
-      
-      // Update local storage
+
       InventoryStorage.adjustStock(
         selectedCatalogItem.id,
         targetLocId,
         restockQty,
-        'RECEIVE',
-        `Restocked ${restockQty} ${selectedCatalogItem.unit}`
+        "RECEIVE",
+        `Restocked ${restockQty} ${selectedCatalogItem.unit}`,
       );
 
-      // Also create/update in Firestore
-      const { createFirestoreDocument, updateDocument } = await import('../services/firebaseCollections');
-      
+      const { createFirestoreDocument, updateDocument } =
+        await import("../services/firebaseCollections");
+
       try {
-        // Try to find existing stock in Firestore by fetching all
-        const { getCollection } = await import('../services/firebaseCollections');
+        const { getCollection } =
+          await import("../services/firebaseCollections");
         const allStocks = await getCollection<{
           id: string;
           catalog_item_id: string;
           location_id: string;
           quantity: number;
-        }>('stock_levels');
+        }>("stock_levels");
         const existingStock = allStocks.find(
-          (s: any) => s.catalog_item_id === selectedCatalogItem.id && s.location_id === targetLocId
+          (s: any) =>
+            s.catalog_item_id === selectedCatalogItem.id &&
+            s.location_id === targetLocId,
         );
 
         if (existingStock) {
-          // Update existing stock
-          await updateDocument('stock_levels', existingStock.id, {
+          await updateDocument("stock_levels", existingStock.id, {
             quantity: existingStock.quantity + restockQty,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           });
-          console.log(`✅ Updated stock in Firestore: ${existingStock.id}`);
         } else {
-          // Create new stock entry
-          await createFirestoreDocument('stock_levels', {
+          await createFirestoreDocument("stock_levels", {
             catalog_item_id: selectedCatalogItem.id,
             location_id: targetLocId,
             quantity: restockQty,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           });
-          console.log(`✅ Created new stock entry in Firestore`);
         }
       } catch (fbError) {
-        console.warn('⚠️ Firestore update skipped (local storage updated):', fbError);
+        console.warn("⚠️ Firestore update skipped:", fbError);
       }
 
       alert(`✓ Added ${restockQty} ${selectedCatalogItem.unit} to stock`);
@@ -226,55 +242,58 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       setSelectedCatalogItem(null);
       onRefreshData();
     } catch (error: any) {
-      console.error('❌ Restock failed:', error);
-      alert(`Error: ${error?.message || 'Failed to restock'}`);
+      console.error("❌ Restock failed:", error);
+      alert(`Error: ${error?.message || "Failed to restock"}`);
     }
   };
 
   const getItemTypeBadge = (type: ItemType) => {
     switch (type) {
-      case 'CONSUMABLE':
-        return 'border-purple-800 bg-purple-50 text-purple-900';
-      case 'REUSABLE':
-        return 'border-[#D4AF37] bg-amber-50 text-amber-900';
-      case 'TOOL':
-        return 'border-[#1A1A1A] bg-[#1A1A1A] text-white';
+      case "CONSUMABLE":
+        return "bg-[rgba(10,174,240,0.1)] text-[var(--color-idea-deep-blue)] border border-[var(--color-idea-blue)]/30";
+      case "REUSABLE":
+        return "bg-[rgba(133,180,64,0.12)] text-[#3d6b10] border border-[var(--color-idea-green)]/30";
+      case "TOOL":
+        return "bg-[var(--color-idea-deep-blue)] text-white border border-[var(--color-idea-deep-blue)]";
     }
   };
 
   return (
-    <div className="flex-1 space-y-8 p-8 overflow-y-auto max-w-7xl mx-auto w-full paper-texture">
+    <div className="flex-1 space-y-8 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
       {/* Header Bar */}
-      <div className="border-b border-[#1A1A1A]/15 pb-4 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
-          <span className="text-[10px] font-mono tracking-[0.25em] uppercase text-[#6C6863]">CATALOG INDEX</span>
-          <h2 className="font-serif text-3xl font-bold text-[#1A1A1A] mt-0.5">
-            Master Component <span className="font-serif italic font-normal text-[#D4AF37]">Directory</span>
+          <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
+            CATALOG INDEX
+          </span>
+          <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
+            Master Component{" "}
+            <span className="text-[var(--color-idea-blue)]">Directory</span>
           </h2>
         </div>
         <button
           onClick={() => setShowAddModal(true)}
-          className="flex items-center gap-2 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-colors cursor-pointer border border-[#1A1A1A]"
+          className="idea-button flex items-center gap-2 px-5 py-2.5 text-xs font-semibold cursor-pointer"
         >
-          <Plus className="w-4 h-4 text-[#D4AF37]" /> Add New Item
+          <Plus className="w-4 h-4" /> Add New Item
         </button>
       </div>
 
       {/* Filter Tabs & Search Toolbar */}
-      <div className="bg-white p-5 border border-[#1A1A1A]/20 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="idea-card p-4 flex flex-col md:flex-row items-center justify-between gap-4">
         {/* Type Tabs */}
-        <div className="flex items-center gap-2 bg-[#F9F8F6] p-1.5 border border-[#1A1A1A]/10 w-full md:w-auto">
-          {(['ALL', 'CONSUMABLE', 'REUSABLE', 'TOOL'] as const).map((t) => (
+        <div className="flex items-center gap-1.5 bg-[var(--color-idea-light-grey)] p-1.5 rounded-2xl w-full md:w-auto overflow-x-auto">
+          {(["ALL", "CONSUMABLE", "REUSABLE", "TOOL"] as const).map((t) => (
             <button
               key={t}
               onClick={() => setSelectedType(t)}
-              className={`px-4 py-2 text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer ${
+              className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
                 selectedType === t
-                  ? 'bg-[#1A1A1A] text-white'
-                  : 'text-[#6C6863] hover:text-[#1A1A1A]'
+                  ? "bg-white text-[var(--color-idea-blue)] shadow-sm"
+                  : "text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]"
               }`}
             >
-              {t === 'ALL' ? 'All Items' : t}
+              {t === "ALL" ? "All Items" : t}
             </button>
           ))}
         </div>
@@ -287,17 +306,17 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               placeholder="Search catalog directory..."
-              className="input-underline pl-8 pr-4 py-1.5 text-xs font-serif italic text-[#1A1A1A] w-full outline-none"
+              className="idea-input pl-9 pr-4 py-2 text-xs"
             />
-            <Search className="w-4 h-4 text-[#6C6863] absolute left-1 top-2" />
+            <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-2.5" />
           </div>
 
-          <label className="flex items-center gap-2 text-xs font-mono uppercase font-bold text-[#1A1A1A] cursor-pointer select-none shrink-0 bg-[#F9F8F6] px-3 py-2 border border-[#1A1A1A]/20">
+          <label className="flex items-center gap-2 text-xs font-semibold text-[var(--color-idea-text)] cursor-pointer select-none shrink-0 bg-[var(--color-idea-light-grey)] px-3 py-2 rounded-xl border border-[var(--color-idea-border)]">
             <input
               type="checkbox"
               checked={onlyLowStock}
               onChange={(e) => setOnlyLowStock(e.target.checked)}
-              className="accent-[#D4AF37]"
+              className="accent-[var(--color-idea-blue)]"
             />
             <span>Low Stock Alerts</span>
           </label>
@@ -307,76 +326,101 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       {/* Catalog Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map((item) => {
-          // Match stock by both ID and item_code (in case it was saved either way)
-          const itemStocks = stockLevels.filter((s) => 
-            s.catalog_item_id === item.id || s.catalog_item_id === item.item_code
+          const itemStocks = stockLevels.filter(
+            (s) =>
+              s.catalog_item_id === item.id ||
+              s.catalog_item_id === item.item_code,
           );
-          const totalStock = itemStocks.reduce((a, b) => a + (b.quantity || 0), 0);
+          const totalStock = itemStocks.reduce(
+            (a, b) => a + (b.quantity || 0),
+            0,
+          );
           const minStock = item.min_stock_alert ?? 10;
           const isLowStock = totalStock <= minStock;
 
-          console.log(`📊 Stock for ${item.item_code}:`, { totalStock, itemStocks: itemStocks.length });
-
-          // For Reusables and Tools, count physical assets
-          const itemAssets = assets.filter((a) => a.catalog_item_id === item.id);
-          const availableAssetsCount = itemAssets.filter((a) => a.status === 'AVAILABLE').length;
+          const itemAssets = assets.filter(
+            (a) => a.catalog_item_id === item.id,
+          );
+          const availableAssetsCount = itemAssets.filter(
+            (a) => a.status === "AVAILABLE",
+          ).length;
 
           return (
             <div
               key={item.id}
-              className="bg-white border border-[#1A1A1A]/20 shadow-sm p-6 flex flex-col justify-between relative overflow-hidden group hover:border-[#D4AF37] transition-all"
+              className="idea-card p-6 flex flex-col justify-between relative overflow-hidden group"
             >
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <span className={`text-[9px] px-2.5 py-0.5 border font-mono font-bold uppercase tracking-widest ${getItemTypeBadge(item.type)}`}>
+                    <span
+                      className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-widest ${getItemTypeBadge(item.type)}`}
+                    >
                       {item.type}
                     </span>
-                    <h3 className="font-serif text-lg font-bold text-[#1A1A1A] mt-2 group-hover:text-[#D4AF37] transition-colors">
+                    <h3 className="text-base font-bold text-[var(--color-idea-text)] mt-2 group-hover:text-[var(--color-idea-blue)] transition-colors">
                       {item.name}
                     </h3>
-                    <p className="text-xs font-mono font-bold text-[#D4AF37] mt-0.5">{item.item_code}</p>
+                    <p className="text-xs font-mono font-bold text-[var(--color-idea-blue)] mt-0.5">
+                      {item.item_code}
+                    </p>
                   </div>
                   <button
-                    onClick={() => onOpenQRGenerator(item.item_code, item.name, `Type: ${item.type}`)}
-                    className="p-2 bg-[#1A1A1A] text-[#D4AF37] hover:bg-[#D4AF37] hover:text-[#1A1A1A] transition-colors cursor-pointer"
+                    onClick={() =>
+                      onOpenQRGenerator(
+                        item.item_code,
+                        item.name,
+                        `Type: ${item.type}`,
+                      )
+                    }
+                    className="p-2 idea-button rounded-xl cursor-pointer"
                     title="Generate QR Label"
                   >
                     <QrCode className="w-4 h-4" />
                   </button>
                 </div>
 
-                <p className="text-xs text-[#6C6863] line-clamp-2 leading-relaxed">{item.description}</p>
+                <p className="text-xs text-[var(--color-idea-muted)] line-clamp-2 leading-relaxed">
+                  {item.description}
+                </p>
 
                 {/* Stock Level Display */}
-                <div className="pt-3 border-t border-[#1A1A1A]/10">
+                <div className="pt-3 border-t border-[var(--color-idea-border)]">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-mono uppercase tracking-widest text-[#6C6863]">
-                      {item.type === 'CONSUMABLE' ? 'Bulk Inventory Stock' : 'Tracked Physical Assets'}
+                    <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-idea-muted)]">
+                      {item.type === "CONSUMABLE"
+                        ? "Bulk Inventory Stock"
+                        : "Tracked Physical Assets"}
                     </span>
-                    <span className={`text-base font-mono font-bold ${isLowStock ? 'text-red-700' : 'text-[#1A1A1A]'}`}>
-                      {item.type === 'CONSUMABLE' ? `${totalStock} ${item.unit}` : `${availableAssetsCount} / ${itemAssets.length} Avail`}
+                    <span
+                      className={`text-base font-mono font-bold ${isLowStock ? "text-[var(--color-idea-red)]" : "text-[var(--color-idea-text)]"}`}
+                    >
+                      {item.type === "CONSUMABLE"
+                        ? `${totalStock} ${item.unit}`
+                        : `${availableAssetsCount} / ${itemAssets.length} Avail`}
                     </span>
                   </div>
 
                   {isLowStock && (
-                    <div className="flex items-center gap-1.5 text-red-800 text-[10px] font-mono font-bold mt-2 bg-red-50 border border-red-200 px-2.5 py-1">
-                      <AlertTriangle className="w-3.5 h-3.5 text-red-700" />
-                      <span>Below minimum threshold ({minStock} {item.unit})</span>
+                    <div className="flex items-center gap-1.5 idea-error text-[10px] font-bold mt-2 px-2.5 py-1 rounded-xl">
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                      <span>
+                        Below minimum threshold ({minStock} {item.unit})
+                      </span>
                     </div>
                   )}
                 </div>
               </div>
 
               {/* Card Footer Actions */}
-              <div className="pt-4 mt-4 border-t border-[#1A1A1A]/10 flex items-center gap-2">
+              <div className="pt-4 mt-4 border-t border-[var(--color-idea-border)]">
                 <button
                   onClick={() => {
                     setSelectedCatalogItem(item);
-                    setTargetLocId(locations[0]?.id || '');
+                    setTargetLocId(locations[0]?.id || "");
                     setShowRestockModal(true);
                   }}
-                  className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white font-mono text-xs uppercase font-bold tracking-wider transition-colors cursor-pointer"
+                  className="w-full py-2.5 idea-button rounded-xl text-xs font-semibold cursor-pointer"
                 >
                   + Add Stock / Restock
                 </button>
@@ -388,43 +432,49 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
       {/* Add Catalog Item Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 bg-[#1A1A1A]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#F9F8F6] border border-[#1A1A1A] shadow-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
-            <h3 className="font-serif font-bold text-[#1A1A1A] text-lg border-b border-[#1A1A1A]/15 pb-2">
+        <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
+            <h3 className="font-bold text-[var(--color-idea-text)] text-lg border-b border-[var(--color-idea-border)] pb-2">
               Create New Catalog Entry
             </h3>
             <form onSubmit={handleCreateCatalogItem} className="space-y-3">
               <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863]">Item Code (Unique)</label>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Item Code (Unique)
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. CON-100K-X or ARD-DUE-01"
                   value={newItemCode}
                   onChange={(e) => setNewItemCode(e.target.value)}
-                  className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs font-mono uppercase font-bold outline-none"
+                  className="idea-input mt-1 p-2.5 text-xs font-mono uppercase"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863]">Item Name</label>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Item Name
+                </label>
                 <input
                   type="text"
                   required
                   placeholder="e.g. 100k Ohm 1/4W Metal Film Resistors"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
-                  className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs font-serif outline-none"
+                  className="idea-input mt-1 p-2.5 text-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="text-[11px] font-mono uppercase text-[#6C6863]">Category Type</label>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Category Type
+                  </label>
                   <select
                     value={newItemType}
                     onChange={(e) => setNewItemType(e.target.value as ItemType)}
-                    className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs font-mono outline-none"
+                    className="idea-input mt-1 p-2.5 text-xs"
                   >
                     <option value="CONSUMABLE">CONSUMABLE</option>
                     <option value="REUSABLE">REUSABLE</option>
@@ -432,47 +482,55 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   </select>
                 </div>
                 <div>
-                  <label className="text-[11px] font-mono uppercase text-[#6C6863]">Unit</label>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Unit
+                  </label>
                   <input
                     type="text"
                     value={newItemUnit}
                     onChange={(e) => setNewItemUnit(e.target.value)}
                     placeholder="pcs, packs, meters"
-                    className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs outline-none"
+                    className="idea-input mt-1 p-2.5 text-xs"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863]">Description</label>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Description
+                </label>
                 <textarea
                   rows={2}
                   value={newItemDesc}
                   onChange={(e) => setNewItemDesc(e.target.value)}
                   placeholder="Detailed technical specifications..."
-                  className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A]/30 text-xs outline-none"
+                  className="idea-input mt-1 p-2.5 text-xs resize-none"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863]">Min Stock Threshold</label>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Min Stock Threshold
+                </label>
                 <input
                   type="number"
                   min="1"
                   value={newItemMinStock}
                   onChange={(e) => setNewItemMinStock(Number(e.target.value))}
-                  className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs font-mono font-bold outline-none"
+                  className="idea-input mt-1 p-2.5 text-xs font-mono"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863]">Storage Place</label>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Storage Place
+                </label>
                 <input
                   type="text"
                   value={newItemStoragePlace}
                   onChange={(e) => setNewItemStoragePlace(e.target.value)}
                   placeholder="e.g. Shelf A / Cabinet B / Room 204"
-                  className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs outline-none"
+                  className="idea-input mt-1 p-2.5 text-xs"
                 />
               </div>
 
@@ -480,13 +538,13 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] text-xs font-mono font-bold uppercase"
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase hover:bg-[#D4AF37] transition-colors"
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   Create Record
                 </button>
@@ -498,22 +556,27 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
       {/* Restock Modal */}
       {showRestockModal && selectedCatalogItem && (
-        <div className="fixed inset-0 bg-[#1A1A1A]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#F9F8F6] border border-[#1A1A1A] shadow-2xl w-full max-w-sm overflow-hidden p-6 space-y-4">
-            <h3 className="font-serif font-bold text-[#1A1A1A] text-base border-b border-[#1A1A1A]/15 pb-2">
+        <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-sm overflow-hidden p-6 space-y-4">
+            <h3 className="font-bold text-[var(--color-idea-text)] text-base border-b border-[var(--color-idea-border)] pb-2">
               Receive Shipment / Add Stock
             </h3>
-            <p className="text-xs text-[#6C6863]">
-              Adding stock to catalog item: <span className="font-bold text-[#1A1A1A] font-serif">{selectedCatalogItem.name}</span>
+            <p className="text-xs text-[var(--color-idea-muted)]">
+              Adding stock to catalog item:{" "}
+              <span className="font-bold text-[var(--color-idea-text)]">
+                {selectedCatalogItem.name}
+              </span>
             </p>
 
             <form onSubmit={handleRestockSubmit} className="space-y-3">
               <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863]">Storage Bin</label>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Storage Bin
+                </label>
                 <select
                   value={targetLocId}
                   onChange={(e) => setTargetLocId(e.target.value)}
-                  className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs outline-none"
+                  className="idea-input mt-1 p-2.5 text-xs"
                   required
                 >
                   <option value="">-- Choose Storage Location --</option>
@@ -526,13 +589,15 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               </div>
 
               <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863]">Quantity ({selectedCatalogItem.unit})</label>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Quantity ({selectedCatalogItem.unit})
+                </label>
                 <input
                   type="number"
                   min="1"
                   value={restockQty}
                   onChange={(e) => setRestockQty(Number(e.target.value))}
-                  className="w-full mt-1 p-2.5 bg-white border border-[#1A1A1A] text-xs font-mono font-bold outline-none"
+                  className="idea-input mt-1 p-2.5 text-xs font-mono"
                 />
               </div>
 
@@ -540,13 +605,13 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <button
                   type="button"
                   onClick={() => setShowRestockModal(false)}
-                  className="flex-1 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] text-xs font-mono font-bold uppercase"
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase hover:bg-[#D4AF37] transition-colors"
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
                 >
                   Confirm Restock
                 </button>

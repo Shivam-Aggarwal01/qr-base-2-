@@ -1,12 +1,21 @@
-export type UserRole = 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT_LEAD' | 'STUDENT';
+export type UserRole =
+  "ADMIN" | "STUDENT_AMBASSADOR" | "STUDENT_LEAD" | "STUDENT";
 
-export type ItemType = 'CONSUMABLE' | 'REUSABLE' | 'TOOL';
+export type ItemType = "CONSUMABLE" | "REUSABLE" | "TOOL";
 
-export type AssetStatus = 'AVAILABLE' | 'ISSUED' | 'UNDER_REPAIR' | 'DAMAGED' | 'LOST' | 'DISPOSED';
+export type AssetStatus =
+  "AVAILABLE" | "ISSUED" | "UNDER_REPAIR" | "DAMAGED" | "LOST" | "DISPOSED";
 
-export type RequestStatus = 'PENDING' | 'COMPLETED' | 'PARTIAL' | 'CANCELLED';
+export type RequestStatus = "PENDING" | "COMPLETED" | "PARTIAL" | "CANCELLED";
 
-export type TransactionType = 'RECEIVE' | 'ISSUE' | 'RETURN' | 'MOVE' | 'ADJUSTMENT' | 'DAMAGE' | 'DISPOSAL';
+export type TransactionType =
+  | "RECEIVE"
+  | "ISSUE"
+  | "RETURN"
+  | "MOVE"
+  | "ADJUSTMENT"
+  | "DAMAGE"
+  | "DISPOSAL";
 
 export interface User {
   id: string;
@@ -18,7 +27,7 @@ export interface User {
   updated_at: string;
 }
 
-export type AssetTrackingMode = 'BOX' | 'INDIVIDUAL';
+export type AssetTrackingMode = "BOX" | "INDIVIDUAL";
 
 export interface CatalogItem {
   id: string;
@@ -123,4 +132,12 @@ export interface AuditLog {
   created_at: string;
 }
 
-export type ViewMode = 'dashboard' | 'inventory' | 'assets' | 'requests' | 'locations' | 'activity' | 'qr-sheet' | 'users';
+export type ViewMode =
+  | "dashboard"
+  | "inventory"
+  | "assets"
+  | "requests"
+  | "locations"
+  | "activity"
+  | "qr-sheet"
+  | "users";

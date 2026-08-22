@@ -1,74 +1,315 @@
 @import "tailwindcss";
 
+@theme {
+  /* AICTE IDEA Lab Brand Colours */
+  --color-idea-blue: #0aaef0;
+  --color-idea-deep-blue: #0b4ca3;
+  --color-idea-green: #85b440;
+  --color-idea-red: #ee1b24;
+  --color-idea-yellow: #ffca08;
+  /* Neutrals */
+  --color-idea-grey: #737e83;
+  --color-idea-light-grey: #eef3f5;
+  --color-idea-border: #dce5e9;
+  --color-idea-background: #f7fafc;
+  --color-idea-white: #ffffff;
+  /* Text */
+  --color-idea-text: #172b3a;
+  --color-idea-muted: #687782;
+}
+
 @layer base {
-  :root {
-    --bg-alabaster: #F9F8F6;
-    --fg-charcoal: #1A1A1A;
-    --muted-taupe: #EBE5DE;
-    --muted-grey: #6C6863;
-    --accent-gold: #D4AF37;
+  * {
+    box-sizing: border-box;
   }
-
+  html {
+    scroll-behavior: smooth;
+  }
   body {
-    background-color: #F9F8F6;
-    color: #1A1A1A;
-    font-family: 'Inter', sans-serif;
+    margin: 0;
+    background-color: var(--color-idea-background);
+    color: var(--color-idea-text);
+    font-family: "Inter", sans-serif;
   }
-
-  h1, h2, h3, .font-serif {
-    font-family: 'Playfair Display', Georgia, serif;
+  button,
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+  ::selection {
+    background-color: rgba(10, 174, 240, 0.2);
+    color: var(--color-idea-deep-blue);
   }
 }
 
-/* Custom Luxury Architectural Utilities */
-.writing-mode-vertical {
-  writing-mode: vertical-rl;
-  text-orientation: mixed;
+/* IDEA LAB BACKGROUNDS */
+.idea-bg {
+  background:
+    radial-gradient(
+      circle at 10% 10%,
+      rgba(10, 174, 240, 0.08),
+      transparent 30%
+    ),
+    radial-gradient(
+      circle at 90% 90%,
+      rgba(133, 180, 64, 0.08),
+      transparent 30%
+    ),
+    var(--color-idea-background);
 }
 
-/* Custom Architectural Gridlines */
-.grid-lines-bg {
-  background-image: linear-gradient(to right, rgba(26, 26, 26, 0.05) 1px, transparent 1px);
-  background-size: 25% 100%;
+/* Subtle technology / network background */
+.tech-grid {
+  background-image:
+    linear-gradient(rgba(11, 76, 163, 0.045) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(11, 76, 163, 0.045) 1px, transparent 1px);
+  background-size: 32px 32px;
 }
 
-/* Paper Grain Texture */
-.paper-texture {
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.035'/%3E%3C/svg%3E");
+/* Small dot network pattern */
+.dot-grid {
+  background-image: radial-gradient(
+    rgba(11, 76, 163, 0.16) 1px,
+    transparent 1px
+  );
+
+  background-size: 20px 20px;
 }
 
-/* Custom Scrollbar for Luxury Aesthetic */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
+/* IDEA LAB GRADIENTS */
+.idea-gradient {
+  background: linear-gradient(135deg, #0aaef0 0%, #0b4ca3 100%);
+}
+.idea-gradient-soft {
+  background: linear-gradient(
+    135deg,
+    rgba(10, 174, 240, 0.12),
+    rgba(11, 76, 163, 0.06)
+  );
+}
+.idea-gradient-multi {
+  background: linear-gradient(135deg, #0aaef0 0%, #0b4ca3 45%, #85b440 100%);
 }
 
-::-webkit-scrollbar-track {
-  background: #EBE5DE;
+/* BRAND ACCENTS */
+.idea-blue {
+  color: var(--color-idea-blue);
+}
+.idea-deep-blue {
+  color: var(--color-idea-deep-blue);
+}
+.idea-green {
+  color: var(--color-idea-green);
+}
+.idea-red {
+  color: var(--color-idea-red);
+}
+.idea-yellow {
+  color: var(--color-idea-yellow);
 }
 
-::-webkit-scrollbar-thumb {
-  background: #1A1A1A;
+/* CARDS */
+.idea-card {
+  background: var(--color-idea-white);
+  border: 1px solid var(--color-idea-border);
+  border-radius: 16px;
+  box-shadow:
+    0 2px 6px rgba(23, 43, 58, 0.04),
+    0 10px 30px rgba(23, 43, 58, 0.05);
+  transition:
+    transform 0.25s ease,
+    box-shadow 0.25s ease,
+    border-color 0.25s ease;
+}
+.idea-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(10, 174, 240, 0.35);
+  box-shadow:
+    0 4px 10px rgba(23, 43, 58, 0.06),
+    0 16px 40px rgba(23, 43, 58, 0.08);
 }
 
-::-webkit-scrollbar-thumb:hover {
-  background: #D4AF37;
+/* AUTH / FORM ELEMENTS */
+.idea-input {
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid var(--color-idea-border);
+  border-radius: 10px;
+  color: var(--color-idea-text);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
 }
-
-/* Sharp 0px Border Enforcements */
-* {
-  border-radius: 0px !important;
+.idea-input::placeholder {
+  color: #9aa7ae;
 }
-
-/* Underline Inputs */
-.input-underline {
-  border: none;
-  border-bottom: 1px solid rgba(26, 26, 26, 0.25);
-  background: transparent;
-  transition: border-color 0.3s ease;
+.idea-input:hover {
+  border-color: #b9c9d1;
 }
-
-.input-underline:focus {
+.idea-input:focus {
   outline: none;
-  border-bottom-color: #D4AF37;
+  border-color: var(--color-idea-blue);
+  box-shadow: 0 0 0 3px rgba(10, 174, 240, 0.12);
+}
+
+/* BUTTONS */
+.idea-button {
+  background: var(--color-idea-blue);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
+}
+.idea-button:hover {
+  background: #079edc;
+  box-shadow: 0 6px 18px rgba(10, 174, 240, 0.25);
+  transform: translateY(-1px);
+}
+.idea-button:active {
+  transform: translateY(0);
+}
+.idea-button-primary {
+  background: var(--color-idea-deep-blue);
+  color: white;
+}
+.idea-button-primary:hover {
+  background: #083d84;
+}
+.idea-button-green {
+  background: var(--color-idea-green);
+  color: white;
+}
+.idea-button-green:hover {
+  background: #759f38;
+}
+
+/* LOGO / BRAND MARK */
+.idea-logo-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background: linear-gradient(
+    135deg,
+    rgba(10, 174, 240, 0.12),
+    rgba(11, 76, 163, 0.08)
+  );
+}
+
+/* COLOUR ACCENT BAR */
+.idea-accent-bar {
+  height: 4px;
+  background: linear-gradient(
+    90deg,
+    var(--color-idea-blue) 0%,
+    var(--color-idea-blue) 25%,
+    var(--color-idea-green) 25%,
+    var(--color-idea-green) 50%,
+    var(--color-idea-yellow) 50%,
+    var(--color-idea-yellow) 75%,
+    var(--color-idea-red) 75%,
+    var(--color-idea-red) 100%
+  );
+}
+
+/* STATUS / ALERTS */
+.idea-success {
+  background: rgba(133, 180, 64, 0.1);
+  border: 1px solid rgba(133, 180, 64, 0.25);
+  color: #5e8a27;
+}
+.idea-error {
+  background: rgba(238, 27, 36, 0.07);
+  border: 1px solid rgba(238, 27, 36, 0.2);
+  color: #c9151d;
+}
+.idea-info {
+  background: rgba(10, 174, 240, 0.08);
+  border: 1px solid rgba(10, 174, 240, 0.2);
+  color: var(--color-idea-deep-blue);
+}
+.idea-warning {
+  background: rgba(255, 202, 8, 0.12);
+  border: 1px solid rgba(255, 202, 8, 0.3);
+  color: #927500;
+}
+
+/* NETWORK / AI VISUAL ELEMENT */
+.network-glow {
+  background: radial-gradient(
+    circle,
+    rgba(10, 174, 240, 0.2) 0%,
+    rgba(10, 174, 240, 0.05) 35%,
+    transparent 70%
+  );
+}
+.blue-glow {
+  box-shadow: 0 0 40px rgba(10, 174, 240, 0.15);
+}
+.green-glow {
+  box-shadow: 0 0 40px rgba(133, 180, 64, 0.15);
+}
+
+/* DIVIDERS */
+.idea-divider {
+  height: 1px;
+  background: var(--color-idea-border);
+}
+.idea-divider-gradient {
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(10, 174, 240, 0.35),
+    transparent
+  );
+}
+
+/* SCROLLBAR */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-idea-light-grey);
+}
+::-webkit-scrollbar-thumb {
+  background: #aebbc1;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-idea-blue);
+}
+
+/* FOCUS */
+:focus-visible {
+  outline: 2px solid var(--color-idea-blue);
+  outline-offset: 2px;
+}
+
+/* SUBTLE ANIMATION */
+@keyframes idea-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.idea-float {
+  animation: idea-float 4s ease-in-out infinite;
+}
+
+/* RESPONSIVE */
+@media (max-width: 640px) {
+  .idea-card {
+    border-radius: 12px;
+  }
 }

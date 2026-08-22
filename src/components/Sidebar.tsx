@@ -1,4 +1,4 @@
-import React from 'react';
+import React from "react";
 import {
   LayoutDashboard,
   Box,
@@ -7,16 +7,16 @@ import {
   MapPin,
   History,
   QrCode,
-  Users
-} from 'lucide-react';
-import { ViewMode } from '../types/inventory';
+  Users,
+} from "lucide-react";
+import { ViewMode } from "../types/inventory";
 
 interface SidebarProps {
   currentView: ViewMode;
   onSelectView: (view: ViewMode) => void;
   pendingRequestsCount: number;
   onOpenScanner: () => void;
-  userRole?: 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT_LEAD' | 'STUDENT';
+  userRole?: "ADMIN" | "STUDENT_AMBASSADOR" | "STUDENT_LEAD" | "STUDENT";
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -24,42 +24,55 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectView,
   pendingRequestsCount,
   onOpenScanner,
-  userRole = 'STUDENT'
+  userRole = "STUDENT",
 }) => {
-  const isStudent = userRole === 'STUDENT';
+  const isStudent = userRole === "STUDENT";
   const menuItems = isStudent
     ? [
-        { id: 'requests' as ViewMode, label: 'Requests', icon: ClipboardList, badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined },
-        { id: 'dashboard' as ViewMode, label: 'Dashboard', icon: LayoutDashboard }
+        {
+          id: "requests" as ViewMode,
+          label: "Requests",
+          icon: ClipboardList,
+          badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
+        },
+        {
+          id: "dashboard" as ViewMode,
+          label: "Dashboard",
+          icon: LayoutDashboard,
+        },
       ]
     : [
-        { id: 'dashboard' as ViewMode, label: 'Dashboard', icon: LayoutDashboard },
-        { id: 'inventory' as ViewMode, label: 'Inventory', icon: Box },
-        { id: 'assets' as ViewMode, label: 'Assets', icon: Layers },
         {
-          id: 'requests' as ViewMode,
-          label: 'Requests',
-          icon: ClipboardList,
-          badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined
+          id: "dashboard" as ViewMode,
+          label: "Dashboard",
+          icon: LayoutDashboard,
         },
-        { id: 'locations' as ViewMode, label: 'Locations', icon: MapPin },
-        { id: 'activity' as ViewMode, label: 'Activity', icon: History },
-        { id: 'qr-sheet' as ViewMode, label: 'QR Labels', icon: QrCode },
-        { id: 'users' as ViewMode, label: 'User Directory', icon: Users }
+        { id: "inventory" as ViewMode, label: "Inventory", icon: Box },
+        { id: "assets" as ViewMode, label: "Assets", icon: Layers },
+        {
+          id: "requests" as ViewMode,
+          label: "Requests",
+          icon: ClipboardList,
+          badge: pendingRequestsCount > 0 ? pendingRequestsCount : undefined,
+        },
+        { id: "locations" as ViewMode, label: "Locations", icon: MapPin },
+        { id: "activity" as ViewMode, label: "Activity", icon: History },
+        { id: "qr-sheet" as ViewMode, label: "QR Labels", icon: QrCode },
+        { id: "users" as ViewMode, label: "User Directory", icon: Users },
       ];
 
   return (
-    <aside className="w-64 bg-[#1A1A1A] text-white p-6 flex flex-col justify-between shrink-0 h-full overflow-y-auto border-r border-[#1A1A1A] relative select-none">
-      {/* Decorative Gold Top Accent Line */}
-      <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
+    <aside className="w-64 bg-[var(--color-idea-deep-blue)] text-white p-6 flex flex-col justify-between shrink-0 h-full overflow-y-auto relative select-none">
+      {/* Brand Accent Bar */}
+      <div className="idea-accent-bar absolute top-0 left-0 w-full" />
 
       <div className="space-y-8 mt-2">
         {/* Navigation Category Label */}
         <div>
-          <h3 className="text-[10px] font-mono font-bold text-[#D4AF37] uppercase tracking-[0.25em] mb-4 px-2">
-            System Index
+          <h3 className="text-[10px] font-bold text-white/50 uppercase tracking-[0.25em] mb-4 px-2">
+            Navigation
           </h3>
-          <nav className="space-y-1.5">
+          <nav className="space-y-1">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = currentView === item.id;
@@ -67,18 +80,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <button
                   key={item.id}
                   onClick={() => onSelectView(item.id)}
-                  className={`w-full flex items-center justify-between px-3.5 py-3 text-xs font-mono font-bold uppercase tracking-wider transition-all cursor-pointer border ${
+                  className={`w-full flex items-center justify-between px-3.5 py-3 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-[#D4AF37] text-[#1A1A1A] border-[#D4AF37]'
-                      : 'text-[#EBE5DE]/70 border-transparent hover:border-[#D4AF37]/40 hover:text-white'
+                      ? "bg-white/20 text-white shadow-sm"
+                      : "text-white/60 hover:bg-white/10 hover:text-white"
                   }`}
                 >
                   <div className="flex items-center gap-3">
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-[#1A1A1A]' : 'text-[#D4AF37]'}`} />
+                    <Icon
+                      className={`w-4 h-4 ${isActive ? "text-[var(--color-idea-blue)]" : "text-white/50"}`}
+                    />
                     <span>{item.label}</span>
                   </div>
                   {item.badge !== undefined && (
-                    <span className="bg-[#D4AF37] text-[#1A1A1A] text-[9px] px-2 py-0.5 font-mono font-bold">
+                    <span className="bg-[var(--color-idea-blue)] text-white text-[9px] px-2 py-0.5 rounded-full font-bold">
                       {item.badge}
                     </span>
                   )}
@@ -89,16 +104,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* QR Quick Scanner Widget & Vertical Editorial Tag */}
+      {/* QR Quick Scanner Widget */}
       <div className="mt-8 pt-6 border-t border-white/10 space-y-4">
-        <div className="border border-[#D4AF37]/30 bg-white/5 p-4 text-white relative overflow-hidden">
-          <p className="text-[9px] font-mono uppercase text-[#D4AF37] tracking-[0.2em] mb-1">Live QR Scanner</p>
-          <p className="text-xs font-serif font-bold text-[#F9F8F6] leading-snug mb-3">
+        <div className="idea-gradient-soft border border-[var(--color-idea-blue)]/30 rounded-xl p-4 text-white relative overflow-hidden">
+          <p className="text-[9px] font-bold text-[var(--color-idea-blue)] uppercase tracking-[0.2em] mb-1">
+            Live QR Scanner
+          </p>
+          <p className="text-xs font-semibold text-white leading-snug mb-3">
             Scan Box QR or Fixed Asset Tag
           </p>
           <button
             onClick={onOpenScanner}
-            className="w-full py-3 bg-[#D4AF37] hover:bg-white text-[#1A1A1A] border border-[#D4AF37] flex items-center justify-center gap-2 transition-colors cursor-pointer font-mono text-xs font-bold uppercase tracking-wider"
+            className="w-full py-2.5 idea-button flex items-center justify-center gap-2 rounded-xl font-semibold text-xs cursor-pointer"
           >
             <QrCode className="w-4 h-4" />
             <span>Launch Scanner</span>
@@ -106,8 +123,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="text-center pt-2">
-          <p className="text-[9px] font-mono tracking-[0.25em] text-[#EBE5DE]/40 uppercase">
-            LABLOGIC • VOL. 01 • 2026
+          <p className="text-[9px] tracking-[0.25em] text-white/30 uppercase">
+            AICTE IDEA Lab • 2026
           </p>
         </div>
       </div>

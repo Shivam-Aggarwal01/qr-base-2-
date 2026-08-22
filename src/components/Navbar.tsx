@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { QrCode, Search, Plus, RefreshCw, ChevronDown } from 'lucide-react';
-import { User } from '../types/inventory';
+import React, { useState } from "react";
+import { QrCode, Search, Plus, RefreshCw, ChevronDown } from "lucide-react";
+import { User } from "../types/inventory";
 
 interface NavbarProps {
   activeUser: User;
@@ -21,9 +21,9 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenNewRequest,
   onSearch,
   onResetData,
-  onLogout
+  onLogout,
 }) => {
-  const [searchVal, setSearchVal] = useState('');
+  const [searchVal, setSearchVal] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,56 +34,59 @@ export const Navbar: React.FC<NavbarProps> = ({
 
   const getInitials = (name: string) => {
     return name
-      .split(' ')
+      .split(" ")
       .map((n) => n[0])
-      .join('')
+      .join("")
       .substring(0, 2)
       .toUpperCase();
   };
 
   return (
-    <nav className="flex items-center justify-between px-8 py-4 bg-[#F9F8F6] border-b border-[#1A1A1A]/15 shrink-0 z-30 relative">
-      {/* Brand Logo & Editorial Header */}
-      <div className="flex items-center gap-4">
-        <div className="bg-[#1A1A1A] p-2.5 text-white shadow-sm flex items-center justify-center border border-[#D4AF37]">
-          <QrCode className="w-5 h-5 text-[#D4AF37]" />
+    <nav className="flex items-center justify-between px-8 py-3 bg-white border-b border-[var(--color-idea-border)] shrink-0 z-30 relative">
+      {/* Brand Logo */}
+      <div className="flex items-center gap-3">
+        <div className="idea-logo-container">
+          <QrCode className="w-6 h-6 text-[var(--color-idea-blue)]" />
         </div>
         <div>
-          <span className="font-serif text-2xl font-bold tracking-tight text-[#1A1A1A]">
-            LabLogic <span className="font-serif italic font-normal text-[#D4AF37]">QR</span>
+          <span className="text-lg font-bold tracking-tight text-[var(--color-idea-text)]">
+            LabLogic{" "}
+            <span className="text-[var(--color-idea-blue)] font-normal">
+              QR
+            </span>
           </span>
-          <p className="text-[10px] text-[#6C6863] font-mono tracking-[0.2em] uppercase">
-            Electronics Laboratory Inventory & Box Batch Ledger
+          <p className="text-[10px] text-[var(--color-idea-muted)] tracking-wide uppercase">
+            Electronics Laboratory Inventory &amp; Ledger
           </p>
         </div>
       </div>
 
       {/* Center Search & Quick Actions */}
-      <div className="flex items-center gap-5">
+      <div className="flex items-center gap-4">
         <div className="relative">
           <input
             type="text"
             value={searchVal}
             onChange={handleSearchChange}
             placeholder="Search assets, boxes, serials, QR..."
-            className="input-underline pl-9 pr-4 py-1.5 text-xs w-80 font-serif italic text-[#1A1A1A] placeholder-[#6C6863] focus:border-[#D4AF37] outline-none"
+            className="idea-input pl-9 pr-4 py-2 text-xs w-80"
           />
-          <Search className="w-4 h-4 text-[#6C6863] absolute left-1.5 top-2" />
+          <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-2.5" />
         </div>
 
         {/* Scan QR Button */}
         <button
           onClick={onOpenScanner}
-          className="flex items-center gap-2 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-colors cursor-pointer border border-[#1A1A1A]"
+          className="idea-button flex items-center gap-2 px-4 py-2 text-xs font-semibold cursor-pointer"
         >
-          <QrCode className="w-4 h-4 text-[#D4AF37]" />
+          <QrCode className="w-4 h-4" />
           <span>Scan QR</span>
         </button>
 
         {/* New Request Button */}
         <button
           onClick={onOpenNewRequest}
-          className="flex items-center gap-2 border border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white px-5 py-2.5 text-xs font-mono font-bold uppercase tracking-widest transition-colors cursor-pointer"
+          className="flex items-center gap-2 border border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] hover:bg-[var(--color-idea-blue)] hover:text-white px-4 py-2 text-xs font-semibold rounded-[10px] transition-colors cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>Requisition</span>
@@ -91,75 +94,89 @@ export const Navbar: React.FC<NavbarProps> = ({
       </div>
 
       {/* Active User Switcher */}
-      <div className="flex items-center gap-4 border-l border-[#1A1A1A]/15 pl-6 relative">
+      <div className="flex items-center gap-4 border-l border-[var(--color-idea-border)] pl-6 relative">
         <button
           onClick={() => setShowUserDropdown(!showUserDropdown)}
-          className="flex items-center gap-3 hover:bg-[#EBE5DE] p-2 transition-colors text-left cursor-pointer border border-transparent hover:border-[#1A1A1A]/10"
+          className="flex items-center gap-3 hover:bg-[var(--color-idea-light-grey)] px-3 py-2 rounded-xl transition-colors text-left cursor-pointer"
         >
           <div className="text-right">
-            <p className="text-xs font-serif font-bold text-[#1A1A1A]">{activeUser.name}</p>
+            <p className="text-xs font-semibold text-[var(--color-idea-text)]">
+              {activeUser.name}
+            </p>
             <div className="flex items-center justify-end gap-1.5 mt-0.5">
-              <span className="text-[9px] px-2 py-0.2 border border-[#1A1A1A] bg-[#1A1A1A] text-white font-mono uppercase tracking-widest">
-                {activeUser.role.replace('_', ' ')}
+              <span className="text-[9px] px-2 py-0.5 rounded-full bg-[var(--color-idea-blue)] text-white font-medium uppercase tracking-wide">
+                {activeUser.role.replace("_", " ")}
               </span>
-              <span className="text-[10px] text-[#6C6863] font-mono">{activeUser.user_code}</span>
+              <span className="text-[10px] text-[var(--color-idea-muted)] font-mono">
+                {activeUser.user_code}
+              </span>
             </div>
           </div>
-          <div className="w-9 h-9 bg-[#1A1A1A] text-[#D4AF37] border border-[#D4AF37] flex items-center justify-center font-mono font-bold text-xs">
+          <div className="idea-gradient w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-xs">
             {getInitials(activeUser.name)}
           </div>
-          <ChevronDown className="w-3.5 h-3.5 text-[#6C6863]" />
+          <ChevronDown className="w-3.5 h-3.5 text-[var(--color-idea-muted)]" />
         </button>
 
         {/* User Switcher Dropdown */}
         {showUserDropdown && (
-          <div className="absolute right-0 top-16 w-80 bg-[#F9F8F6] border border-[#1A1A1A] shadow-2xl py-2 z-50">
-            <div className="px-4 py-2 border-b border-[#1A1A1A]/10 flex items-center justify-between">
-              <span className="text-[10px] font-mono text-[#6C6863] uppercase tracking-[0.2em]">
-                {activeUser.role === 'STUDENT' ? 'Account' : 'Switch Active User'}
+          <div className="absolute right-0 top-16 w-80 bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl py-2 z-50">
+            <div className="px-4 py-2 border-b border-[var(--color-idea-border)] flex items-center justify-between">
+              <span className="text-[10px] text-[var(--color-idea-muted)] uppercase tracking-wider">
+                {activeUser.role === "STUDENT"
+                  ? "Account"
+                  : "Switch Active User"}
               </span>
-              {activeUser.role !== 'STUDENT' && (
+              {activeUser.role !== "STUDENT" && (
                 <button
                   onClick={() => {
                     onResetData();
                     setShowUserDropdown(false);
                   }}
-                  className="text-[10px] text-red-700 hover:text-red-900 flex items-center gap-1 font-mono uppercase font-bold cursor-pointer"
+                  className="text-[10px] text-[var(--color-idea-red)] hover:opacity-80 flex items-center gap-1 font-medium cursor-pointer"
                 >
                   <RefreshCw className="w-3 h-3" /> Reset Demo
                 </button>
               )}
             </div>
-            <div className="max-h-64 overflow-y-auto divide-y divide-[#1A1A1A]/10">
-              {(activeUser.role === 'STUDENT' ? [activeUser] : users).map((u) => (
-                <button
-                  key={u.id}
-                  onClick={() => {
-                    onUserChange(u);
-                    setShowUserDropdown(false);
-                  }}
-                  className={`w-full px-4 py-3 flex items-center justify-between hover:bg-[#EBE5DE] text-left transition-colors cursor-pointer ${
-                    u.id === activeUser.id ? 'bg-[#EBE5DE] border-l-4 border-[#D4AF37]' : ''
-                  }`}
-                >
-                  <div>
-                    <p className="text-xs font-serif font-bold text-[#1A1A1A]">{u.name}</p>
-                    <p className="text-[10px] text-[#6C6863] font-mono">{u.user_code} • {u.email}</p>
-                  </div>
-                  <span className="text-[9px] px-2 py-0.5 border border-[#1A1A1A] text-[#1A1A1A] font-mono uppercase">
-                    {u.role.replace('_', ' ')}
-                  </span>
-                </button>
-              ))}
+            <div className="max-h-64 overflow-y-auto divide-y divide-[var(--color-idea-border)]">
+              {(activeUser.role === "STUDENT" ? [activeUser] : users).map(
+                (u) => (
+                  <button
+                    key={u.id}
+                    onClick={() => {
+                      onUserChange(u);
+                      setShowUserDropdown(false);
+                    }}
+                    className={`w-full px-4 py-3 flex items-center justify-between hover:bg-[var(--color-idea-light-grey)] text-left transition-colors cursor-pointer ${
+                      u.id === activeUser.id
+                        ? "bg-[var(--color-idea-light-grey)] border-l-4 border-[var(--color-idea-blue)]"
+                        : ""
+                    }`}
+                  >
+                    <div>
+                      <p className="text-xs font-semibold text-[var(--color-idea-text)]">
+                        {u.name}
+                      </p>
+                      <p className="text-[10px] text-[var(--color-idea-muted)] font-mono">
+                        {u.user_code} • {u.email}
+                      </p>
+                    </div>
+                    <span className="text-[9px] px-2 py-0.5 rounded-full bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] font-medium uppercase border border-[var(--color-idea-border)]">
+                      {u.role.replace("_", " ")}
+                    </span>
+                  </button>
+                ),
+              )}
             </div>
             {onLogout && (
-              <div className="px-3 pt-2 border-t border-[#1A1A1A]/10">
+              <div className="px-3 pt-2 border-t border-[var(--color-idea-border)]">
                 <button
                   onClick={() => {
                     onLogout();
                     setShowUserDropdown(false);
                   }}
-                  className="w-full px-3 py-2 text-[10px] font-mono uppercase tracking-[0.2em] text-red-700 hover:bg-red-50 rounded-md transition-colors cursor-pointer"
+                  className="w-full px-3 py-2 text-[10px] font-medium uppercase tracking-wider text-[var(--color-idea-red)] hover:bg-red-50 rounded-xl transition-colors cursor-pointer"
                 >
                   Logout
                 </button>

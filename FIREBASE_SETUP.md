@@ -5,6 +5,7 @@
 Use Firebase Authentication with email/password. Store the app role inside the `users` document.
 
 Role values:
+
 - ADMIN
 - STUDENT_AMBASSADOR
 - STUDENT_LEAD
@@ -15,9 +16,11 @@ Role values:
 Create these collections in Firestore:
 
 ### 1) users
+
 Document ID: Firebase Auth UID
 
 Required fields:
+
 - id: string
 - user_code: string
 - name: string
@@ -27,9 +30,11 @@ Required fields:
 - updated_at: timestamp
 
 ### 2) catalog_items
+
 Document ID: auto id or custom item id
 
 Required fields:
+
 - id: string
 - item_code: string
 - name: string
@@ -42,9 +47,11 @@ Required fields:
 - updated_at: timestamp
 
 ### 3) locations
+
 Document ID: auto id or custom location id
 
 Required fields:
+
 - id: string
 - name: string
 - code: string
@@ -52,9 +59,11 @@ Required fields:
 - updated_at: timestamp
 
 ### 4) stock_levels
+
 Document ID: auto id
 
 Required fields:
+
 - catalog_item_id: string
 - location_id: string
 - quantity: number
@@ -63,9 +72,11 @@ Required fields:
 Unique rule: one stock record per item + location.
 
 ### 5) assets
+
 Document ID: asset id
 
 Required fields:
+
 - id: string
 - asset_code: string
 - catalog_item_id: string
@@ -78,9 +89,11 @@ Required fields:
 - updated_at: timestamp
 
 ### 6) asset_assignments
+
 Document ID: auto id
 
 Required fields:
+
 - asset_id: string
 - assigned_to_user_id: string
 - assigned_by_user_id: string
@@ -89,9 +102,11 @@ Required fields:
 - remarks: string | null
 
 ### 7) requests
+
 Document ID: request id
 
 Required fields:
+
 - id: string
 - request_number: string
 - user_id: string
@@ -103,18 +118,22 @@ Required fields:
 - updated_at: timestamp
 
 ### 8) request_items (subcollection under requests/{requestId})
+
 Document ID: auto id
 
 Required fields:
+
 - catalog_item_id: string
 - requested_qty: number
 - fulfilled_qty: number
 - created_at: timestamp
 
 ### 9) inventory_transactions
+
 Document ID: auto id
 
 Required fields:
+
 - catalog_item_id: string | null
 - asset_id: string | null
 - transaction_type: 'RECEIVE' | 'ISSUE' | 'RETURN' | 'MOVE' | 'ADJUSTMENT' | 'DAMAGE' | 'DISPOSAL'
@@ -128,9 +147,11 @@ Required fields:
 - created_at: timestamp
 
 ### 10) audit_logs
+
 Document ID: auto id
 
 Required fields:
+
 - user_id: string | null
 - action: string
 - entity_type: string
@@ -162,30 +183,43 @@ Required fields:
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() { return request.auth != null; }
-    function roleOf() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    function signedIn() { return request.auth != null; }
+
+    function role() {
+      return signedIn() ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : null;
+    }
+
+    function isAdmin() {
+      return signedIn() && role() == 'ADMIN';
+    }
+
+    function isStaff() {
+      return signedIn() && role() in ['ADMIN', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR'];
+    }
+
+    function isStudent() {
+      return signedIn() && role() in ['ADMIN', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR', 'STUDENT'];
     }
 
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && roleOf() == 'ADMIN';
+      allow read: if signedIn();
+      allow write: if signedIn() && (request.auth.uid == userId || isAdmin());
     }
 
     match /catalog_items/{itemId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (roleOf() == 'ADMIN' || roleOf() == 'STUDENT_AMBASSADOR');
+      allow read: if signedIn();
+      allow write: if isStaff();
     }
 
     match /requests/{requestId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
-      allow update: if isSignedIn() && (roleOf() == 'ADMIN' || roleOf() == 'STUDENT_AMBASSADOR' || roleOf() == 'STUDENT_LEAD');
+      allow read: if signedIn() && (request.auth.uid == resource.data.user_id || isStaff());
+      allow create: if isStudent();
+      allow update: if isStaff();
     }
 
     match /assets/{assetId} {
-      allow read: if isSignedIn();
-      allow write: if isSignedIn() && (roleOf() == 'ADMIN' || roleOf() == 'STUDENT_AMBASSADOR' || roleOf() == 'STUDENT_LEAD');
+      allow read: if signedIn();
+      allow write: if isStaff();
     }
   }
 }

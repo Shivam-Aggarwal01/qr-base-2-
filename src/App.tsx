@@ -1,11 +1,33 @@
-import React, { useState, useEffect } from 'react';
-import { onAuthStateChanged, signOut } from 'firebase/auth';
-import { auth } from './firebase';
-import { InventoryStorage, parseQRCodeFromEntities } from './services/storage';
-import { ensureUserProfile, getUserProfile, completeGoogleRedirect } from './services/firebaseInventory';
-import { readFirestoreState } from './services/firebaseCollections';
-import { FirebaseAuthPanel } from './components/FirebaseAuthPanel';
-import { resolveRoleFromEmail } from './services/roleConfig';
+import { useEffect, useState } from "react";
+import { onAuthStateChanged, signOut } from "firebase/auth";
+import { auth } from "./firebase";
+import { InventoryStorage, parseQRCodeFromEntities } from "./services/storage";
+import {
+  ensureUserProfile,
+  getUserProfile,
+  completeGoogleRedirect,
+  updateFirestoreDocument,
+  deleteFirestoreDocument,
+  COLLECTIONS,
+} from "./services/firebaseInventory";
+import { readFirestoreState } from "./services/firebaseCollections";
+import { resolveRoleFromEmail } from "./services/roleConfig";
+import { isStudent } from "./services/authRoles";
+import { FirebaseAuthPanel } from "./components/FirebaseAuthPanel";
+import { Navbar } from "./components/Navbar";
+import { Sidebar } from "./components/Sidebar";
+import { DashboardView } from "./components/DashboardView";
+import { CatalogView } from "./components/CatalogView";
+import { AssetsView } from "./components/AssetsView";
+import { RequestsView } from "./components/RequestsView";
+import { LocationsView } from "./components/LocationsView";
+import { ActivityView } from "./components/ActivityView";
+import { UsersView } from "./components/UsersView";
+import { BatchQRLabelsModal } from "./components/BatchQRLabelsModal";
+import { QRScannerModal } from "./components/QRScannerModal";
+import { QRGeneratorModal } from "./components/QRGeneratorModal";
+import { QuickActionModal } from "./components/QuickActionModal";
+import { NewRequestModal } from "./components/NewRequestModal";
 import {
   User,
   CatalogItem,
@@ -15,28 +37,12 @@ import {
   AssetAssignment,
   Request,
   InventoryTransaction,
-  ViewMode
-} from './types/inventory';
-import { Navbar } from './components/Navbar';
-import { Sidebar } from './components/Sidebar';
-import { DashboardView } from './components/DashboardView';
-import { CatalogView } from './components/CatalogView';
-import { AssetsView } from './components/AssetsView';
-import { RequestsView } from './components/RequestsView';
-import { LocationsView } from './components/LocationsView';
-import { ActivityView } from './components/ActivityView';
-import { UsersView } from './components/UsersView';
-import { isStudent } from './services/authRoles';
-import { BatchQRLabelsModal } from './components/BatchQRLabelsModal';
-import { QRScannerModal } from './components/QRScannerModal';
-import { QRGeneratorModal } from './components/QRGeneratorModal';
-import { QuickActionModal } from './components/QuickActionModal';
-import { NewRequestModal } from './components/NewRequestModal';
+  ViewMode,
+} from "./types/inventory";
 
 export default function App() {
+  // Data
   const [users, setUsers] = useState<User[]>([]);
-  const [activeUser, setActiveUser] = useState<User | null>(null);
-  const [firebaseUserProfile, setFirebaseUserProfile] = useState<User | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([]);
@@ -44,19 +50,24 @@ export default function App() {
   const [assignments, setAssignments] = useState<AssetAssignment[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
-
+  // Authentication
+  const [activeUser, setActiveUser] = useState<User | null>(null);
+  const [firebaseUserProfile, setFirebaseUserProfile] = useState<User | null>(
+    null,
+  );
   // Navigation
-  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
-
-  // Modals
+  const [currentView, setCurrentView] = useState<ViewMode>("dashboard");
+  // Scanner
   const [isScannerOpen, setIsScannerOpen] = useState(false);
+  // New request
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
-  const [newRequestPrefillItems, setNewRequestPrefillItems] = useState<{
-    catalog_item_id: string;
-    requested_qty: number;
-  }[]>([]);
-
-  // QR Generator Modal State
+  const [newRequestPrefillItems, setNewRequestPrefillItems] = useState<
+    {
+      catalog_item_id: string;
+      requested_qty: number;
+    }[]
+  >([]);
+  // QR generator
   const [qrGenData, setQrGenData] = useState<{
     isOpen: boolean;
     code: string;
@@ -64,191 +75,227 @@ export default function App() {
     subtitle?: string;
   }>({
     isOpen: false,
-    code: '',
-    title: ''
+    code: "",
+    title: "",
   });
-
-  // Quick Action Modal State
+  // Quick actions
   const [quickActionData, setQuickActionData] = useState<{
     isOpen: boolean;
     qrResult: any;
   }>({
     isOpen: false,
-    qrResult: null
+    qrResult: null,
   });
+  //  DERIVED STATE
+  const currentUser = firebaseUserProfile ?? activeUser;
+  const isStudentUser = isStudent(currentUser?.role);
+  const pendingRequestsCount = isStudentUser
+    ? requests.filter(
+        (request) =>
+          request.status === "PENDING" && request.user_id === currentUser?.id,
+      ).length
+    : requests.filter((request) => request.status === "PENDING").length;
 
-  // Load state from Storage
+  //  DATA LOADING
+  const loadLocalData = () => {
+    const localUsers = InventoryStorage.getUsers();
+    setUsers(localUsers);
+    setActiveUser(localUsers[0] ?? null);
+    setLocations(InventoryStorage.getLocations());
+    setCatalogItems(InventoryStorage.getCatalog());
+    setStockLevels(InventoryStorage.getStockLevels());
+    setAssets(InventoryStorage.getAssets());
+    setAssignments(InventoryStorage.getAssignments());
+    setRequests(InventoryStorage.getRequests());
+    setTransactions(InventoryStorage.getTransactions());
+  };
+  const loadFirestoreData = async () => {
+    const state = await readFirestoreState();
+    setCatalogItems(state.catalogItems ?? []);
+    setLocations(state.locations ?? []);
+    setStockLevels(state.stockLevels ?? []);
+    setAssets(state.assets ?? []);
+    setAssignments(state.assignments ?? []);
+    setRequests(state.requests ?? []);
+    setTransactions(state.transactions ?? []);
+    setUsers(state.users ?? []);
+  };
   const refreshAllData = async () => {
-    console.log('🔄 Refreshing all data... currentUser:', auth.currentUser?.email);
-    
     if (!auth.currentUser) {
-      console.log('⚠️ No auth user, loading from local storage');
-      const fallbackUsers = InventoryStorage.getUsers();
-      setUsers(fallbackUsers);
-      setActiveUser(fallbackUsers[0] ?? null);
-      setLocations(InventoryStorage.getLocations());
-      setCatalogItems(InventoryStorage.getCatalog());
-      setStockLevels(InventoryStorage.getStockLevels());
-      setAssets(InventoryStorage.getAssets());
-      setAssignments(InventoryStorage.getAssignments());
-      setRequests(InventoryStorage.getRequests());
-      setTransactions(InventoryStorage.getTransactions());
+      loadLocalData();
       return;
     }
-
     try {
-      const firestoreState = await readFirestoreState();
-      
-      console.log('📊 Firestore data loaded:', {
-        catalogItems: firestoreState.catalogItems?.length || 0,
-        locations: firestoreState.locations?.length || 0,
-        stockLevels: firestoreState.stockLevels?.length || 0,
-        assets: firestoreState.assets?.length || 0,
-        requests: firestoreState.requests?.length || 0,
-        transactions: firestoreState.transactions?.length || 0,
-        users: firestoreState.users?.length || 0,
-      });
-
-      // Use Firestore data directly — it is the source of truth
-      setCatalogItems(firestoreState.catalogItems || []);
-      setLocations(firestoreState.locations || []);
-      setStockLevels(firestoreState.stockLevels || []);
-      setAssets(firestoreState.assets || []);
-      setAssignments(firestoreState.assignments || []);
-      setRequests(firestoreState.requests || []);
-      setTransactions(firestoreState.transactions || []);
-      setUsers(firestoreState.users || []);
+      await loadFirestoreData();
     } catch (error) {
-      console.error('❌ Firebase state unavailable, using local fallback state.', error);
-      const fallbackUsers = InventoryStorage.getUsers();
-      setUsers(fallbackUsers);
-      setActiveUser(fallbackUsers[0] ?? null);
-      setLocations(InventoryStorage.getLocations());
-      setCatalogItems(InventoryStorage.getCatalog());
-      setStockLevels(InventoryStorage.getStockLevels());
-      setAssets(InventoryStorage.getAssets());
-      setAssignments(InventoryStorage.getAssignments());
-      setRequests(InventoryStorage.getRequests());
-      setTransactions(InventoryStorage.getTransactions());
+      loadLocalData();
     }
   };
 
+  //  AUTHENTICATION
   useEffect(() => {
-    refreshAllData();
-  }, []);
-
-  useEffect(() => {
-    void completeGoogleRedirect().catch((error) => {
-      console.warn('Google redirect sign-in did not complete:', error);
-    });
-
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const existingProfile = await getUserProfile(firebaseUser.uid);
-        if (existingProfile) {
-          setFirebaseUserProfile(existingProfile);
-          setActiveUser(existingProfile);
+    let unsubscribe: (() => void) | undefined;
+    const initialiseAuth = async () => {
+      try {
+        await completeGoogleRedirect();
+      } catch (error) {
+        console.warn("Google redirect sign-in did not complete:", error);
+      }
+      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+        if (!firebaseUser) {
+          setFirebaseUserProfile(null);
+          setActiveUser(null);
           await refreshAllData();
           return;
         }
+        try {
+          let profile = await getUserProfile(firebaseUser.uid);
+          if (!profile) {
+            const role =
+              resolveRoleFromEmail(firebaseUser.email ?? "") ?? "STUDENT";
 
-        const fallbackRole = resolveRoleFromEmail(firebaseUser.email ?? '') || 'STUDENT';
-        const fallbackProfile = await ensureUserProfile(firebaseUser, fallbackRole);
-        setFirebaseUserProfile(fallbackProfile);
-        setActiveUser(fallbackProfile);
-        await refreshAllData();
-        return;
-      }
-
-      setFirebaseUserProfile(null);
-      setActiveUser(null);
-      await refreshAllData();
-    });
-
-    return () => unsubscribe();
+            profile = await ensureUserProfile(firebaseUser, role);
+          }
+          setFirebaseUserProfile(profile);
+          setActiveUser(profile);
+          await refreshAllData();
+        } catch (error) {
+          console.error("❌ Failed to initialise Firebase user:", error);
+        }
+      });
+    };
+    void initialiseAuth();
+    return () => {
+      unsubscribe?.();
+    };
   }, []);
 
-  const handleUserChange = (u: User) => {
-    const newActive = InventoryStorage.setActiveUser(u.id);
-    setActiveUser(newActive);
-    setFirebaseUserProfile(null);
-  };
-
-  const handleResetData = () => {
-    if (confirm('Reset all electronics lab data back to initial seed state?')) {
-      InventoryStorage.resetAllData();
-      refreshAllData();
-    }
-  };
-
-  const handleOpenQRGenerator = (code: string, title: string, subtitle?: string) => {
-    setQrGenData({
-      isOpen: true,
-      code,
-      title,
-      subtitle
-    });
-  };
-
-  const openNewRequest = (prefillItems?: { catalog_item_id: string; requested_qty: number }[]) => {
-    setNewRequestPrefillItems(prefillItems ?? []);
-    setIsNewRequestOpen(true);
-  };
-
-  const handleScanResult = (code: string) => {
-    const parsed = parseQRCodeFromEntities(code, {
-      assets,
-      catalog: catalogItems,
-      locations,
-      requests,
-      users
-    });
-    setQuickActionData({
-      isOpen: true,
-      qrResult: parsed
-    });
-  };
-
-  const handleGlobalSearch = (query: string) => {
-    if (!query.trim()) return;
-    // Check if query directly matches a QR code
-    const parsed = parseQRCodeFromEntities(query, {
-      assets,
-      catalog: catalogItems,
-      locations,
-      requests,
-      users
-    });
-    if (parsed.type !== 'unknown') {
-      setQuickActionData({
-        isOpen: true,
-        qrResult: parsed
-      });
-    } else if (!isStudent(currentUser?.role)) {
-      setCurrentView('inventory');
-    }
-  };
-
-  const currentUser = firebaseUserProfile || activeUser;
-  const isStudentUser = isStudent(currentUser?.role);
-
+  //  NAVIGATION
   useEffect(() => {
-    if (isStudentUser && currentView !== 'requests' && currentView !== 'dashboard') {
-      setCurrentView('requests');
+    if (
+      isStudentUser &&
+      currentView !== "dashboard" &&
+      currentView !== "requests"
+    ) {
+      setCurrentView("requests");
     }
   }, [isStudentUser, currentView]);
 
+  //  USER ACTIONS
+  const handleUserChange = (user: User) => {
+    const newActiveUser = InventoryStorage.setActiveUser(user.id);
+    setActiveUser(newActiveUser);
+    setFirebaseUserProfile(null);
+  };
   const handleAuthSuccess = (user: User) => {
     setFirebaseUserProfile(user);
     setActiveUser(user);
   };
-
   const handleLogout = async () => {
-    await signOut(auth);
-    setFirebaseUserProfile(null);
-    setActiveUser(null);
+    try {
+      await signOut(auth);
+      setFirebaseUserProfile(null);
+      setActiveUser(null);
+    } catch (error) {
+      console.error("❌ Logout failed:", error);
+    }
+  };
+  const handleResetData = () => {
+    const confirmed = confirm(
+      "Reset all electronics lab data back to initial seed state?",
+    );
+    if (!confirmed) {
+      return;
+    }
+    InventoryStorage.resetAllData();
+    void refreshAllData();
   };
 
+  //  QR / REQUEST ACTIONS
+  const handleOpenQRGenerator = (
+    code: string,
+    title: string,
+    subtitle?: string,
+  ) => {
+    setQrGenData({
+      isOpen: true,
+      code,
+      title,
+      subtitle,
+    });
+  };
+  const openNewRequest = (
+    items: {
+      catalog_item_id: string;
+      requested_qty: number;
+    }[] = [],
+  ) => {
+    setNewRequestPrefillItems(items);
+    setIsNewRequestOpen(true);
+  };
+  const handleScanResult = (code: string) => {
+    const result = parseQRCodeFromEntities(code, {
+      assets,
+      catalog: catalogItems,
+      locations,
+      requests,
+      users,
+    });
+    setQuickActionData({
+      isOpen: true,
+      qrResult: result,
+    });
+  };
+  const handleGlobalSearch = (query: string) => {
+    const searchQuery = query.trim();
+    if (!searchQuery) {
+      return;
+    }
+    const result = parseQRCodeFromEntities(searchQuery, {
+      assets,
+      catalog: catalogItems,
+      locations,
+      requests,
+      users,
+    });
+    if (result.type !== "unknown") {
+      setQuickActionData({
+        isOpen: true,
+        qrResult: result,
+      });
+      return;
+    }
+    if (!isStudentUser) {
+      setCurrentView("inventory");
+    }
+  };
+
+  //  USER MANAGEMENT
+  const handleUpdateUserRole = async (
+    userId: string,
+    newRole: User["role"],
+  ) => {
+    try {
+      await updateFirestoreDocument(COLLECTIONS.USERS, userId, {
+        role: newRole,
+      });
+      await refreshAllData();
+    } catch (error) {
+      console.error("❌ Failed to update user role:", error);
+      alert("Failed to update user role.");
+    }
+  };
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      await deleteFirestoreDocument(COLLECTIONS.USERS, userId);
+      await refreshAllData();
+    } catch (error) {
+      console.error("❌ Failed to delete user:", error);
+      alert("Failed to delete user.");
+    }
+  };
+
+  //  AUTH SCREEN
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
@@ -257,13 +304,10 @@ export default function App() {
     );
   }
 
-  const pendingRequestsCount = isStudentUser
-    ? requests.filter((r) => r.status === 'PENDING' && r.user_id === currentUser.id).length
-    : requests.filter((r) => r.status === 'PENDING').length;
-
+  //  APPLICATION
   return (
     <div className="flex flex-col h-screen w-screen bg-[#f8fafc] text-slate-900 font-sans overflow-hidden antialiased select-none">
-      {/* Top Navigation */}
+      {/* NAVBAR */}
       <Navbar
         activeUser={currentUser}
         users={users}
@@ -274,21 +318,18 @@ export default function App() {
         onResetData={handleResetData}
         onLogout={handleLogout}
       />
-
-      {/* Main Body */}
+      {/* MAIN LAYOUT */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Left Sidebar Menu */}
         <Sidebar
           currentView={currentView}
           onSelectView={setCurrentView}
           pendingRequestsCount={pendingRequestsCount}
           onOpenScanner={() => setIsScannerOpen(true)}
-          userRole={currentUser?.role}
+          userRole={currentUser.role}
         />
-
-        {/* Center Content View */}
         <main className="flex-1 flex flex-col overflow-hidden relative">
-          {currentView === 'dashboard' && (
+          {/* Dashboard */}
+          {currentView === "dashboard" && (
             <DashboardView
               assets={assets}
               catalogItems={catalogItems}
@@ -304,20 +345,20 @@ export default function App() {
               onOpenNewRequest={() => openNewRequest()}
             />
           )}
-
-          {currentView === 'inventory' && (
+          {/* Inventory */}
+          {currentView === "inventory" && (
             <CatalogView
               catalogItems={catalogItems}
               stockLevels={stockLevels}
               locations={locations}
               assets={assets}
-              userRole={currentUser?.role}
+              userRole={currentUser.role}
               onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
             />
           )}
-
-          {currentView === 'assets' && (
+          {/* Assets */}
+          {currentView === "assets" && (
             <AssetsView
               assets={assets}
               catalogItems={catalogItems}
@@ -327,20 +368,20 @@ export default function App() {
               onRefreshData={refreshAllData}
             />
           )}
-
-          {currentView === 'requests' && (
+          {/* Requests */}
+          {currentView === "requests" && (
             <RequestsView
               requests={requests}
               catalogItems={catalogItems}
               users={users}
               activeUser={currentUser}
-              onOpenNewRequest={() => setIsNewRequestOpen(true)}
+              onOpenNewRequest={() => openNewRequest()}
               onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
             />
           )}
-
-          {currentView === 'locations' && (
+          {/* Locations */}
+          {currentView === "locations" && (
             <LocationsView
               locations={locations}
               catalogItems={catalogItems}
@@ -350,8 +391,8 @@ export default function App() {
               onRefreshData={refreshAllData}
             />
           )}
-
-          {currentView === 'activity' && (
+          {/* Activity */}
+          {currentView === "activity" && (
             <ActivityView
               transactions={transactions}
               catalogItems={catalogItems}
@@ -361,45 +402,54 @@ export default function App() {
               onOpenQRGenerator={handleOpenQRGenerator}
             />
           )}
-
-          {currentView === 'qr-sheet' && (
+          {/* QR Sheet */}
+          {currentView === "qr-sheet" && (
             <BatchQRLabelsModal
               assets={assets}
               catalogItems={catalogItems}
               locations={locations}
             />
           )}
-
-          {currentView === 'users' && (
+          {/* Users */}
+          {currentView === "users" && (
             <UsersView
               users={users}
               assets={assets}
               catalogItems={catalogItems}
-              onOpenQRGenerator={handleOpenQRGenerator}
+              activeUser={currentUser}
+              onUpdateUserRole={handleUpdateUserRole}
+              onDeleteUser={handleDeleteUser}
               onRefreshData={refreshAllData}
             />
           )}
         </main>
       </div>
-
-      {/* Global Modals */}
+      {/* GLOBAL MODALS */}
       <QRScannerModal
         isOpen={isScannerOpen}
         onClose={() => setIsScannerOpen(false)}
         onScanResult={handleScanResult}
       />
-
       <QRGeneratorModal
         isOpen={qrGenData.isOpen}
-        onClose={() => setQrGenData({ ...qrGenData, isOpen: false })}
+        onClose={() =>
+          setQrGenData((previous) => ({
+            ...previous,
+            isOpen: false,
+          }))
+        }
         code={qrGenData.code}
         title={qrGenData.title}
         subtitle={qrGenData.subtitle}
       />
-
       <QuickActionModal
         isOpen={quickActionData.isOpen}
-        onClose={() => setQuickActionData({ ...quickActionData, isOpen: false })}
+        onClose={() =>
+          setQuickActionData((previous) => ({
+            ...previous,
+            isOpen: false,
+          }))
+        }
         qrData={quickActionData.qrResult}
         users={users}
         locations={locations}
@@ -408,17 +458,18 @@ export default function App() {
         assets={assets}
         requests={requests}
         activeUser={currentUser}
-        onOpenNewRequest={(items) => openNewRequest(items)}
+        onOpenNewRequest={openNewRequest}
         onRefreshData={refreshAllData}
         onOpenQRGenerator={handleOpenQRGenerator}
       />
-
       <NewRequestModal
         isOpen={isNewRequestOpen}
         onClose={() => setIsNewRequestOpen(false)}
         activeUser={currentUser}
         catalogItems={catalogItems}
-        initialItems={newRequestPrefillItems.length ? newRequestPrefillItems : undefined}
+        initialItems={
+          newRequestPrefillItems.length > 0 ? newRequestPrefillItems : undefined
+        }
         onRefreshData={refreshAllData}
       />
     </div>

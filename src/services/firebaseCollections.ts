@@ -8,9 +8,9 @@ import {
   query,
   serverTimestamp,
   setDoc,
-  updateDoc
-} from 'firebase/firestore';
-import { auth, db } from '../firebase';
+  updateDoc,
+} from "firebase/firestore";
+import { auth, db } from "../firebase";
 import type {
   Asset,
   AssetAssignment,
@@ -19,34 +19,34 @@ import type {
   Location,
   Request,
   StockLevel,
-  User
-} from '../types/inventory';
+  User,
+} from "../types/inventory";
 
 const collectionName = {
-  users: 'users',
-  catalogItems: 'catalog_items',
-  locations: 'locations',
-  stockLevels: 'stock_levels',
-  assets: 'assets',
-  assetAssignments: 'asset_assignments',
-  requests: 'requests',
-  requestItems: 'request_items',
-  inventoryTransactions: 'inventory_transactions',
-  auditLogs: 'audit_logs'
+  users: "users",
+  catalogItems: "catalog_items",
+  locations: "locations",
+  stockLevels: "stock_levels",
+  assets: "assets",
+  assetAssignments: "asset_assignments",
+  requests: "requests",
+  requestItems: "request_items",
+  inventoryTransactions: "inventory_transactions",
+  auditLogs: "audit_logs",
 } as const;
 
 export const firebaseCollections = collectionName;
 
 function requireSignedInUser(): void {
   if (!auth.currentUser) {
-    throw new Error('Firestore access blocked: user is not signed in.');
+    throw new Error("Firestore access blocked: user is not signed in.");
   }
 }
 
 function getMs(val: any): number {
   if (!val) return 0;
-  if (typeof val.toMillis === 'function') return val.toMillis();
-  if (typeof val.toDate === 'function') return val.toDate().getTime();
+  if (typeof val.toMillis === "function") return val.toMillis();
+  if (typeof val.toDate === "function") return val.toDate().getTime();
   if (val.seconds !== undefined) return val.seconds * 1000;
   const time = new Date(val).getTime();
   return isNaN(time) ? 0 : time;
@@ -54,9 +54,10 @@ function getMs(val: any): number {
 
 function tsToString(val: any): string {
   if (!val) return new Date().toISOString();
-  if (typeof val === 'string') return val;
-  if (typeof val.toDate === 'function') return val.toDate().toISOString();
-  if (val.seconds !== undefined) return new Date(val.seconds * 1000).toISOString();
+  if (typeof val === "string") return val;
+  if (typeof val.toDate === "function") return val.toDate().toISOString();
+  if (val.seconds !== undefined)
+    return new Date(val.seconds * 1000).toISOString();
   return new Date().toISOString();
 }
 
@@ -76,14 +77,18 @@ export async function getCollection<T>(name: string): Promise<T[]> {
       }
 
       // Convert Firestore Timestamps to ISO strings
-      if (cleaned.created_at) cleaned.created_at = tsToString(cleaned.created_at);
-      if (cleaned.updated_at) cleaned.updated_at = tsToString(cleaned.updated_at);
-      if (cleaned.assigned_at) cleaned.assigned_at = tsToString(cleaned.assigned_at);
-      if (cleaned.returned_at) cleaned.returned_at = tsToString(cleaned.returned_at);
+      if (cleaned.created_at)
+        cleaned.created_at = tsToString(cleaned.created_at);
+      if (cleaned.updated_at)
+        cleaned.updated_at = tsToString(cleaned.updated_at);
+      if (cleaned.assigned_at)
+        cleaned.assigned_at = tsToString(cleaned.assigned_at);
+      if (cleaned.returned_at)
+        cleaned.returned_at = tsToString(cleaned.returned_at);
 
       return {
         ...cleaned,
-        id: document.id,  // Firestore doc ID MUST always win
+        id: document.id, // Firestore doc ID MUST always win
       };
     }) as any[];
 
@@ -100,85 +105,97 @@ export async function getCollection<T>(name: string): Promise<T[]> {
   }
 }
 
-export async function getUserProfileFromFirestore(uid: string): Promise<User | null> {
+export async function getUserProfileFromFirestore(
+  uid: string,
+): Promise<User | null> {
   try {
     requireSignedInUser();
-    const snapshot = await getDoc(doc(db, 'users', uid));
+    const snapshot = await getDoc(doc(db, "users", uid));
     if (!snapshot.exists()) return null;
     return {
       id: snapshot.id,
-      ...(snapshot.data() as Omit<User, 'id'>)
+      ...(snapshot.data() as Omit<User, "id">),
     };
   } catch (error) {
-    console.warn('Failed to read user profile from Firestore:', error);
+    console.warn("Failed to read user profile from Firestore:", error);
     return null;
   }
 }
 
 export async function saveUserProfileToFirestore(user: User): Promise<void> {
   requireSignedInUser();
-  await setDoc(doc(db, 'users', user.id), {
+  await setDoc(doc(db, "users", user.id), {
     ...user,
     updated_at: new Date().toISOString(),
-    created_at: user.created_at || new Date().toISOString()
+    created_at: user.created_at || new Date().toISOString(),
   });
 }
 
-export async function createCatalogItemFirestore(payload: Omit<CatalogItem, 'id' | 'created_at' | 'updated_at'>): Promise<CatalogItem> {
+export async function createCatalogItemFirestore(
+  payload: Omit<CatalogItem, "id" | "created_at" | "updated_at">,
+): Promise<CatalogItem> {
   const now = new Date().toISOString();
-  const docRef = await addDoc(collection(db, 'catalog_items'), {
+  const docRef = await addDoc(collection(db, "catalog_items"), {
     ...payload,
     created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
+    updated_at: serverTimestamp(),
   });
 
   return {
     id: docRef.id,
     ...payload,
     created_at: now,
-    updated_at: now
+    updated_at: now,
   };
 }
 
-export async function createLocationFirestore(payload: Omit<Location, 'id' | 'created_at' | 'updated_at'>): Promise<Location> {
+export async function createLocationFirestore(
+  payload: Omit<Location, "id" | "created_at" | "updated_at">,
+): Promise<Location> {
   const now = new Date().toISOString();
-  const docRef = await addDoc(collection(db, 'locations'), {
+  const docRef = await addDoc(collection(db, "locations"), {
     ...payload,
     created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
+    updated_at: serverTimestamp(),
   });
 
   return {
     id: docRef.id,
     ...payload,
     created_at: now,
-    updated_at: now
+    updated_at: now,
   };
 }
 
-export async function createAssetFirestore(payload: Omit<Asset, 'id' | 'created_at' | 'updated_at'>): Promise<Asset> {
+export async function createAssetFirestore(
+  payload: Omit<Asset, "id" | "created_at" | "updated_at">,
+): Promise<Asset> {
   const now = new Date().toISOString();
-  const docRef = await addDoc(collection(db, 'assets'), {
+  const docRef = await addDoc(collection(db, "assets"), {
     ...payload,
     created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
+    updated_at: serverTimestamp(),
   });
 
   return {
     id: docRef.id,
     ...payload,
     created_at: now,
-    updated_at: now
+    updated_at: now,
   };
 }
 
-export async function createRequestFirestore(payload: Omit<Request, 'id' | 'created_at' | 'updated_at' | 'items'> & { items?: any[] }): Promise<Request> {
+export async function createRequestFirestore(
+  payload: Omit<Request, "id" | "created_at" | "updated_at" | "items"> & {
+    items?: any[];
+  },
+): Promise<Request> {
   const now = new Date().toISOString();
-  const docRef = await addDoc(collection(db, 'requests'), {
+  const docRef = await addDoc(collection(db, "requests"), {
     ...payload,
     items: payload.items || [],
     created_at: serverTimestamp(),
-    updated_at: serverTimestamp()
+    updated_at: serverTimestamp(),
   });
 
   return {
@@ -186,21 +203,23 @@ export async function createRequestFirestore(payload: Omit<Request, 'id' | 'crea
     ...payload,
     items: payload.items || [],
     created_at: now,
-    updated_at: now
+    updated_at: now,
   };
 }
 
-export async function createInventoryTransactionFirestore(payload: Omit<InventoryTransaction, 'id' | 'created_at'>): Promise<InventoryTransaction> {
+export async function createInventoryTransactionFirestore(
+  payload: Omit<InventoryTransaction, "id" | "created_at">,
+): Promise<InventoryTransaction> {
   const now = new Date().toISOString();
-  const docRef = await addDoc(collection(db, 'inventory_transactions'), {
+  const docRef = await addDoc(collection(db, "inventory_transactions"), {
     ...payload,
-    created_at: serverTimestamp()
+    created_at: serverTimestamp(),
   });
 
   return {
     id: docRef.id,
     ...payload,
-    created_at: now
+    created_at: now,
   };
 }
 
@@ -211,18 +230,22 @@ export async function createAuditLogFirestore(payload: {
   entity_id: string;
   created_at?: string;
 }): Promise<void> {
-  await addDoc(collection(db, 'audit_logs'), {
+  await addDoc(collection(db, "audit_logs"), {
     ...payload,
-    created_at: payload.created_at || new Date().toISOString()
+    created_at: payload.created_at || new Date().toISOString(),
   });
 }
 
-export async function updateDocument<T>(collectionName: string, documentId: string, updates: Partial<T>): Promise<void> {
+export async function updateDocument<T>(
+  collectionName: string,
+  documentId: string,
+  updates: Partial<T>,
+): Promise<void> {
   requireSignedInUser();
   const ref = doc(db, collectionName, documentId);
   await updateDoc(ref, {
     ...updates,
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   });
 }
 
@@ -236,19 +259,28 @@ export async function readFirestoreState() {
       assignments: [],
       requests: [],
       transactions: [],
-      users: []
+      users: [],
     };
   }
 
-  const [catalogItems, locations, stockLevels, assets, assignments, requests, transactions, users] = await Promise.all([
-    getCollection<CatalogItem>('catalog_items'),
-    getCollection<Location>('locations'),
-    getCollection<StockLevel>('stock_levels'),
-    getCollection<Asset>('assets'),
-    getCollection<AssetAssignment>('asset_assignments'),
-    getCollection<Request>('requests'),
-    getCollection<InventoryTransaction>('inventory_transactions'),
-    getCollection<User>('users')
+  const [
+    catalogItems,
+    locations,
+    stockLevels,
+    assets,
+    assignments,
+    requests,
+    transactions,
+    users,
+  ] = await Promise.all([
+    getCollection<CatalogItem>("catalog_items"),
+    getCollection<Location>("locations"),
+    getCollection<StockLevel>("stock_levels"),
+    getCollection<Asset>("assets"),
+    getCollection<AssetAssignment>("asset_assignments"),
+    getCollection<Request>("requests"),
+    getCollection<InventoryTransaction>("inventory_transactions"),
+    getCollection<User>("users"),
   ]);
 
   return {
@@ -259,17 +291,23 @@ export async function readFirestoreState() {
     assignments,
     requests,
     transactions,
-    users
+    users,
   };
 }
 
-export async function createFirestoreDocument<T>(collectionName: string, data: T): Promise<string> {
+export async function createFirestoreDocument<T>(
+  collectionName: string,
+  data: T,
+): Promise<string> {
   const payload = {
     ...data,
     created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    updated_at: new Date().toISOString(),
   };
 
-  const docRef = await addDoc(collection(db, collectionName), payload as Record<string, unknown>);
+  const docRef = await addDoc(
+    collection(db, collectionName),
+    payload as Record<string, unknown>,
+  );
   return docRef.id;
 }
