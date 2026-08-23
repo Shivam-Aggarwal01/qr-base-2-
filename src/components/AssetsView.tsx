@@ -153,11 +153,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             <button
               key={m}
               onClick={() => setModeFilter(m)}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                modeFilter === m
-                  ? "bg-white text-[var(--color-idea-blue)] shadow-sm"
-                  : "text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]"
-              }`}
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${modeFilter === m
+                ? "bg-white text-[var(--color-idea-blue)] shadow-sm"
+                : "text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]"
+                }`}
             >
               {m === "ALL"
                 ? "All Modes"

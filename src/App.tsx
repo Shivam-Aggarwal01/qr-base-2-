@@ -3,15 +3,16 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "./firebase";
 import { InventoryStorage, parseQRCodeFromEntities } from "./services/storage";
 import {
+  COLLECTIONS,
+  completeGoogleRedirect,
+  deleteFirestoreDocument,
   ensureUserProfile,
   getUserProfile,
-  completeGoogleRedirect,
+  mapFirebaseUserToLabUser,
   updateFirestoreDocument,
-  deleteFirestoreDocument,
-  COLLECTIONS,
 } from "./services/firebaseInventory";
 import { readFirestoreState } from "./services/firebaseCollections";
-import { resolveRoleFromEmail } from "./services/roleConfig";
+import { isAdminAccount, resolveRoleFromEmail } from "./services/roleConfig";
 import { isStudent } from "./services/authRoles";
 import { FirebaseAuthPanel } from "./components/FirebaseAuthPanel";
 import { Navbar } from "./components/Navbar";
@@ -55,6 +56,7 @@ export default function App() {
   const [firebaseUserProfile, setFirebaseUserProfile] = useState<User | null>(
     null,
   );
+  const [authReady, setAuthReady] = useState(false);
   // Navigation
   const [currentView, setCurrentView] = useState<ViewMode>("dashboard");
   // Scanner
@@ -88,7 +90,10 @@ export default function App() {
   });
   //  DERIVED STATE
   const currentUser = firebaseUserProfile ?? activeUser;
-  const isStudentUser = isStudent(currentUser?.role);
+  const effectiveRole = currentUser
+    ? resolveRoleFromEmail(currentUser.email) ?? currentUser.role
+    : undefined;
+  const isStudentUser = isStudent(effectiveRole);
   const pendingRequestsCount = isStudentUser
     ? requests.filter(
         (request) =>
@@ -97,18 +102,6 @@ export default function App() {
     : requests.filter((request) => request.status === "PENDING").length;
 
   //  DATA LOADING
-  const loadLocalData = () => {
-    const localUsers = InventoryStorage.getUsers();
-    setUsers(localUsers);
-    setActiveUser(localUsers[0] ?? null);
-    setLocations(InventoryStorage.getLocations());
-    setCatalogItems(InventoryStorage.getCatalog());
-    setStockLevels(InventoryStorage.getStockLevels());
-    setAssets(InventoryStorage.getAssets());
-    setAssignments(InventoryStorage.getAssignments());
-    setRequests(InventoryStorage.getRequests());
-    setTransactions(InventoryStorage.getTransactions());
-  };
   const loadFirestoreData = async () => {
     const state = await readFirestoreState();
     setCatalogItems(state.catalogItems ?? []);
@@ -122,46 +115,64 @@ export default function App() {
   };
   const refreshAllData = async () => {
     if (!auth.currentUser) {
-      loadLocalData();
       return;
     }
     try {
       await loadFirestoreData();
     } catch (error) {
-      loadLocalData();
+      console.warn("Could not refresh Firestore data:", error);
     }
   };
 
   //  AUTHENTICATION
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
+    const applyFirebaseSession = async (
+      firebaseUser: typeof auth.currentUser,
+    ) => {
+      if (!firebaseUser) {
+        setFirebaseUserProfile(null);
+        setActiveUser(null);
+        return;
+      }
+      const role =
+        resolveRoleFromEmail(firebaseUser.email ?? "") ?? "STUDENT";
+      try {
+        let profile =
+          (await getUserProfile(firebaseUser.uid)) ??
+          (await ensureUserProfile(firebaseUser, role));
+        if (isAdminAccount(firebaseUser.email, profile.role)) {
+          profile = {
+            ...profile,
+            email: firebaseUser.email ?? profile.email,
+            role: "ADMIN",
+          };
+        }
+        setFirebaseUserProfile(profile);
+        setActiveUser(profile);
+        await refreshAllData();
+      } catch (error) {
+        console.error("❌ Failed to initialise Firebase user:", error);
+        const fallback = mapFirebaseUserToLabUser(firebaseUser, role);
+        setFirebaseUserProfile(fallback);
+        setActiveUser(fallback);
+      }
+    };
     const initialiseAuth = async () => {
       try {
         await completeGoogleRedirect();
       } catch (error) {
         console.warn("Google redirect sign-in did not complete:", error);
       }
-      unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-        if (!firebaseUser) {
-          setFirebaseUserProfile(null);
-          setActiveUser(null);
-          await refreshAllData();
-          return;
-        }
-        try {
-          let profile = await getUserProfile(firebaseUser.uid);
-          if (!profile) {
-            const role =
-              resolveRoleFromEmail(firebaseUser.email ?? "") ?? "STUDENT";
-
-            profile = await ensureUserProfile(firebaseUser, role);
-          }
-          setFirebaseUserProfile(profile);
-          setActiveUser(profile);
-          await refreshAllData();
-        } catch (error) {
-          console.error("❌ Failed to initialise Firebase user:", error);
-        }
+      try {
+        await auth.authStateReady();
+      } catch (error) {
+        console.warn("Firebase auth persistence was not ready:", error);
+      }
+      await applyFirebaseSession(auth.currentUser);
+      setAuthReady(true);
+      unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        void applyFirebaseSession(firebaseUser);
       });
     };
     void initialiseAuth();
@@ -183,9 +194,11 @@ export default function App() {
 
   //  USER ACTIONS
   const handleUserChange = (user: User) => {
+    if (auth.currentUser) {
+      return;
+    }
     const newActiveUser = InventoryStorage.setActiveUser(user.id);
     setActiveUser(newActiveUser);
-    setFirebaseUserProfile(null);
   };
   const handleAuthSuccess = (user: User) => {
     setFirebaseUserProfile(user);
@@ -287,15 +300,39 @@ export default function App() {
   };
   const handleDeleteUser = async (userId: string) => {
     try {
+      if (currentUser?.id === userId) {
+        throw new Error("You cannot delete your own account.");
+      }
+      const target = users.find((user) => user.id === userId);
+      if (target && isAdminAccount(target.email, target.role)) {
+        throw new Error("Admin accounts cannot be removed from the directory.");
+      }
       await deleteFirestoreDocument(COLLECTIONS.USERS, userId);
+      setUsers((previous) => previous.filter((user) => user.id !== userId));
       await refreshAllData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("❌ Failed to delete user:", error);
-      alert("Failed to delete user.");
+      const denied =
+        error?.code === "permission-denied" ||
+        String(error?.message || "").includes("permission-denied");
+      alert(
+        denied
+          ? "Permission denied. Publish the latest Firestore rules and make sure your users/{uid} profile has role ADMIN."
+          : error?.message || "Failed to delete user.",
+      );
+      throw error;
     }
   };
 
   //  AUTH SCREEN
+  if (!authReady) {
+    return (
+      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+        <p className="text-sm font-medium text-slate-500">Restoring session…</p>
+      </div>
+    );
+  }
+
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
@@ -312,6 +349,7 @@ export default function App() {
         activeUser={currentUser}
         users={users}
         onUserChange={handleUserChange}
+        lockIdentity={Boolean(auth.currentUser)}
         onOpenScanner={() => setIsScannerOpen(true)}
         onOpenNewRequest={() => openNewRequest()}
         onSearch={handleGlobalSearch}
@@ -325,7 +363,7 @@ export default function App() {
           onSelectView={setCurrentView}
           pendingRequestsCount={pendingRequestsCount}
           onOpenScanner={() => setIsScannerOpen(true)}
-          userRole={currentUser.role}
+          userRole={effectiveRole ?? currentUser.role}
         />
         <main className="flex-1 flex flex-col overflow-hidden relative">
           {/* Dashboard */}
@@ -352,7 +390,7 @@ export default function App() {
               stockLevels={stockLevels}
               locations={locations}
               assets={assets}
-              userRole={currentUser.role}
+              userRole={effectiveRole ?? currentUser.role}
               onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
             />

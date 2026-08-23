@@ -76,14 +76,18 @@ export async function getUserProfile(uid: string): Promise<User | null> {
   };
 
   if (current.role !== resolvedRole || current.email !== email) {
-    await setDoc(
-      userRef,
-      {
-        ...normalizedProfile,
-        updated_at: serverTimestamp(),
-      },
-      { merge: true },
-    );
+    try {
+      await setDoc(
+        userRef,
+        {
+          ...normalizedProfile,
+          updated_at: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (error) {
+      console.warn("Could not sync user profile role:", error);
+    }
   }
 
   return normalizedProfile;
@@ -116,25 +120,33 @@ export async function ensureUserProfile(
       current.role !== finalRole ||
       current.email !== normalizedProfile.email
     ) {
-      await setDoc(
-        userRef,
-        {
-          ...normalizedProfile,
-          updated_at: serverTimestamp(),
-        },
-        { merge: true },
-      );
+      try {
+        await setDoc(
+          userRef,
+          {
+            ...normalizedProfile,
+            updated_at: serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } catch (error) {
+        console.warn("Could not sync existing user profile:", error);
+      }
     }
 
     return normalizedProfile;
   }
 
   const profile = mapFirebaseUserToLabUser(firebaseUser, resolvedRole);
-  await setDoc(userRef, {
-    ...profile,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp(),
-  });
+  try {
+    await setDoc(userRef, {
+      ...profile,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.warn("Could not create user profile document:", error);
+  }
 
   return profile;
 }

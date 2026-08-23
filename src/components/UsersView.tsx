@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Search, Trash2, Pencil, Check, X } from "lucide-react";
 import { User, Asset, CatalogItem } from "../types/inventory";
+import { isAdminAccount } from "../services/roleConfig";
 
 interface UsersViewProps {
   users: User[];
@@ -37,7 +38,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
     );
   });
 
-  const isAdmin = activeUser?.role === "ADMIN";
+  const isAdmin = isAdminAccount(activeUser?.email, activeUser?.role);
 
   //  ROLE HELPERS
   const getRoleBadge = (role: string) => {
@@ -114,6 +115,10 @@ export const UsersView: React.FC<UsersViewProps> = ({
       alert("You cannot delete your own account.");
       return;
     }
+    if (isAdminAccount(user.email, user.role)) {
+      alert("Admin accounts cannot be removed from the directory.");
+      return;
+    }
     const confirmed = window.confirm(
       `Are you sure you want to remove ${user.name}?`
     );
@@ -173,7 +178,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
           const isEditing = editingUserId === user.id;
           const isSaving = savingUserId === user.id;
           const isCurrentUser = user.id === activeUser?.id;
-          const isUserAdmin = user.role === "ADMIN";
+          const isUserAdmin = isAdminAccount(user.email, user.role);
           return (
             <div
               key={user.id}
@@ -298,7 +303,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
                         </button>
                       )}
                       {/* Delete */}
-                      {!isCurrentUser && (
+                      {!isCurrentUser && !isUserAdmin && (
                         <button
                           type="button"
                           onClick={() => handleDeleteUser(user)}

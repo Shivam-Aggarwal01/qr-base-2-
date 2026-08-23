@@ -6,24 +6,35 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Single source of truth for user role (from database)
-    function role() {
-      return signedIn() ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role : null;
+    function userDocPath() {
+      return /databases/$(database)/documents/users/$(request.auth.uid);
     }
 
-    // Admin level: Can manage users and system settings
+    function role() {
+      return signedIn() && exists(userDocPath())
+        ? get(userDocPath()).data.role
+        : null;
+    }
+
+    function isAdminEmail() {
+      return signedIn() && request.auth.token.email != null && (
+        request.auth.token.email.matches('(?i)^shivamafterall111@gmail\\.com$') ||
+        request.auth.token.email.matches('(?i)^mohitdavar2004@gmail\\.com$')
+      );
+    }
+
+    // Admin level: hardcoded emails must win even if the users/{uid} doc is missing.
     function isAdmin() {
-      return signedIn() && role() == 'ADMIN';
+      return isAdminEmail() || role() == 'ADMIN';
     }
 
     // Staff level (STUDENT_AMBASSADOR, STUDENT_LEAD): Can issue inventory, manage catalog, approve requests
     function isStaff() {
-      return signedIn() && role() in ['ADMIN', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR'];
+      return isAdmin() || (signedIn() && role() in ['STUDENT_LEAD', 'STUDENT_AMBASSADOR']);
     }
 
-    // Student level: Can browse items, submit requests
     function isStudent() {
-      return signedIn() && role() in ['ADMIN', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR', 'STUDENT'];
+      return isStaff() || (signedIn() && role() in ['ADMIN', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR', 'STUDENT']);
     }
 
     match /users/{userId} {

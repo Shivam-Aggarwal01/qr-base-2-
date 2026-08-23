@@ -4,6 +4,8 @@ import { getFirestore } from "firebase/firestore";
 import {
   browserLocalPersistence,
   browserPopupRedirectResolver,
+  getAuth,
+  indexedDBLocalPersistence,
   initializeAuth,
 } from "firebase/auth";
 
@@ -19,11 +21,24 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
-export const analytics = getAnalytics(app);
-export const auth = initializeAuth(app, {
-  persistence: browserLocalPersistence,
-  popupRedirectResolver: browserPopupRedirectResolver,
-});
+export const analytics = (() => {
+  try {
+    return getAnalytics(app);
+  } catch {
+    return undefined;
+  }
+})();
+
+export const auth = (() => {
+  try {
+    return initializeAuth(app, {
+      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+      popupRedirectResolver: browserPopupRedirectResolver,
+    });
+  } catch {
+    return getAuth(app);
+  }
+})();
 export const db = getFirestore(app);
 
 export default app;

@@ -10,6 +10,13 @@ export function normalizeEmail(email?: string | null): string {
   return (email ?? "").trim().toLowerCase();
 }
 
+export function isAdminAccount(
+  email?: string | null,
+  role?: UserRole | null,
+): boolean {
+  return role === "ADMIN" || resolveRoleFromEmail(email) === "ADMIN";
+}
+
 export function resolveRoleFromEmail(
   email?: string | null,
 ): UserRole | undefined {
