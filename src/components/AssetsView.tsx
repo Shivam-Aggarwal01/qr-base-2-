@@ -125,11 +125,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     return true;
   });
 
-  // SINGLE, UNIFIED SUBMIT HANDLER
+  // SINGLE, UNIFIED SUBMIT HANDLER WITH NULL PROTECTION
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // 1. Validation check
     if (!selectedCatalogId || !newAssetCode.trim() || !newLocationId) {
       return alert("Item, Asset Code, and Storage Location are required");
     }
@@ -138,7 +137,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       await createAssetInFirestore({
         asset_code: newAssetCode.trim().toUpperCase(),
         catalog_item_id: selectedCatalogId,
-        serial_number: newSerialNum.trim() ? newSerialNum.trim() : undefined,
+        serial_number: newSerialNum.trim() ? newSerialNum.trim() : null, // Prevent Firestore undefined crash
         status: "AVAILABLE",
         location_id: newLocationId,
         assigned_to_user_id: null,
@@ -146,7 +145,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         is_box: newTrackingMode === "BOX",
         box_capacity: newTrackingMode === "BOX" ? newBoxCapacity : 1,
         available_in_box: newTrackingMode === "BOX" ? newBoxCapacity : 1,
-        notes: newNotes || "",
+        notes: newNotes ? newNotes : "",
       });
 
       setShowAddModal(false);
