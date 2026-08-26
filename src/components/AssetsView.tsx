@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Plus, Search, QrCode, Box, Layers, ShieldCheck } from "lucide-react";
+import React, { useEffect, useState } from "react";
+import { Plus, Search, QrCode } from "lucide-react";
 import {
   Asset,
   CatalogItem,
@@ -27,45 +27,92 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   onOpenQRGenerator,
   onRefreshData,
 }) => {
-  const [statusFilter, setStatusFilter] = useState<AssetStatus | "ALL">("ALL");
-  const [modeFilter, setModeFilter] = useState<"ALL" | "BOX" | "INDIVIDUAL">(
-    "ALL",
-  );
+  const [statusFilter, setStatusFilter] =
+    useState<AssetStatus | "ALL">("ALL");
+
+  const [modeFilter, setModeFilter] = useState<
+    "ALL" | "BOX" | "INDIVIDUAL"
+  >("ALL");
+
   const [searchFilter, setSearchFilter] = useState("");
 
   // Add Asset Modal
   const [showAddModal, setShowAddModal] = useState(false);
-  const [selectedCatalogId, setSelectedCatalogId] = useState(
-    catalogItems.find((c) => c.type !== "CONSUMABLE")?.id || "",
-  );
+
+  const [selectedCatalogId, setSelectedCatalogId] = useState("");
   const [newAssetCode, setNewAssetCode] = useState("");
   const [newTrackingMode, setNewTrackingMode] =
     useState<AssetTrackingMode>("BOX");
+
   const [newBoxCapacity, setNewBoxCapacity] = useState(15);
   const [newSerialNum, setNewSerialNum] = useState("");
-  const [newLocationId, setNewLocationId] = useState(locations[0]?.id || "");
+
+  const [newLocationId, setNewLocationId] = useState(
+    locations[0]?.id || ""
+  );
+
   const [newNotes, setNewNotes] = useState("");
 
+  useEffect(() => {
+    const availableCatalogItems = catalogItems.filter(
+      (c) => c.type !== "CONSUMABLE"
+    );
+
+    if (availableCatalogItems.length === 0) {
+      setSelectedCatalogId("");
+      return;
+    }
+
+    const currentSelectionExists = availableCatalogItems.some(
+      (c) => c.id === selectedCatalogId
+    );
+
+    if (!currentSelectionExists) {
+      setSelectedCatalogId(availableCatalogItems[0].id);
+    }
+  }, [catalogItems, selectedCatalogId]);
+
+  useEffect(() => {
+    if (!newLocationId && locations.length > 0) {
+      setNewLocationId(locations[0].id);
+    }
+  }, [locations, newLocationId]);
+
+  const availableCatalogItems = catalogItems.filter(
+    (c) => c.type !== "CONSUMABLE"
+  );
+
   const filteredAssets = assets.filter((asset) => {
-    if (statusFilter !== "ALL" && asset.status !== statusFilter) return false;
+    if (
+      statusFilter !== "ALL" &&
+      asset.status !== statusFilter
+    ) {
+      return false;
+    }
+
     if (
       modeFilter === "BOX" &&
       !(asset.is_box || asset.tracking_mode === "BOX")
-    )
+    ) {
       return false;
+    }
+
     if (
       modeFilter === "INDIVIDUAL" &&
       (asset.is_box || asset.tracking_mode === "BOX")
-    )
+    ) {
       return false;
+    }
 
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
+
       const cat = catalogItems.find(
         (c) =>
           c.id === asset.catalog_item_id ||
-          c.item_code === asset.catalog_item_id,
+          c.item_code === asset.catalog_item_id
       );
+
       if (
         !asset.asset_code.toLowerCase().includes(q) &&
         !asset.serial_number?.toLowerCase().includes(q) &&
@@ -74,11 +121,15 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         return false;
       }
     }
+
     return true;
   });
 
+  // SINGLE, UNIFIED SUBMIT HANDLER
   const handleAddAssetSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Validation check
     if (!selectedCatalogId || !newAssetCode.trim() || !newLocationId) {
       return alert("Item, Asset Code, and Storage Location are required");
     }
@@ -102,6 +153,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       setNewAssetCode("");
       setNewSerialNum("");
       setNewNotes("");
+
       onRefreshData();
     } catch (error) {
       console.error("Failed to create asset in Firestore:", error);
@@ -122,6 +174,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       case "LOST":
       case "DISPOSED":
         return "bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] border border-[var(--color-idea-border)]";
+      default:
+        return "";
     }
   };
 
@@ -134,15 +188,19 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             PHYSICAL ASSET REGISTER
           </span>
           <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-            Tracked Equipment &amp;{" "}
-            <span className="text-[var(--color-idea-blue)]">Box Batches</span>
+            Tracked Equipment &{" "}
+            <span className="text-[var(--color-idea-blue)]">
+              Box Batches
+            </span>
           </h2>
         </div>
+
         <button
           onClick={() => setShowAddModal(true)}
           className="idea-button flex items-center gap-2 px-5 py-2.5 text-xs font-semibold cursor-pointer"
         >
-          <Plus className="w-4 h-4" /> Register New Asset
+          <Plus className="w-4 h-4" />
+          Register New Asset
         </button>
       </div>
 
@@ -153,16 +211,17 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             <button
               key={m}
               onClick={() => setModeFilter(m)}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${modeFilter === m
-                ? "bg-white text-[var(--color-idea-blue)] shadow-sm"
-                : "text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]"
-                }`}
+              className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
+                modeFilter === m
+                  ? "bg-white text-[var(--color-idea-blue)] shadow-sm"
+                  : "text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]"
+              }`}
             >
               {m === "ALL"
                 ? "All Modes"
                 : m === "BOX"
-                  ? "Box Batches"
-                  : "Fixed Tools"}
+                ? "Box Batches"
+                : "Fixed Tools"}
             </button>
           ))}
         </div>
@@ -180,7 +239,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         </div>
       </div>
 
-      {/* Asset Table Card */}
+      {/* Asset Table */}
       <div className="idea-card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
@@ -197,13 +256,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             <tbody className="divide-y divide-[var(--color-idea-border)]">
               {filteredAssets.map((asset) => {
                 const cat = catalogItems.find(
-                  (c) => c.id === asset.catalog_item_id,
+                  (c) => c.id === asset.catalog_item_id
                 );
-                const loc = locations.find((l) => l.id === asset.location_id);
+                const loc = locations.find(
+                  (l) => l.id === asset.location_id
+                );
                 const user = users.find(
-                  (u) => u.id === asset.assigned_to_user_id,
+                  (u) => u.id === asset.assigned_to_user_id
                 );
-                const isBox = asset.is_box || asset.tracking_mode === "BOX";
+                const isBox =
+                  asset.is_box || asset.tracking_mode === "BOX";
 
                 return (
                   <tr
@@ -220,7 +282,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                         </p>
                       </div>
                     </td>
-
                     <td className="px-6 py-4">
                       {isBox ? (
                         <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[var(--color-idea-blue)] text-white uppercase tracking-wider">
@@ -232,26 +293,27 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                         </span>
                       )}
                     </td>
-
                     <td className="px-6 py-4 text-xs font-mono font-semibold text-[var(--color-idea-text)]">
                       {isBox ? (
                         <span className="font-bold text-[var(--color-idea-text)]">
-                          {asset.available_in_box ?? asset.box_capacity ?? 10} /{" "}
-                          {asset.box_capacity ?? 15} Available
+                          {asset.available_in_box ??
+                            asset.box_capacity ??
+                            10}{" "}
+                          / {asset.box_capacity ?? 15} Available
                         </span>
                       ) : (
                         <span>{asset.serial_number || "N/A"}</span>
                       )}
                     </td>
-
                     <td className="px-6 py-4">
                       <span
-                        className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadge(asset.status)}`}
+                        className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadge(
+                          asset.status
+                        )}`}
                       >
                         {asset.status.replace("_", " ")}
                       </span>
                     </td>
-
                     <td className="px-6 py-4 text-xs font-medium text-[var(--color-idea-text)]">
                       {asset.status === "ISSUED" && !isBox ? (
                         <span className="text-[var(--color-idea-blue)] font-bold">
@@ -263,7 +325,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                         </span>
                       )}
                     </td>
-
                     <td className="px-6 py-4 text-right">
                       <button
                         onClick={() =>
@@ -272,12 +333,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                             cat?.name || asset.asset_code,
                             isBox
                               ? `Box Capacity: ${asset.box_capacity} Units`
-                              : `SN: ${asset.serial_number || "N/A"}`,
+                              : `SN: ${asset.serial_number || "N/A"}`
                           )
                         }
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 idea-button rounded-lg text-xs font-semibold cursor-pointer"
                       >
-                        <QrCode className="w-3.5 h-3.5" /> Label
+                        <QrCode className="w-3.5 h-3.5" />
+                        Label
                       </button>
                     </td>
                   </tr>
@@ -304,16 +366,21 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 <select
                   value={selectedCatalogId}
                   onChange={(e) => setSelectedCatalogId(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs"
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
                   required
                 >
-                  {catalogItems
-                    .filter((c) => c.type !== "CONSUMABLE")
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} ({c.type})
-                      </option>
-                    ))}
+                  <option value="" disabled>
+                    {catalogItems.length === 0
+                      ? "Loading catalog items..."
+                      : availableCatalogItems.length === 0
+                      ? "No catalog items available"
+                      : "Select catalog item"}
+                  </option>
+                  {availableCatalogItems.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name} ({c.type})
+                    </option>
+                  ))}
                 </select>
               </div>
 
@@ -326,7 +393,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   onChange={(e) =>
                     setNewTrackingMode(e.target.value as AssetTrackingMode)
                   }
-                  className="idea-input mt-1 p-2.5 text-xs"
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
                 >
                   <option value="BOX">
                     BOX BATCH (Quantity taken/returned from box)
@@ -347,7 +414,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   placeholder="e.g. BOX-ESP32-A1 or TOOL-SOLD-01"
                   value={newAssetCode}
                   onChange={(e) => setNewAssetCode(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs font-mono uppercase"
+                  className="idea-input mt-1 p-2.5 text-xs font-mono uppercase w-full"
                 />
               </div>
 
@@ -361,7 +428,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     min="1"
                     value={newBoxCapacity}
                     onChange={(e) => setNewBoxCapacity(Number(e.target.value))}
-                    className="idea-input mt-1 p-2.5 text-xs font-mono"
+                    className="idea-input mt-1 p-2.5 text-xs font-mono w-full"
                   />
                 </div>
               ) : (
@@ -374,7 +441,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                     placeholder="SN-XXXX-YYYY"
                     value={newSerialNum}
                     onChange={(e) => setNewSerialNum(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs font-mono"
+                    className="idea-input mt-1 p-2.5 text-xs font-mono w-full"
                   />
                 </div>
               )}
@@ -386,9 +453,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 <select
                   value={newLocationId}
                   onChange={(e) => setNewLocationId(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs"
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
                   required
                 >
+                  <option value="" disabled>
+                    {locations.length === 0
+                      ? "Loading locations..."
+                      : "Select storage location"}
+                  </option>
                   {locations.map((l) => (
                     <option key={l.id} value={l.id}>
                       {l.name}
@@ -406,7 +478,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   placeholder="e.g. Fresh batch sealed in box"
                   value={newNotes}
                   onChange={(e) => setNewNotes(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs"
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
                 />
               </div>
 
@@ -418,9 +490,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
+                  disabled={
+                    !selectedCatalogId || availableCatalogItems.length === 0
+                  }
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Register Asset
                 </button>
