@@ -8,7 +8,8 @@ import {
   deleteFirestoreDocument,
   ensureUserProfile,
   getUserProfile,
-  mapFirebaseUserToLabUser,
+  reviewAccountRequest,
+  submitAccountRequest,
   updateFirestoreDocument,
 } from "./services/firebaseInventory";
 import { readFirestoreState } from "./services/firebaseCollections";
@@ -39,11 +40,14 @@ import {
   Request,
   InventoryTransaction,
   ViewMode,
+  AccountRequest,
+  AccountRequestStatus,
 } from "./types/inventory";
 
 export default function App() {
   // Data
   const [users, setUsers] = useState<User[]>([]);
+  const [accountRequests, setAccountRequests] = useState<AccountRequest[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([]);
@@ -57,6 +61,11 @@ export default function App() {
     null,
   );
   const [authReady, setAuthReady] = useState(false);
+  const [accessNotice, setAccessNotice] = useState<{
+    status: AccountRequestStatus;
+    name?: string;
+    email?: string;
+  } | null>(null);
   // Navigation
   const [currentView, setCurrentView] = useState<ViewMode>("dashboard");
   // Scanner
@@ -94,6 +103,9 @@ export default function App() {
     ? resolveRoleFromEmail(currentUser.email) ?? currentUser.role
     : undefined;
   const isStudentUser = isStudent(effectiveRole);
+  const pendingAccountCount = accountRequests.filter(
+    (request) => request.status === "PENDING",
+  ).length;
   const pendingRequestsCount = isStudentUser
     ? requests.filter(
         (request) =>
@@ -112,6 +124,7 @@ export default function App() {
     setRequests(state.requests ?? []);
     setTransactions(state.transactions ?? []);
     setUsers(state.users ?? []);
+    setAccountRequests(state.accountRequests ?? []);
   };
   const refreshAllData = async () => {
     if (!auth.currentUser) {
@@ -138,24 +151,57 @@ export default function App() {
       const role =
         resolveRoleFromEmail(firebaseUser.email ?? "") ?? "STUDENT";
       try {
-        let profile =
-          (await getUserProfile(firebaseUser.uid)) ??
-          (await ensureUserProfile(firebaseUser, role));
-        if (isAdminAccount(firebaseUser.email, profile.role)) {
+        if (isAdminAccount(firebaseUser.email, role)) {
+          let profile =
+            (await getUserProfile(firebaseUser.uid)) ??
+            (await ensureUserProfile(firebaseUser, "ADMIN"));
           profile = {
             ...profile,
             email: firebaseUser.email ?? profile.email,
             role: "ADMIN",
           };
+          setAccessNotice(null);
+          setFirebaseUserProfile(profile);
+          setActiveUser(profile);
+          await refreshAllData();
+          return;
         }
-        setFirebaseUserProfile(profile);
-        setActiveUser(profile);
-        await refreshAllData();
+
+        const existingProfile = await getUserProfile(firebaseUser.uid);
+        if (existingProfile) {
+          setAccessNotice(null);
+          setFirebaseUserProfile(existingProfile);
+          setActiveUser(existingProfile);
+          await refreshAllData();
+          return;
+        }
+
+        const accessRequest = await submitAccountRequest(firebaseUser);
+        if (accessRequest.status === "APPROVED") {
+          const profile = await ensureUserProfile(firebaseUser, "STUDENT");
+          setAccessNotice(null);
+          setFirebaseUserProfile(profile);
+          setActiveUser(profile);
+          await refreshAllData();
+          return;
+        }
+        setAccessNotice({
+          status: accessRequest.status,
+          name: accessRequest.name,
+          email: accessRequest.email,
+        });
+        setFirebaseUserProfile(null);
+        setActiveUser(null);
+        await signOut(auth);
       } catch (error) {
         console.error("❌ Failed to initialise Firebase user:", error);
-        const fallback = mapFirebaseUserToLabUser(firebaseUser, role);
-        setFirebaseUserProfile(fallback);
-        setActiveUser(fallback);
+        setFirebaseUserProfile(null);
+        setActiveUser(null);
+        try {
+          await signOut(auth);
+        } catch {
+          // already signed out
+        }
       }
     };
     const initialiseAuth = async () => {
@@ -199,10 +245,6 @@ export default function App() {
     }
     const newActiveUser = InventoryStorage.setActiveUser(user.id);
     setActiveUser(newActiveUser);
-  };
-  const handleAuthSuccess = (user: User) => {
-    setFirebaseUserProfile(user);
-    setActiveUser(user);
   };
   const handleLogout = async () => {
     try {
@@ -323,6 +365,14 @@ export default function App() {
       throw error;
     }
   };
+  const handleReviewAccountRequest = async (
+    requestId: string,
+    status: "APPROVED" | "REJECTED",
+  ) => {
+    if (!currentUser) return;
+    await reviewAccountRequest(requestId, status, currentUser);
+    await refreshAllData();
+  };
 
   //  AUTH SCREEN
   if (!authReady) {
@@ -334,11 +384,7 @@ export default function App() {
   }
 
   if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-        <FirebaseAuthPanel onAuthSuccess={handleAuthSuccess} />
-      </div>
-    );
+    return <FirebaseAuthPanel accessNotice={accessNotice} />;
   }
 
   //  APPLICATION
@@ -362,6 +408,7 @@ export default function App() {
           currentView={currentView}
           onSelectView={setCurrentView}
           pendingRequestsCount={pendingRequestsCount}
+          pendingAccountCount={pendingAccountCount}
           onOpenScanner={() => setIsScannerOpen(true)}
           userRole={effectiveRole ?? currentUser.role}
         />
@@ -457,6 +504,8 @@ export default function App() {
               activeUser={currentUser}
               onUpdateUserRole={handleUpdateUserRole}
               onDeleteUser={handleDeleteUser}
+              accountRequests={accountRequests}
+              onReviewAccountRequest={handleReviewAccountRequest}
               onRefreshData={refreshAllData}
             />
           )}

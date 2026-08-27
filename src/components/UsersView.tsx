@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Search, Trash2, Pencil, Check, X } from "lucide-react";
-import { User, Asset, CatalogItem } from "../types/inventory";
+import { User, Asset, CatalogItem, AccountRequest } from "../types/inventory";
 import { isAdminAccount } from "../services/roleConfig";
 
 interface UsersViewProps {
@@ -10,6 +10,11 @@ interface UsersViewProps {
   activeUser: User | null;
   onUpdateUserRole?: (userId: string, newRole: User["role"]) => Promise<void>;
   onDeleteUser?: (userId: string) => Promise<void>;
+  accountRequests?: AccountRequest[];
+  onReviewAccountRequest?: (
+    requestId: string,
+    status: "APPROVED" | "REJECTED",
+  ) => Promise<void>;
   onRefreshData: () => void;
 }
 
@@ -20,12 +25,18 @@ export const UsersView: React.FC<UsersViewProps> = ({
   activeUser,
   onUpdateUserRole,
   onDeleteUser,
+  accountRequests = [],
+  onReviewAccountRequest,
 }) => {
   //  STATE
   const [searchFilter, setSearchFilter] = useState("");
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<User["role"]>("STUDENT");
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
+  const pendingAccountRequests = accountRequests.filter(
+    (request) => request.status === "PENDING",
+  );
 
   //  DERIVED DATA
   const filteredUsers = users.filter((user) => {
@@ -130,6 +141,28 @@ export const UsersView: React.FC<UsersViewProps> = ({
     }
   };
 
+  const reviewRequest = async (
+    request: AccountRequest,
+    status: "APPROVED" | "REJECTED",
+  ) => {
+    if (!onReviewAccountRequest) return;
+    const confirmed = window.confirm(
+      status === "APPROVED"
+        ? `Approve account for ${request.name}? They will be able to sign in as a student.`
+        : `Decline account request for ${request.name}?`,
+    );
+    if (!confirmed) return;
+    try {
+      setReviewingId(request.id);
+      await onReviewAccountRequest(request.id, status);
+    } catch (error) {
+      console.error("Failed to review account request:", error);
+      alert("Failed to update the account request.");
+    } finally {
+      setReviewingId(null);
+    }
+  };
+
   //  RENDER
   return (
     <div className="flex-1 space-y-6 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
@@ -159,6 +192,55 @@ export const UsersView: React.FC<UsersViewProps> = ({
           <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-2.5" />
         </div>
       </div>
+      {isAdmin && pendingAccountRequests.length > 0 && (
+        <div className="idea-card p-5 space-y-4">
+          <div>
+            <p className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
+              Access requests
+            </p>
+            <h3 className="text-lg font-bold text-[var(--color-idea-text)] mt-1">
+              Students waiting for approval
+            </h3>
+          </div>
+          <div className="space-y-3">
+            {pendingAccountRequests.map((request) => (
+              <div
+                key={request.id}
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[var(--color-idea-border)] p-4"
+              >
+                <div className="min-w-0">
+                  <p className="font-bold text-[var(--color-idea-text)] truncate">
+                    {request.name}
+                  </p>
+                  <p className="text-xs text-[var(--color-idea-muted)] truncate">
+                    {request.email}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    disabled={reviewingId === request.id}
+                    onClick={() => reviewRequest(request, "REJECTED")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold idea-error cursor-pointer disabled:opacity-50"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                    Decline
+                  </button>
+                  <button
+                    type="button"
+                    disabled={reviewingId === request.id}
+                    onClick={() => reviewRequest(request, "APPROVED")}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--color-idea-blue)] text-white cursor-pointer disabled:opacity-50"
+                  >
+                    <Check className="w-3.5 h-3.5" />
+                    Approve
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* User Count */}
       <div className="text-xs text-[var(--color-idea-muted)]">
         Showing{" "}

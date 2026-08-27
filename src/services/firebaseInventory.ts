@@ -20,8 +20,8 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
-import type { User, UserRole } from "../types/inventory";
-import { resolveRoleFromEmail } from "./roleConfig";
+import type { AccountRequest, User, UserRole } from "../types/inventory";
+import { isAdminAccount, resolveRoleFromEmail } from "./roleConfig";
 
 export const COLLECTIONS = {
   USERS: "users",
@@ -34,6 +34,7 @@ export const COLLECTIONS = {
   REQUEST_ITEMS: "request_items",
   INVENTORY_TRANSACTIONS: "inventory_transactions",
   AUDIT_LOGS: "audit_logs",
+  ACCOUNT_REQUESTS: "account_requests",
 } as const;
 
 export type FirebaseUserProfile = User;
@@ -137,6 +138,13 @@ export async function ensureUserProfile(
     return normalizedProfile;
   }
 
+  if (!isAdminAccount(email, resolvedRole)) {
+    const accessRequest = await getAccountRequest(firebaseUser.uid);
+    if (accessRequest?.status !== "APPROVED") {
+      throw new Error("Student account is waiting for admin approval.");
+    }
+  }
+
   const profile = mapFirebaseUserToLabUser(firebaseUser, resolvedRole);
   try {
     await setDoc(userRef, {
@@ -149,6 +157,102 @@ export async function ensureUserProfile(
   }
 
   return profile;
+}
+
+function mapAccountRequest(
+  id: string,
+  data: Record<string, unknown>,
+): AccountRequest {
+  return {
+    id,
+    email: String(data.email ?? ""),
+    name: String(data.name ?? "Student"),
+    status: (data.status as AccountRequest["status"]) || "PENDING",
+    reviewed_by_user_id: (data.reviewed_by_user_id as string | null) ?? null,
+    reviewed_at: (data.reviewed_at as string | null) ?? null,
+    created_at:
+      typeof data.created_at === "string"
+        ? data.created_at
+        : new Date().toISOString(),
+    updated_at:
+      typeof data.updated_at === "string"
+        ? data.updated_at
+        : new Date().toISOString(),
+  };
+}
+
+export async function getAccountRequest(
+  uid: string,
+): Promise<AccountRequest | null> {
+  const snapshot = await getDoc(doc(db, COLLECTIONS.ACCOUNT_REQUESTS, uid));
+  if (!snapshot.exists()) return null;
+  return mapAccountRequest(snapshot.id, snapshot.data() as Record<string, unknown>);
+}
+
+export async function submitAccountRequest(
+  firebaseUser: FirebaseUser,
+): Promise<AccountRequest> {
+  const existing = await getAccountRequest(firebaseUser.uid);
+  if (existing) return existing;
+
+  const request: AccountRequest = {
+    id: firebaseUser.uid,
+    email: firebaseUser.email ?? "",
+    name: firebaseUser.displayName ?? firebaseUser.email?.split("@")[0] ?? "Student",
+    status: "PENDING",
+    reviewed_by_user_id: null,
+    reviewed_at: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  await setDoc(doc(db, COLLECTIONS.ACCOUNT_REQUESTS, firebaseUser.uid), {
+    ...request,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+
+  return request;
+}
+
+export async function reviewAccountRequest(
+  requestId: string,
+  status: "APPROVED" | "REJECTED",
+  reviewer: User,
+): Promise<void> {
+  const request = await getAccountRequest(requestId);
+  if (!request) {
+    throw new Error("Account request was not found.");
+  }
+
+  await updateDoc(doc(db, COLLECTIONS.ACCOUNT_REQUESTS, requestId), {
+    status,
+    reviewed_by_user_id: reviewer.id,
+    reviewed_at: new Date().toISOString(),
+    updated_at: serverTimestamp(),
+  });
+
+  if (status !== "APPROVED") return;
+
+  const userRef = doc(db, COLLECTIONS.USERS, requestId);
+  const existingUser = await getDoc(userRef);
+  if (existingUser.exists()) return;
+
+  const profile: User = {
+    id: requestId,
+    user_code: `STU-${Date.now().toString().slice(-6)}`,
+    name: request.name,
+    email: request.email,
+    role: resolveRoleFromEmail(request.email) || "STUDENT",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  await setDoc(userRef, {
+    ...profile,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
 }
 
 export async function createFirebaseAccount(
@@ -196,13 +300,12 @@ export async function loginToFirebase(
   return profile;
 }
 
-export async function completeGoogleRedirect(): Promise<User | null> {
+export async function completeGoogleRedirect(): Promise<FirebaseUser | null> {
   const result = await getRedirectResult(auth);
-  if (!result?.user) return null;
-  return ensureUserProfile(result.user, "STUDENT");
+  return result?.user ?? null;
 }
 
-export async function loginWithGoogle(): Promise<User | null> {
+export async function loginWithGoogle(): Promise<FirebaseUser | null> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({
     prompt: "select_account",
@@ -210,7 +313,7 @@ export async function loginWithGoogle(): Promise<User | null> {
 
   try {
     const result = await signInWithPopup(auth, provider);
-    return ensureUserProfile(result.user, "STUDENT");
+    return result.user;
   } catch (error: any) {
     const shouldUseRedirect =
       error?.code === "auth/popup-blocked" ||

@@ -39,9 +39,28 @@ service cloud.firestore {
 
     match /users/{userId} {
       allow read: if signedIn();
-      allow create: if signedIn() && request.auth.uid == userId;
+      allow create: if signedIn() && (
+        isAdmin() ||
+        (
+          request.auth.uid == userId && (
+            isAdminEmail() ||
+            (
+              exists(/databases/$(database)/documents/account_requests/$(userId)) &&
+              get(/databases/$(database)/documents/account_requests/$(userId)).data.status == 'APPROVED'
+            )
+          )
+        )
+      );
       allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
       allow delete: if isAdmin();
+    }
+
+    match /account_requests/{requestId} {
+      allow create: if signedIn()
+        && request.auth.uid == requestId
+        && request.resource.data.status == 'PENDING';
+      allow read: if signedIn() && (request.auth.uid == requestId || isAdmin());
+      allow update, delete: if isAdmin();
     }
 
     match /catalog_items/{itemId} {

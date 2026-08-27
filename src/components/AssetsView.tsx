@@ -137,7 +137,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       await createAssetInFirestore({
         asset_code: newAssetCode.trim().toUpperCase(),
         catalog_item_id: selectedCatalogId,
-        serial_number: newSerialNum.trim() ? newSerialNum.trim() : null, // Prevent Firestore undefined crash
+        serial_number: newSerialNum.trim() || undefined,
         status: "AVAILABLE",
         location_id: newLocationId,
         assigned_to_user_id: null,

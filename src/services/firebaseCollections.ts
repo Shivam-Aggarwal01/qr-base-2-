@@ -20,6 +20,7 @@ import type {
   Request,
   StockLevel,
   User,
+  AccountRequest,
 } from "../types/inventory";
 
 const collectionName = {
@@ -260,6 +261,7 @@ export async function readFirestoreState() {
       requests: [],
       transactions: [],
       users: [],
+      accountRequests: [],
     };
   }
 
@@ -272,6 +274,7 @@ export async function readFirestoreState() {
     requests,
     transactions,
     users,
+    accountRequests,
   ] = await Promise.all([
     getCollection<CatalogItem>("catalog_items"),
     getCollection<Location>("locations"),
@@ -281,6 +284,7 @@ export async function readFirestoreState() {
     getCollection<Request>("requests"),
     getCollection<InventoryTransaction>("inventory_transactions"),
     getCollection<User>("users"),
+    getCollection<AccountRequest>("account_requests"),
   ]);
 
   return {
@@ -292,6 +296,7 @@ export async function readFirestoreState() {
     requests,
     transactions,
     users,
+    accountRequests,
   };
 }
 

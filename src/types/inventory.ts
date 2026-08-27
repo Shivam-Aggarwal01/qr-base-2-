@@ -8,6 +8,19 @@ export type AssetStatus =
 
 export type RequestStatus = "PENDING" | "COMPLETED" | "PARTIAL" | "CANCELLED";
 
+export type AccountRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface AccountRequest {
+  id: string;
+  email: string;
+  name: string;
+  status: AccountRequestStatus;
+  reviewed_by_user_id?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export type TransactionType =
   | "RECEIVE"
   | "ISSUE"
