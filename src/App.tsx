@@ -42,6 +42,7 @@ import {
   ViewMode,
   AccountRequest,
   AccountRequestStatus,
+  RequestLineDraft,
 } from "./types/inventory";
 
 export default function App() {
@@ -73,10 +74,7 @@ export default function App() {
   // New request
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
   const [newRequestPrefillItems, setNewRequestPrefillItems] = useState<
-    {
-      catalog_item_id: string;
-      requested_qty: number;
-    }[]
+    RequestLineDraft[]
   >([]);
   // QR generator
   const [qrGenData, setQrGenData] = useState<{
@@ -109,9 +107,13 @@ export default function App() {
   const pendingRequestsCount = isStudentUser
     ? requests.filter(
         (request) =>
-          request.status === "PENDING" && request.user_id === currentUser?.id,
+          (request.status === "PENDING" || request.status === "APPROVED") &&
+          request.user_id === currentUser?.id,
       ).length
-    : requests.filter((request) => request.status === "PENDING").length;
+    : requests.filter(
+        (request) =>
+          request.status === "PENDING" || request.status === "APPROVED",
+      ).length;
 
   //  DATA LOADING
   const loadFirestoreData = async () => {
@@ -279,12 +281,7 @@ export default function App() {
       subtitle,
     });
   };
-  const openNewRequest = (
-    items: {
-      catalog_item_id: string;
-      requested_qty: number;
-    }[] = [],
-  ) => {
+  const openNewRequest = (items: RequestLineDraft[] = []) => {
     setNewRequestPrefillItems(items);
     setIsNewRequestOpen(true);
   };
@@ -458,6 +455,7 @@ export default function App() {
             <RequestsView
               requests={requests}
               catalogItems={catalogItems}
+              assets={assets}
               users={users}
               activeUser={currentUser}
               onOpenNewRequest={() => openNewRequest()}
@@ -554,6 +552,7 @@ export default function App() {
         onClose={() => setIsNewRequestOpen(false)}
         activeUser={currentUser}
         catalogItems={catalogItems}
+        assets={assets}
         initialItems={
           newRequestPrefillItems.length > 0 ? newRequestPrefillItems : undefined
         }

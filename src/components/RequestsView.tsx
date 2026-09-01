@@ -2,20 +2,30 @@ import React, { useState } from "react";
 import {
   Plus,
   ClipboardList,
-  Check,
-  X,
   QrCode,
   AlertTriangle,
 } from "lucide-react";
-import { Request, CatalogItem, User, RequestStatus } from "../types/inventory";
-import { canApproveRequests } from "../services/authRoles";
-import { updateDocument } from "../services/firebaseCollections";
-import { InventoryStorage } from "../services/storage";
+import {
+  Request,
+  RequestItem,
+  CatalogItem,
+  User,
+  RequestStatus,
+  Asset,
+} from "../types/inventory";
+import { canApproveRequests, isStudent } from "../services/authRoles";
+import {
+  completeLabRequest,
+  getRequestLineKind,
+  handoverLabRequest,
+  reviewLabRequest,
+} from "../services/requestWorkflow";
 import confetti from "canvas-confetti";
 
 interface RequestsViewProps {
   requests: Request[];
   catalogItems: CatalogItem[];
+  assets: Asset[];
   users: User[];
   activeUser: User;
   onOpenNewRequest: () => void;
@@ -23,9 +33,19 @@ interface RequestsViewProps {
   onRefreshData: () => void;
 }
 
+const FILTERS: Array<RequestStatus | "ALL"> = [
+  "ALL",
+  "PENDING",
+  "APPROVED",
+  "REJECTED",
+  "HANDED_OVER",
+  "COMPLETED",
+];
+
 export const RequestsView: React.FC<RequestsViewProps> = ({
   requests,
   catalogItems,
+  assets,
   users,
   activeUser,
   onOpenNewRequest,
@@ -36,76 +56,88 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     "ALL",
   );
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
-  const [fulfillmentRemarks, setFulfillmentRemarks] = useState("");
+  const [modalMode, setModalMode] = useState<"review" | "handover" | "complete">(
+    "review",
+  );
+  const [remarks, setRemarks] = useState("");
   const [processingError, setProcessingError] = useState<string | null>(null);
   const canProcessRequests = canApproveRequests(activeUser?.role);
-  const visibleRequests =
-    activeUser?.role === "STUDENT"
-      ? requests.filter((r) => r.user_id === activeUser.id)
-      : requests;
+  const visibleRequests = isStudent(activeUser?.role)
+    ? requests.filter((r) => r.user_id === activeUser.id)
+    : requests;
 
-  const getDefaultApprovalRemarks = (req: Request) => {
-    const totalItems =
-      req.items?.reduce((sum, item) => sum + (item.requested_qty || 0), 0) ?? 0;
-    return `Issued ${totalItems} item${totalItems === 1 ? "" : "s"} from stock and approved for ${req.request_number}.`;
-  };
-
-  const openProcessRequest = (req: Request) => {
+  const openModal = (
+    req: Request,
+    mode: "review" | "handover" | "complete",
+  ) => {
     setSelectedRequest(req);
-    setFulfillmentRemarks(getDefaultApprovalRemarks(req));
+    setModalMode(mode);
+    setProcessingError(null);
+    setRemarks(
+      mode === "review"
+        ? `Approved for ${req.request_number}. Inventory will change only after handover.`
+        : mode === "handover"
+          ? `Handed over items/assets for ${req.request_number}.`
+          : `Completed ${req.request_number}.`,
+    );
   };
 
   const filteredRequests = visibleRequests.filter((r) => {
-    if (statusFilter !== "ALL" && r.status !== statusFilter) return false;
-    return true;
+    if (statusFilter === "ALL") return true;
+    if (statusFilter === "REJECTED") {
+      return r.status === "REJECTED" || r.status === "CANCELLED";
+    }
+    if (statusFilter === "COMPLETED") {
+      return r.status === "COMPLETED";
+    }
+    return r.status === statusFilter;
   });
 
-  const handleFulfill = async (req: Request, newStatus: RequestStatus) => {
+  const lineLabel = (item: RequestItem) => {
+    const kind = getRequestLineKind(item);
+    if (kind === "ASSET") {
+      const asset = assets.find((entry) => entry.id === item.asset_id);
+      const catalog = catalogItems.find(
+        (entry) =>
+          entry.id === item.catalog_item_id ||
+          entry.id === asset?.catalog_item_id,
+      );
+      return {
+        name: asset?.asset_code || catalog?.name || "Asset",
+        detail: catalog?.name ? `Asset · ${catalog.name}` : "Asset",
+      };
+    }
+    const catalog = catalogItems.find((entry) => entry.id === item.catalog_item_id);
+    return {
+      name: catalog?.name || "Item",
+      detail: `${item.requested_qty} ${catalog?.unit || "pcs"}`,
+    };
+  };
+
+  const closeModal = () => {
+    setSelectedRequest(null);
+    setRemarks("");
+    setProcessingError(null);
+  };
+
+  const handleAction = async () => {
+    if (!selectedRequest) return;
     setProcessingError(null);
     try {
-      const finalRemark =
-        fulfillmentRemarks.trim() || getDefaultApprovalRemarks(req);
-
-      await updateDocument("requests", req.id, {
-        status: newStatus,
-        approved_by_user_id: activeUser.id,
-        remarks: finalRemark,
-        updated_at: new Date().toISOString(),
-      });
-
-      if (req.items && req.items.length > 0) {
-        for (const item of req.items) {
-          if (item.catalog_item_id && item.requested_qty) {
-            if (newStatus === "COMPLETED") {
-              InventoryStorage.adjustStock(
-                item.catalog_item_id,
-                "default-location-1",
-                -Math.abs(item.requested_qty),
-                "ISSUE",
-                `Issued to requisition ${req.request_number}`,
-              );
-            } else if (
-              newStatus === "CANCELLED" &&
-              req.status === "COMPLETED"
-            ) {
-              InventoryStorage.adjustStock(
-                item.catalog_item_id,
-                "default-location-1",
-                Math.abs(item.requested_qty),
-                "RETURN",
-                `Returned from requisition ${req.request_number}`,
-              );
-            }
-          }
-        }
-      }
-
-      if (newStatus === "COMPLETED") {
+      if (modalMode === "review") {
+        await reviewLabRequest(
+          selectedRequest,
+          "APPROVED",
+          activeUser,
+          remarks.trim(),
+        );
+      } else if (modalMode === "handover") {
+        await handoverLabRequest(selectedRequest, activeUser, remarks.trim());
         confetti({ particleCount: 30, spread: 50 });
+      } else {
+        await completeLabRequest(selectedRequest, activeUser, remarks.trim());
       }
-
-      setSelectedRequest(null);
-      setFulfillmentRemarks("");
+      closeModal();
       onRefreshData();
     } catch (error: any) {
       console.error("Failed to process request:", error);
@@ -116,12 +148,33 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     }
   };
 
+  const handleReject = async () => {
+    if (!selectedRequest) return;
+    setProcessingError(null);
+    try {
+      await reviewLabRequest(
+        selectedRequest,
+        "REJECTED",
+        activeUser,
+        remarks.trim() || "Request rejected.",
+      );
+      closeModal();
+      onRefreshData();
+    } catch (error: any) {
+      setProcessingError(error?.message || "Failed to reject request.");
+    }
+  };
+
   const getStatusBadge = (status: RequestStatus) => {
     switch (status) {
       case "PENDING":
         return "idea-warning animate-pulse";
+      case "APPROVED":
+        return "idea-info";
+      case "HANDED_OVER":
       case "COMPLETED":
         return "idea-success";
+      case "REJECTED":
       case "CANCELLED":
         return "idea-error";
       default:
@@ -129,18 +182,26 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     }
   };
 
+  const statusLabel = (status: RequestStatus) => {
+    if (status === "CANCELLED") return "REJECTED";
+    if (status === "HANDED_OVER") return "HANDED OVER";
+    return status.replace("_", " ");
+  };
+
   return (
     <div className="flex-1 space-y-8 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
             REQUISITION DESK
           </span>
           <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-            Material &amp; Component{" "}
-            <span className="text-[var(--color-idea-blue)]">Requisitions</span>
+            Material &amp; Asset{" "}
+            <span className="text-[var(--color-idea-blue)]">Requests</span>
           </h2>
+          <p className="text-xs text-[var(--color-idea-muted)] mt-1">
+            Approve gives permission. Hand over is when inventory actually moves.
+          </p>
         </div>
         <button
           onClick={onOpenNewRequest}
@@ -150,24 +211,22 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
         </button>
       </div>
 
-      {/* Filter Tabs */}
       <div className="idea-card p-4 flex items-center gap-2 overflow-x-auto">
-        {(["ALL", "PENDING", "COMPLETED", "CANCELLED"] as const).map((s) => (
+        {FILTERS.map((s) => (
           <button
             key={s}
             onClick={() => setStatusFilter(s)}
-            className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+            className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
               statusFilter === s
                 ? "bg-[var(--color-idea-blue)] text-white shadow-sm"
                 : "text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)]"
             }`}
           >
-            {s === "ALL" ? "All Slips" : s}
+            {s === "ALL" ? "All Slips" : s.replace("_", " ")}
           </button>
         ))}
       </div>
 
-      {/* Requests List */}
       <div className="space-y-4">
         {filteredRequests.map((req) => {
           const student = users.find((u) => u.id === req.user_id);
@@ -190,7 +249,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                       <span
                         className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-widest ${getStatusBadge(req.status)}`}
                       >
-                        {req.status}
+                        {statusLabel(req.status)}
                       </span>
                     </div>
                     <p className="text-xs font-medium text-[var(--color-idea-muted)] mt-0.5">
@@ -200,7 +259,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                   </div>
                 </div>
 
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <button
                     onClick={() =>
                       onOpenQRGenerator(
@@ -215,16 +274,31 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                   </button>
                   {req.status === "PENDING" && canProcessRequests && (
                     <button
-                      onClick={() => openProcessRequest(req)}
+                      onClick={() => openModal(req, "review")}
                       className="px-4 py-2 border border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] hover:bg-[var(--color-idea-blue)] hover:text-white text-xs font-semibold rounded-xl transition-colors cursor-pointer"
                     >
-                      Process Slip
+                      Review
+                    </button>
+                  )}
+                  {req.status === "APPROVED" && canProcessRequests && (
+                    <button
+                      onClick={() => openModal(req, "handover")}
+                      className="px-4 py-2 idea-button text-xs font-semibold rounded-xl cursor-pointer"
+                    >
+                      Hand Over
+                    </button>
+                  )}
+                  {req.status === "HANDED_OVER" && canProcessRequests && (
+                    <button
+                      onClick={() => openModal(req, "complete")}
+                      className="px-4 py-2 border border-[var(--color-idea-green)] text-[#3d6b10] text-xs font-semibold rounded-xl cursor-pointer"
+                    >
+                      Complete
                     </button>
                   )}
                 </div>
               </div>
 
-              {/* Purpose & Items */}
               <div>
                 <div className="mb-3">
                   <span className="text-[9px] font-medium uppercase tracking-[0.2em] text-[var(--color-idea-muted)] block">
@@ -237,19 +311,18 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 mt-3">
                   {req.items?.map((item) => {
-                    const cat = catalogItems.find(
-                      (c) => c.id === item.catalog_item_id,
-                    );
+                    const label = lineLabel(item);
+                    const kind = getRequestLineKind(item);
                     return (
                       <div
                         key={item.id}
                         className="p-3 idea-gradient-soft border border-[var(--color-idea-blue)]/20 rounded-xl flex items-center justify-between text-xs"
                       >
                         <span className="font-bold text-[var(--color-idea-text)]">
-                          {cat?.name || "Item"}
+                          {label.name}
                         </span>
                         <span className="font-mono font-bold text-[var(--color-idea-blue)]">
-                          {item.requested_qty} {cat?.unit}
+                          {kind === "ASSET" ? "1 asset" : label.detail}
                         </span>
                       </div>
                     );
@@ -267,12 +340,16 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
         })}
       </div>
 
-      {/* Process Request Modal */}
       {selectedRequest && (
         <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
             <h3 className="font-bold text-[var(--color-idea-text)] text-lg border-b border-[var(--color-idea-border)] pb-2">
-              Process Requisition Slip {selectedRequest.request_number}
+              {modalMode === "review"
+                ? "Approve or reject"
+                : modalMode === "handover"
+                  ? "Hand over"
+                  : "Complete request"}{" "}
+              {selectedRequest.request_number}
             </h3>
             {processingError && (
               <div className="flex items-start gap-2 p-3 idea-error rounded-xl text-xs">
@@ -281,25 +358,24 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               </div>
             )}
             <p className="text-xs text-[var(--color-idea-muted)]">
-              Requisitioner:{" "}
-              <span className="font-bold text-[var(--color-idea-text)]">
-                {users.find((u) => u.id === selectedRequest.user_id)?.name}
-              </span>
+              {modalMode === "review"
+                ? "Approval only gives permission. Inventory does not change yet."
+                : modalMode === "handover"
+                  ? "This records the physical handover and updates stock, asset status, and the ledger."
+                  : "Mark this request closed after handover."}
             </p>
 
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {selectedRequest.items?.map((item) => {
-                const cat = catalogItems.find(
-                  (c) => c.id === item.catalog_item_id,
-                );
+                const label = lineLabel(item);
                 return (
                   <div
                     key={item.id}
                     className="p-2.5 idea-gradient-soft border border-[var(--color-idea-blue)]/20 rounded-xl flex justify-between text-xs font-semibold"
                   >
-                    <span>{cat?.name}</span>
+                    <span>{label.name}</span>
                     <span className="text-[var(--color-idea-blue)] font-mono">
-                      {item.requested_qty} {cat?.unit}
+                      {label.detail}
                     </span>
                   </div>
                 );
@@ -308,41 +384,40 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
 
             <div>
               <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                Issuance / Approval Remarks
+                Remarks
               </label>
               <input
                 type="text"
-                value={fulfillmentRemarks}
-                onChange={(e) => setFulfillmentRemarks(e.target.value)}
-                placeholder="e.g. Issued 2 boxes from Cabinet A Bin 12"
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
                 className="idea-input mt-1 p-2.5 text-xs"
               />
             </div>
 
             <div className="pt-2 flex gap-2">
               <button
-                onClick={() => {
-                  setSelectedRequest(null);
-                  setFulfillmentRemarks("");
-                  setProcessingError(null);
-                }}
+                onClick={closeModal}
                 className="py-2.5 px-4 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
               >
                 Close
               </button>
+              {modalMode === "review" && (
+                <button
+                  onClick={handleReject}
+                  className="flex-1 py-2.5 idea-error rounded-xl text-xs font-bold uppercase cursor-pointer"
+                >
+                  Reject
+                </button>
+              )}
               <button
-                onClick={() => handleFulfill(selectedRequest, "CANCELLED")}
-                disabled={!!processingError}
-                className="flex-1 py-2.5 idea-error rounded-xl text-xs font-bold uppercase transition-colors disabled:opacity-50 hover:opacity-80 cursor-pointer"
+                onClick={handleAction}
+                className="flex-1 py-2.5 idea-button rounded-xl text-xs font-bold uppercase cursor-pointer"
               >
-                Reject
-              </button>
-              <button
-                onClick={() => handleFulfill(selectedRequest, "COMPLETED")}
-                disabled={!!processingError}
-                className="flex-1 py-2.5 idea-button rounded-xl text-xs font-bold uppercase transition-colors disabled:opacity-50 cursor-pointer"
-              >
-                Approve &amp; Issue
+                {modalMode === "review"
+                  ? "Approve"
+                  : modalMode === "handover"
+                    ? "Hand Over"
+                    : "Complete"}
               </button>
             </div>
           </div>

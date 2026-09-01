@@ -9,6 +9,8 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
+  FieldPath,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import type {
@@ -65,7 +67,25 @@ function tsToString(val: any): string {
 export async function getCollection<T>(name: string): Promise<T[]> {
   try {
     requireSignedInUser();
-    const snapshot = await getDocs(collection(db, name));
+
+    let collectionRef = collection(db, name);
+    if (name === "requests" && auth.currentUser) {
+      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+      const userRole = userDoc.exists() ? (userDoc.data().role as string | undefined) : undefined;
+      if (!userRole || userRole === "STUDENT") {
+        collectionRef = query(collectionRef, where("user_id", "==", auth.currentUser.uid));
+      }
+    }
+
+    if (name === "account_requests" && auth.currentUser) {
+      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+      const userRole = userDoc.exists() ? (userDoc.data().role as string | undefined) : undefined;
+      if (!userRole || userRole === "STUDENT") {
+        collectionRef = query(collectionRef, where(FieldPath.documentId(), "==", auth.currentUser.uid));
+      }
+    }
+
+    const snapshot = await getDocs(collectionRef);
     console.log(`📂 Firestore read ${name}: ${snapshot.size} docs`);
 
     const items = snapshot.docs.map((document) => {

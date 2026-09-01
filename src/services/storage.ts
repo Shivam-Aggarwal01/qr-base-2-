@@ -523,7 +523,7 @@ export class InventoryStorage {
         );
         const storagePlace = catalogItem?.storage_place || defaultStore;
 
-        if (item.requested_qty > 0) {
+        if (item.catalog_item_id && item.requested_qty > 0 && !item.asset_id) {
           this.adjustStock(
             item.catalog_item_id,
             storagePlace,

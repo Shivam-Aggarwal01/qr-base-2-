@@ -6,7 +6,23 @@ export type ItemType = "CONSUMABLE" | "REUSABLE" | "TOOL";
 export type AssetStatus =
   "AVAILABLE" | "ISSUED" | "UNDER_REPAIR" | "DAMAGED" | "LOST" | "DISPOSED";
 
-export type RequestStatus = "PENDING" | "COMPLETED" | "PARTIAL" | "CANCELLED";
+export type RequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "HANDED_OVER"
+  | "COMPLETED"
+  | "PARTIAL"
+  | "CANCELLED";
+
+export type RequestLineKind = "CATALOG" | "ASSET";
+
+export interface RequestLineDraft {
+  kind: RequestLineKind;
+  catalog_item_id?: string;
+  asset_id?: string;
+  requested_qty: number;
+}
 
 export type AccountRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -103,9 +119,12 @@ export interface AssetAssignment {
 export interface RequestItem {
   id: string;
   request_id: string;
-  catalog_item_id: string;
+  kind?: RequestLineKind;
+  catalog_item_id?: string;
+  asset_id?: string;
   requested_qty: number;
   fulfilled_qty?: number;
+  handed_over?: boolean;
 }
 
 export interface Request {
@@ -115,6 +134,8 @@ export interface Request {
   purpose: string;
   status: RequestStatus;
   approved_by_user_id?: string | null;
+  handed_over_by_user_id?: string | null;
+  handed_over_at?: string | null;
   remarks?: string;
   created_at: string;
   updated_at: string;

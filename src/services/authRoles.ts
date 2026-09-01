@@ -16,7 +16,11 @@ export function hasMinimumRole(
 }
 
 export function isStudent(role: UserRole | null | undefined): boolean {
-  return role === "STUDENT";
+  return (
+    role === "STUDENT" ||
+    role === "STUDENT_LEAD" ||
+    role === "STUDENT_AMBASSADOR"
+  );
 }
 
 export function isAmbassador(role: UserRole | null | undefined): boolean {

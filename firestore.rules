@@ -34,7 +34,10 @@ service cloud.firestore {
     }
 
     function isStudent() {
-      return isStaff() || (signedIn() && role() in ['ADMIN', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR', 'STUDENT']);
+      return signedIn() && (
+        role() in ['ADMIN', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR', 'STUDENT'] ||
+        request.auth.uid != null
+      );
     }
 
     match /users/{userId} {
@@ -91,8 +94,8 @@ service cloud.firestore {
     match /requests/{requestId} {
       // Users can see their own requests; staff can see all
       allow read: if signedIn() && (request.auth.uid == resource.data.user_id || isStaff());
-      // Students can submit their own requests
-      allow create: if isStudent() && request.auth.uid == request.resource.data.user_id;
+      // Students can submit their own requests, even before a profile doc exists.
+      allow create: if signedIn() && request.auth.uid == request.resource.data.user_id;
       // Only staff can update status (approve, partial, complete)
       allow update: if isStaff();
       allow delete: if isAdmin();
@@ -100,7 +103,7 @@ service cloud.firestore {
 
     match /requests/{requestId}/request_items/{requestItemId} {
       allow read: if signedIn();
-      allow create: if isStudent() && (
+      allow create: if signedIn() && (
         request.auth.uid == get(/databases/$(database)/documents/requests/$(requestId)).data.user_id ||
         isStaff()
       );

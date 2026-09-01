@@ -10,6 +10,7 @@ import {
   Users,
 } from "lucide-react";
 import { ViewMode } from "../types/inventory";
+import { isStudent } from "../services/authRoles";
 
 interface SidebarProps {
   currentView: ViewMode;
@@ -28,8 +29,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenScanner,
   userRole = "STUDENT",
 }) => {
-  const isStudent = userRole === "STUDENT";
-  const menuItems = isStudent
+  const studentMode = isStudent(userRole);
+  const menuItems = studentMode
     ? [
         {
           id: "requests" as ViewMode,

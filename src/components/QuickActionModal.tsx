@@ -20,14 +20,20 @@ import {
   AssetStatus,
   StockLevel,
   InventoryTransaction,
+  RequestLineDraft,
 } from "../types/inventory";
 import { InventoryStorage } from "../services/storage";
 import {
   canApproveRequests,
   canIssueInventory,
   canReturnOrRepairItems,
+  isStudent,
 } from "../services/authRoles";
-import { updateDocument } from "../services/firebaseCollections";
+import {
+  completeLabRequest,
+  handoverLabRequest,
+  reviewLabRequest,
+} from "../services/requestWorkflow";
 import confetti from "canvas-confetti";
 
 interface QuickActionModalProps {
@@ -45,9 +51,7 @@ interface QuickActionModalProps {
   stockLevels: StockLevel[];
   requests: Request[];
   activeUser: User;
-  onOpenNewRequest: (
-    items: { catalog_item_id: string; requested_qty: number }[],
-  ) => void;
+  onOpenNewRequest: (items: RequestLineDraft[]) => void;
   onRefreshData: () => void;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
 }
@@ -79,18 +83,29 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const canApprove = canApproveRequests(role);
   const canIssue = canIssueInventory(role);
   const canReturnOrRepair = canReturnOrRepairItems(role);
+  const studentMode = isStudent(role);
 
-  const isStudent = role === "STUDENT";
+  const myPendingRequestForAsset = (assetId: string): Request | null => {
+      if (!activeUser || !isStudent(activeUser.role)) return null;
+      return (
+        requests.find(
+          (r) =>
+            r.user_id === activeUser.id &&
+            (r.status === "PENDING" || r.status === "APPROVED") &&
+            r.items?.some((it) => it.asset_id === assetId),
+        ) ?? null
+      );
+    };
 
   const myPendingRequestForCatalogItem = (
     catalogItemId: string,
   ): Request | null => {
-    if (!activeUser || activeUser.role !== "STUDENT") return null;
+    if (!activeUser || !isStudent(activeUser.role)) return null;
     return (
       requests.find(
         (r) =>
           r.user_id === activeUser.id &&
-          (r.status === "PENDING" || r.status === "PARTIAL") &&
+          (r.status === "PENDING" || r.status === "APPROVED") &&
           r.items?.some((it) => it.catalog_item_id === catalogItemId),
       ) ?? null
     );
@@ -100,7 +115,21 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     catalogItemId: string,
     requested_qty: number,
   ) => {
-    onOpenNewRequest([{ catalog_item_id: catalogItemId, requested_qty }]);
+    onOpenNewRequest([
+      { kind: "CATALOG", catalog_item_id: catalogItemId, requested_qty },
+    ]);
+    onClose();
+  };
+
+  const openRequestForAsset = (asset: Asset) => {
+    onOpenNewRequest([
+      {
+        kind: "ASSET",
+        asset_id: asset.id,
+        catalog_item_id: asset.catalog_item_id,
+        requested_qty: 1,
+      },
+    ]);
     onClose();
   };
 
@@ -130,13 +159,10 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     const boxCap = asset.box_capacity ?? 15;
 
     // Student QR action: they can request the catalog item, but they cannot issue/return or change status.
-    if (isStudent) {
-      const requestCatalogItemId = catalogItem?.id;
-      const existingRequest = requestCatalogItemId
-        ? myPendingRequestForCatalogItem(requestCatalogItemId)
-        : null;
+    if (studentMode) {
+      const existingRequest = myPendingRequestForAsset(asset.id);
       const requestBlockedByAssetStatus =
-        asset.status === "DISPOSED" || asset.status === "LOST";
+        asset.status === "DISPOSED" || asset.status === "LOST" || asset.status === "ISSUED";
 
       return (
         <div className="space-y-6">
@@ -202,25 +228,19 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               </div>
             ) : (
               <div className="p-3 bg-white border border-[#1A1A1A]/10 text-xs rounded-xl">
-                Request this catalog item (quantity: 1) and track approval in{" "}
-                <span className="font-bold">Requests</span>.
+                Request this specific asset and track approval in{" "}
+                <span className="font-bold">Requests</span>. Quantity is not required.
               </div>
             )}
 
             <div className="flex gap-3 pt-1">
               <button
                 type="button"
-                disabled={
-                  !requestCatalogItemId ||
-                  !!existingRequest ||
-                  requestBlockedByAssetStatus
-                }
-                onClick={() =>
-                  openRequestForCatalogItem(requestCatalogItemId || "", 1)
-                }
+                disabled={!!existingRequest || requestBlockedByAssetStatus}
+                onClick={() => openRequestForAsset(asset)}
                 className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 disabled:hover:bg-[#1A1A1A]"
               >
-                {existingRequest ? "Request Submitted" : "Request This Item"}
+                {existingRequest ? "Request Submitted" : "Request This Asset"}
               </button>
 
               <button
@@ -713,7 +733,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     );
 
     // Student QR action: request the catalog item, don't mutate stock.
-    if (isStudent) {
+    if (studentMode) {
       const existingRequest = myPendingRequestForCatalogItem(cat.id);
       const alreadyRequested = !!existingRequest;
 
@@ -947,7 +967,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     const stockInLoc = stockLevels.filter((s) => s.location_id === loc.id);
 
     // Student QR action: show consumable stock + request buttons. Students cannot mutate inventory.
-    if (isStudent) {
+    if (studentMode) {
       const consumablesInLoc = stockInLoc
         .map((s) => {
           const cat = catalogItems.find(
@@ -1148,21 +1168,31 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const renderRequestActions = (req: Request) => {
     const student = users.find((u) => u.id === req.user_id);
 
-    const handleFulfill = async (status: "COMPLETED" | "CANCELLED") => {
-      const finalRemark = remarksInput.trim() || `Fulfilling request via scan`;
+    const handleReview = async (status: "APPROVED" | "REJECTED") => {
+      const finalRemark =
+        remarksInput.trim() ||
+        (status === "APPROVED"
+          ? "Approved. Inventory will change at handover."
+          : "Request rejected.");
+      await reviewLabRequest(req, status, activeUser, finalRemark);
+      triggerSuccess();
+    };
 
-      // QR-based staff actions should still persist to Firestore so students see updated statuses.
-      if (canApprove) {
-        await updateDocument("requests", req.id, {
-          status,
-          approved_by_user_id: activeUser.id,
-          remarks: finalRemark,
-          updated_at: new Date().toISOString(),
-        });
-      }
+    const handleHandover = async () => {
+      await handoverLabRequest(
+        req,
+        activeUser,
+        remarksInput.trim() || `Handed over via scan for ${req.request_number}`,
+      );
+      triggerSuccess();
+    };
 
-      // Keep existing local inventory behavior (stock/transactions) for now.
-      InventoryStorage.fulfillRequest(req.id, status, finalRemark);
+    const handleComplete = async () => {
+      await completeLabRequest(
+        req,
+        activeUser,
+        remarksInput.trim() || `Completed ${req.request_number}`,
+      );
       triggerSuccess();
     };
 
@@ -1188,9 +1218,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className={`text-[10px] px-3 py-1 font-mono uppercase tracking-widest border ${
               req.status === "PENDING"
                 ? "border-amber-700 bg-amber-50 text-amber-800 animate-pulse"
-                : req.status === "COMPLETED"
-                  ? "border-emerald-700 bg-emerald-50 text-emerald-800"
-                  : "border-red-700 bg-red-50 text-red-800"
+                : req.status === "APPROVED"
+                  ? "border-blue-700 bg-blue-50 text-blue-800"
+                  : req.status === "HANDED_OVER" || req.status === "COMPLETED"
+                    ? "border-emerald-700 bg-emerald-50 text-emerald-800"
+                    : "border-red-700 bg-red-50 text-red-800"
             }`}
           >
             {req.status}
@@ -1229,30 +1261,59 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               type="text"
               value={remarksInput}
               onChange={(e) => setRemarksInput(e.target.value)}
-              placeholder="Approval notes / issuance remarks..."
+              placeholder="Approval notes..."
               className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs outline-none focus:border-[#D4AF37]"
             />
             <div className="flex gap-3">
               <button
-                onClick={() => handleFulfill("CANCELLED")}
+                onClick={() => void handleReview("REJECTED")}
                 className="flex-1 py-3 border border-red-800 text-red-800 hover:bg-red-800 hover:text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
               >
-                Reject Request
+                Reject
               </button>
               <button
-                onClick={() => handleFulfill("COMPLETED")}
+                onClick={() => void handleReview("APPROVED")}
                 className="flex-1 py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
               >
-                Approve & Issue
+                Approve
               </button>
             </div>
+          </div>
+        )}
+
+        {req.status === "APPROVED" && canApprove && (
+          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
+            <input
+              type="text"
+              value={remarksInput}
+              onChange={(e) => setRemarksInput(e.target.value)}
+              placeholder="Handover notes..."
+              className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs outline-none focus:border-[#D4AF37]"
+            />
+            <button
+              onClick={() => void handleHandover()}
+              className="w-full py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Hand Over
+            </button>
+          </div>
+        )}
+
+        {req.status === "HANDED_OVER" && canApprove && (
+          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
+            <button
+              onClick={() => void handleComplete()}
+              className="w-full py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Complete
+            </button>
           </div>
         )}
 
         {req.status === "PENDING" && !canApprove && (
           <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
             <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
-              Waiting for authorized staff to approve and issue this request.
+              Waiting for staff to approve this request. Inventory will not change until handover.
             </div>
           </div>
         )}
@@ -1266,7 +1327,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
       (a) => a.assigned_to_user_id === user.id && !a.returned_at,
     );
 
-    if (isStudent) {
+    if (studentMode) {
       return (
         <div className="space-y-5">
           <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
