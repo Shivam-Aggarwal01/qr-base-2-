@@ -394,11 +394,13 @@ export async function createCatalogItemInFirestore(payload: {
 export async function createLocationInFirestore(payload: {
   name: string;
   code?: string;
+  storage_path?: string | null;
 }): Promise<void> {
   await addDoc(collection(db, COLLECTIONS.LOCATIONS), {
     id: "",
     name: payload.name,
     code: payload.code ?? "",
+    storage_path: payload.storage_path ?? "",
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });
@@ -406,10 +408,12 @@ export async function createLocationInFirestore(payload: {
 
 export async function createAssetInFirestore(payload: {
   asset_code: string;
+  qr_code?: string;
   catalog_item_id: string;
   serial_number?: string;
   status?: string;
   location_id?: string | null;
+  storage_location?: string | null;
   assigned_to_user_id?: string | null;
   tracking_mode?: "BOX" | "INDIVIDUAL";
   is_box?: boolean;
@@ -417,11 +421,16 @@ export async function createAssetInFirestore(payload: {
   available_in_box?: number;
   notes?: string;
 }): Promise<void> {
+  const qrCode = payload.qr_code ?? payload.asset_code;
+
   await addDoc(collection(db, COLLECTIONS.ASSETS), {
     id: "",
     ...payload,
+    asset_code: payload.asset_code,
+    qr_code: qrCode,
     status: payload.status ?? "AVAILABLE",
     location_id: payload.location_id ?? null,
+    storage_location: payload.storage_location ?? "",
     assigned_to_user_id: payload.assigned_to_user_id ?? null,
     tracking_mode: payload.tracking_mode ?? null,
     is_box: payload.is_box ?? false,

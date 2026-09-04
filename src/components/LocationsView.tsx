@@ -38,6 +38,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
   const [searchFilter, setSearchFilter] = useState("");
   const [locName, setLocName] = useState("");
   const [locCode, setLocCode] = useState("");
+  const [storagePath, setStoragePath] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -104,10 +105,15 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
 
     setSaving(true);
     try {
-      await createLocationInFirestore({ name: locName.trim(), code });
+      await createLocationInFirestore({
+        name: locName.trim(),
+        code,
+        storage_path: storagePath.trim() || null,
+      });
       setShowAddModal(false);
       setLocName("");
       setLocCode("");
+      setStoragePath("");
       onRefreshData();
     } catch (error) {
       console.error("Failed to create location in Firestore:", error);
@@ -205,6 +211,11 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                           <p className="text-xs font-mono font-bold text-[var(--color-idea-blue)]">
                             {loc.code || loc.id}
                           </p>
+                          {loc.storage_path && (
+                            <p className="text-[10px] text-[var(--color-idea-muted)] truncate">
+                              {loc.storage_path}
+                            </p>
+                          )}
                         </div>
                       </div>
                       <span
@@ -317,6 +328,9 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                 </h3>
                 <p className="text-xs font-mono text-[var(--color-idea-blue)]">
                   {selectedLocation.code || selectedLocation.id}
+                </p>
+                <p className="text-xs text-[var(--color-idea-muted)] mt-1">
+                  {selectedLocation.storage_path || "No detailed storage path set"}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -444,14 +458,14 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
               </div>
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Location QR Code (Optional)
+                  Room / Cupboard / Row / Container
                 </label>
                 <input
                   type="text"
-                  placeholder="LOC-CAB-B05"
-                  value={locCode}
-                  onChange={(e) => setLocCode(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs font-mono uppercase"
+                  placeholder="e.g. Room 2 / Cupboard B / Row 3 / Container 4"
+                  value={storagePath}
+                  onChange={(e) => setStoragePath(e.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs"
                 />
               </div>
               <div className="pt-2 flex gap-2">

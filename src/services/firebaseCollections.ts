@@ -12,6 +12,7 @@ import {
   where,
   FieldPath,
 } from "firebase/firestore";
+import type { DocumentData, Query } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import type {
   Asset,
@@ -68,7 +69,7 @@ export async function getCollection<T>(name: string): Promise<T[]> {
   try {
     requireSignedInUser();
 
-    let collectionRef = collection(db, name);
+    let collectionRef: Query<DocumentData, DocumentData> = collection(db, name);
     if (name === "requests" && auth.currentUser) {
       const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
       const userRole = userDoc.exists() ? (userDoc.data().role as string | undefined) : undefined;

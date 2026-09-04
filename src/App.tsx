@@ -422,7 +422,6 @@ export default function App() {
               stockLevels={stockLevels}
               currentUser={currentUser}
               onSelectView={setCurrentView}
-              onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
               onOpenNewRequest={() => openNewRequest()}
             />
@@ -446,7 +445,6 @@ export default function App() {
               catalogItems={catalogItems}
               locations={locations}
               users={users}
-              onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
             />
           )}

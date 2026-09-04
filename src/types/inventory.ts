@@ -4,7 +4,12 @@ export type UserRole =
 export type ItemType = "CONSUMABLE" | "REUSABLE" | "TOOL";
 
 export type AssetStatus =
-  "AVAILABLE" | "ISSUED" | "UNDER_REPAIR" | "DAMAGED" | "LOST" | "DISPOSED";
+  | "AVAILABLE"
+  | "ISSUED"
+  | "UNDER_REPAIR"
+  | "DAMAGED"
+  | "LOST"
+  | "RETIRED";
 
 export type RequestStatus =
   | "PENDING"
@@ -76,6 +81,7 @@ export interface Location {
   id: string;
   name: string;
   code?: string;
+  storage_path?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -91,10 +97,13 @@ export interface StockLevel {
 export interface Asset {
   id: string;
   asset_code: string;
+  qr_code?: string;
   catalog_item_id: string;
   serial_number?: string;
   status: AssetStatus;
   location_id?: string | null;
+  /** Human-readable path such as "Room 2 / Cupboard B / Row 3 / Bin 4". */
+  storage_location?: string | null;
   assigned_to_user_id?: string | null;
   tracking_mode?: AssetTrackingMode; // 'BOX' or 'INDIVIDUAL'
   is_box?: boolean;

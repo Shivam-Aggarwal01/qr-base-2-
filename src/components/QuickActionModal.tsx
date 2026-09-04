@@ -75,11 +75,17 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedLoc, setSelectedLoc] = useState<string>("");
   const [qtyInput, setQtyInput] = useState<number>(1);
-  const [boxQtyInput, setBoxQtyInput] = useState<number>(1);
   const [remarksInput, setRemarksInput] = useState<string>("");
   const [statusInput, setStatusInput] = useState<AssetStatus>("DAMAGED");
 
   const role = activeUser?.role;
+  const quickStatusOptions: AssetStatus[] = [
+    "AVAILABLE",
+    "UNDER_REPAIR",
+    "DAMAGED",
+    "LOST",
+    "RETIRED",
+  ];
   const canApprove = canApproveRequests(role);
   const canIssue = canIssueInventory(role);
   const canReturnOrRepair = canReturnOrRepairItems(role);
@@ -150,19 +156,16 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     );
     const assignedUser = users.find((u) => u.id === asset.assigned_to_user_id);
     const location = locations.find((l) => l.id === asset.location_id);
-    const isBox =
-      asset.is_box ||
-      asset.tracking_mode === "BOX" ||
-      (asset.box_capacity && asset.box_capacity > 1);
-
-    const availableInBox = asset.available_in_box ?? asset.box_capacity ?? 10;
-    const boxCap = asset.box_capacity ?? 15;
 
     // Student QR action: they can request the catalog item, but they cannot issue/return or change status.
     if (studentMode) {
       const existingRequest = myPendingRequestForAsset(asset.id);
       const requestBlockedByAssetStatus =
-        asset.status === "DISPOSED" || asset.status === "LOST" || asset.status === "ISSUED";
+        asset.status === "LOST" ||
+        asset.status === "RETIRED" ||
+        asset.status === "ISSUED" ||
+        asset.status === "DAMAGED" ||
+        asset.status === "UNDER_REPAIR";
 
       return (
         <div className="space-y-6">
@@ -172,13 +175,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                    {isBox ? "BOX BATCH ASSET" : "INDIVIDUAL TRACKED ASSET"}
+                    INDIVIDUAL TRACKED ASSET
                   </span>
-                  {isBox && (
-                    <span className="bg-[#D4AF37] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5">
-                      Storage Box
-                    </span>
-                  )}
                 </div>
                 <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1 truncate">
                   {catalogItem?.name || asset.asset_code}
@@ -208,9 +206,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                   {asset.status.replace("_", " ")}
                 </span>
                 <p className="text-xs text-[#6C6863] mt-2 font-medium">
-                  {asset.status === "ISSUED" && !isBox
-                    ? `Held by: ${assignedUser?.name || "Student"}`
-                    : `Location: ${location?.name || "Unassigned"}`}
+                  {asset.assigned_to_user_id
+                    ? `Assigned to: ${assignedUser?.name || "Student"}`
+                    : `Location: ${location?.name || "Location not set"}`}
                 </p>
               </div>
             </div>
@@ -269,21 +267,19 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         asset.id,
         selectedUser,
         remarksInput,
-        undefined,
-        isBox ? boxQtyInput : 1,
       );
       triggerSuccess();
     };
 
     const handleReturnSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!selectedLoc && !isBox)
+      if (!selectedLoc && !location?.id) {
         return alert("Please select a storage location");
+      }
       InventoryStorage.returnAsset(
         asset.id,
         selectedLoc || location?.id || locations[0]?.id,
         remarksInput,
-        isBox ? boxQtyInput : 1,
       );
       triggerSuccess();
     };
@@ -308,13 +304,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                  {isBox ? "BOX BATCH ASSET" : "INDIVIDUAL TRACKED ASSET"}
+                  INDIVIDUAL TRACKED ASSET
                 </span>
-                {isBox && (
-                  <span className="bg-[#D4AF37] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5">
-                    Storage Box
-                  </span>
-                )}
               </div>
               <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
                 {catalogItem?.name || asset.asset_code}
@@ -343,34 +334,56 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 {asset.status.replace("_", " ")}
               </span>
               <p className="text-xs text-[#6C6863] mt-2 font-medium">
-                {asset.status === "ISSUED" && !isBox
-                  ? `Held by: ${assignedUser?.name || "Student"}`
-                  : `Location: ${location?.name || "Unassigned"}`}
+                {asset.status === "ISSUED"
+                  ? `Assigned to: ${assignedUser?.name || "Student"}`
+                  : `Location: ${location?.name || "Location not set"}`}
               </p>
             </div>
           </div>
+        </div>
 
-          {/* Box Capacity Visualizer */}
-          {isBox && (
-            <div className="mt-4 pt-4 border-t border-[#1A1A1A]/10 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-[#6C6863]">
-                  Box Stock Available
-                </span>
-                <span className="font-mono font-bold text-[#1A1A1A]">
-                  {availableInBox} / {boxCap} Units Inside Box
-                </span>
-              </div>
-              <div className="w-full bg-[#EBE5DE] h-2">
-                <div
-                  className="bg-[#D4AF37] h-2 transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, (availableInBox / boxCap) * 100))}%`,
+        <div className="border border-[#1A1A1A]/10 bg-white p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">
+              Quick Status
+            </p>
+            <span className="text-[9px] text-[#6C6863]">
+              {asset.status.replace("_", " ")}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {quickStatusOptions.map((status) => {
+              const selected = asset.status === status;
+              const label = status.replace("_", " ");
+              const isDanger = status === "DAMAGED" || status === "LOST" || status === "RETIRED";
+              const isRepair = status === "UNDER_REPAIR";
+              const isAvailable = status === "AVAILABLE";
+
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    setStatusInput(status);
+                    setSubAction("status");
                   }}
-                />
-              </div>
-            </div>
-          )}
+                  className={`py-2 px-2 text-[10px] font-bold uppercase tracking-wider border rounded-lg transition-colors cursor-pointer ${
+                    selected
+                      ? isAvailable
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : isRepair
+                          ? "bg-amber-500 text-white border-amber-500"
+                          : isDanger
+                            ? "bg-red-600 text-white border-red-600"
+                            : "bg-slate-900 text-white border-slate-900"
+                      : "bg-[#F9F8F6] text-[#1A1A1A] border-[#1A1A1A]/10 hover:border-[#1A1A1A]"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Sub Action Forms */}
@@ -380,43 +393,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className="space-y-4 bg-white p-5 border border-[#1A1A1A]"
           >
             <h5 className="font-serif text-sm font-bold text-[#1A1A1A] uppercase tracking-wider border-b border-[#1A1A1A]/10 pb-2">
-              {isBox
-                ? `Check Out Units from ${asset.asset_code}`
-                : `Issue Individual Asset to Student`}
+              Issue Individual Asset to Student
             </h5>
-
-            {isBox && (
-              <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                  Select Quantity to Take Out (Max {availableInBox})
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="1"
-                    max={Math.max(1, availableInBox)}
-                    value={boxQtyInput}
-                    onChange={(e) => setBoxQtyInput(Number(e.target.value))}
-                    className="flex-1 accent-[#D4AF37]"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    max={availableInBox}
-                    value={boxQtyInput}
-                    onChange={(e) =>
-                      setBoxQtyInput(
-                        Math.min(
-                          availableInBox,
-                          Math.max(1, Number(e.target.value)),
-                        ),
-                      )
-                    }
-                    className="w-20 p-2 border border-[#1A1A1A] font-mono font-bold text-center text-sm outline-none"
-                  />
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
@@ -474,44 +452,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className="space-y-4 bg-white p-5 border border-[#1A1A1A]"
           >
             <h5 className="font-serif text-sm font-bold text-[#1A1A1A] uppercase tracking-wider border-b border-[#1A1A1A]/10 pb-2">
-              {isBox
-                ? `Return Units Back to Box (${asset.asset_code})`
-                : `Return Asset to Lab Storage`}
+              Return Asset to Lab Storage
             </h5>
-
-            {isBox && (
-              <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                  Select Quantity Returning (Max {boxCap - availableInBox}{" "}
-                  missing)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="1"
-                    max={Math.max(1, boxCap - availableInBox)}
-                    value={boxQtyInput}
-                    onChange={(e) => setBoxQtyInput(Number(e.target.value))}
-                    className="flex-1 accent-[#D4AF37]"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    max={boxCap - availableInBox}
-                    value={boxQtyInput}
-                    onChange={(e) =>
-                      setBoxQtyInput(
-                        Math.min(
-                          boxCap - availableInBox,
-                          Math.max(1, Number(e.target.value)),
-                        ),
-                      )
-                    }
-                    className="w-20 p-2 border border-[#1A1A1A] font-mono font-bold text-center text-sm outline-none"
-                  />
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
@@ -521,13 +463,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 value={selectedLoc}
                 onChange={(e) => setSelectedLoc(e.target.value)}
                 className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A] text-xs font-medium outline-none focus:border-[#D4AF37]"
-                required={!isBox}
+                required
               >
-                <option value="">
-                  {isBox
-                    ? `-- Current Box Location (${location?.name || "Bin"}) --`
-                    : "-- Select Return Storage --"}
-                </option>
+                <option value="">-- Select Return Storage --</option>
                 {locations.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name} ({l.code})
@@ -590,7 +528,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 </option>
                 <option value="DAMAGED">DAMAGED (Faulty)</option>
                 <option value="LOST">LOST (Missing from Lab)</option>
-                <option value="DISPOSED">DISPOSED (Scrapped)</option>
+                <option value="RETIRED">RETIRED (Retired from Service)</option>
               </select>
             </div>
             <div>
@@ -643,42 +581,35 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         {/* Primary Action Button Bar */}
         {!subAction && (
           <div className="grid grid-cols-2 gap-3">
-            {(asset.status === "AVAILABLE" || isBox) && (
+            {asset.status === "AVAILABLE" && (
               <button
                 onClick={() => {
-                  setBoxQtyInput(1);
                   setSubAction("issue");
                 }}
                 className="p-4 bg-[#1A1A1A] text-white flex items-center gap-3 font-bold text-xs uppercase tracking-wider hover:bg-[#D4AF37] transition-colors cursor-pointer"
               >
                 <UserCheck className="w-5 h-5 text-[#D4AF37] shrink-0" />
                 <div className="text-left">
-                  <p>{isBox ? "Take Out Units" : "Issue to Student"}</p>
+                  <p>Issue to Student</p>
                   <p className="text-[10px] font-normal opacity-70 capitalize">
-                    {isBox
-                      ? "Check out Y items from box"
-                      : "Assign loan record"}
+                    Assign loan record
                   </p>
                 </div>
               </button>
             )}
 
-            {(asset.status === "ISSUED" ||
-              (isBox && availableInBox < boxCap)) && (
+            {asset.status === "ISSUED" && (
               <button
                 onClick={() => {
-                  setBoxQtyInput(1);
                   setSubAction("return");
                 }}
                 className="p-4 bg-emerald-950 text-white flex items-center gap-3 font-bold text-xs uppercase tracking-wider hover:bg-emerald-900 transition-colors cursor-pointer"
               >
                 <Check className="w-5 h-5 text-emerald-400 shrink-0" />
                 <div className="text-left">
-                  <p>{isBox ? "Return Units to Box" : "Return Asset"}</p>
+                  <p>Return Asset</p>
                   <p className="text-[10px] font-normal opacity-70 capitalize">
-                    {isBox
-                      ? "Put Y items back into box"
-                      : "Return to storage bin"}
+                    Return to storage bin
                   </p>
                 </div>
               </button>
