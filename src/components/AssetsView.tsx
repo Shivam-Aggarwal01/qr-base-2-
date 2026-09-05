@@ -164,12 +164,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
     try {
       const fallbackLocation = asset.location_id || locations[0]?.id || null;
-      InventoryStorage.updateAssetStatus(
-        asset.id,
-        nextStatus,
-        nextStatus === "AVAILABLE" ? fallbackLocation : asset.location_id,
-        `Status updated in asset register`,
-      );
       await updateFirestoreDocument(COLLECTIONS.ASSETS, asset.id, {
         status: nextStatus,
         location_id:
@@ -185,6 +179,18 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             ? null
             : asset.assigned_to_user_id ?? null,
       });
+
+      try {
+        InventoryStorage.updateAssetStatus(
+          asset.id,
+          nextStatus,
+          nextStatus === "AVAILABLE" ? fallbackLocation : asset.location_id,
+          `Status updated in asset register`,
+        );
+      } catch (localStorageError) {
+        console.warn("Could not update the legacy local asset cache:", localStorageError);
+      }
+
       onRefreshData();
     } catch (error) {
       console.error("Failed to update asset status:", error);
