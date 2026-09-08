@@ -720,6 +720,7 @@ export class InventoryStorage {
     // 1. Check Asset Code or Serial Number
     const foundAsset = assets.find(
       (a) =>
+        a.id.toLowerCase() === cleanData.toLowerCase() ||
         a.asset_code.toLowerCase() === cleanData.toLowerCase() ||
         a.serial_number?.toLowerCase() === cleanData.toLowerCase(),
     );
@@ -728,7 +729,9 @@ export class InventoryStorage {
 
     // 2. Check Catalog Item Code
     const foundCatalog = catalog.find(
-      (c) => c.item_code.toLowerCase() === cleanData.toLowerCase(),
+      (c) =>
+        c.id.toLowerCase() === cleanData.toLowerCase() ||
+        c.item_code.toLowerCase() === cleanData.toLowerCase(),
     );
     if (foundCatalog)
       return { type: "catalog", entity: foundCatalog, rawCode: cleanData };
@@ -736,6 +739,7 @@ export class InventoryStorage {
     // 3. Check Location Code or Name
     const foundLoc = locations.find(
       (l) =>
+        l.id.toLowerCase() === cleanData.toLowerCase() ||
         l.code?.toLowerCase() === cleanData.toLowerCase() ||
         l.name.toLowerCase() === cleanData.toLowerCase(),
     );
@@ -797,6 +801,7 @@ export function parseQRCodeFromEntities(
   // 1. Check Asset Code or Serial Number
   const foundAsset = assets.find(
     (a) =>
+      a.id.toLowerCase() === cleanData.toLowerCase() ||
       a.asset_code.toLowerCase() === cleanData.toLowerCase() ||
       a.serial_number?.toLowerCase() === cleanData.toLowerCase(),
   );
@@ -805,7 +810,9 @@ export function parseQRCodeFromEntities(
 
   // 2. Check Catalog Item Code
   const foundCatalog = catalog.find(
-    (c) => c.item_code.toLowerCase() === cleanData.toLowerCase(),
+    (c) =>
+      c.id.toLowerCase() === cleanData.toLowerCase() ||
+      c.item_code.toLowerCase() === cleanData.toLowerCase(),
   );
   if (foundCatalog)
     return {
@@ -817,6 +824,7 @@ export function parseQRCodeFromEntities(
   // 3. Check Location Code or Name
   const foundLoc = locations.find(
     (l) =>
+      l.id.toLowerCase() === cleanData.toLowerCase() ||
       l.code?.toLowerCase() === cleanData.toLowerCase() ||
       l.name.toLowerCase() === cleanData.toLowerCase(),
   );

@@ -245,7 +245,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 type="button"
                 onClick={() =>
                   onOpenQRGenerator(
-                    asset.asset_code,
+                    asset.id,
                     catalogItem?.name || asset.asset_code,
                     `SN: ${asset.serial_number || "N/A"}`,
                   )
@@ -631,7 +631,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             <button
               onClick={() =>
                 onOpenQRGenerator(
-                  asset.asset_code,
+                  asset.id,
                   catalogItem?.name || asset.asset_code,
                   `SN: ${asset.serial_number || "N/A"}`,
                 )
@@ -751,7 +751,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 type="button"
                 onClick={() =>
                   onOpenQRGenerator(
-                    cat.item_code,
+                    cat.id,
                     cat.name,
                     "Inventory Item",
                   )
@@ -927,7 +927,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             <button
               onClick={() =>
                 onOpenQRGenerator(
-                  loc.code || loc.name,
+                  loc.id,
                   loc.name,
                   "Storage Location",
                 )
@@ -1005,7 +1005,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <button
             onClick={() =>
               onOpenQRGenerator(
-                loc.code || loc.name,
+                loc.id,
                 loc.name,
                 "Storage Location",
               )

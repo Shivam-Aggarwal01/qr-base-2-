@@ -377,6 +377,7 @@ export async function createCatalogItemInFirestore(payload: {
 
     await updateDoc(doc(db, COLLECTIONS.CATALOG_ITEMS, docRef.id), {
       id: docRef.id,
+      qr_code: docRef.id,
     });
 
     console.log("✅ Document ID field updated");
@@ -395,13 +396,17 @@ export async function createLocationInFirestore(payload: {
   code?: string;
   storage_path?: string | null;
 }): Promise<void> {
-  await addDoc(collection(db, COLLECTIONS.LOCATIONS), {
+  const docRef = await addDoc(collection(db, COLLECTIONS.LOCATIONS), {
     id: "",
     name: payload.name,
     code: payload.code ?? "",
     storage_path: payload.storage_path ?? "",
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
+  });
+  await updateDoc(doc(db, COLLECTIONS.LOCATIONS, docRef.id), {
+    id: docRef.id,
+    qr_code: docRef.id,
   });
 }
 
@@ -420,13 +425,10 @@ export async function createAssetInFirestore(payload: {
   available_in_box?: number;
   notes?: string;
 }): Promise<void> {
-  const qrCode = payload.qr_code ?? payload.asset_code;
-
-  await addDoc(collection(db, COLLECTIONS.ASSETS), {
+  const docRef = await addDoc(collection(db, COLLECTIONS.ASSETS), {
     id: "",
     ...payload,
-    asset_code: payload.asset_code,
-    qr_code: qrCode,
+    qr_code: "",
     status: payload.status ?? "AVAILABLE",
     location_id: payload.location_id ?? null,
     storage_location: payload.storage_location ?? "",
@@ -438,6 +440,11 @@ export async function createAssetInFirestore(payload: {
     notes: payload.notes ?? "",
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
+  });
+  await updateDoc(doc(db, COLLECTIONS.ASSETS, docRef.id), {
+    id: docRef.id,
+    asset_code: docRef.id,
+    qr_code: docRef.id,
   });
 }
 

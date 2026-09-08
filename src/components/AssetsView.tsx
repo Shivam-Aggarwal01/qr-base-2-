@@ -110,7 +110,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
     try {
       await createAssetInFirestore({
-        asset_code: `ASSET-${Date.now()}`,
+        asset_code: "",
         catalog_item_id: selectedCatalogId,
         status: "AVAILABLE",
         location_id: newLocationId,

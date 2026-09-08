@@ -227,7 +227,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                         onClick={(e) => {
                           e.stopPropagation();
                           onOpenQRGenerator(
-                            loc.code || loc.name,
+                            loc.id,
                             loc.name,
                             "Storage Location",
                           );
@@ -346,7 +346,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                   type="button"
                   onClick={() =>
                     onOpenQRGenerator(
-                      selectedLocation.code || selectedLocation.name,
+                      selectedLocation.id,
                       selectedLocation.name,
                       "Storage Location",
                     )

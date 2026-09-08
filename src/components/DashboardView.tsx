@@ -491,7 +491,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <button
                             onClick={() =>
                               onOpenQRGenerator(
-                                displayCode,
+                                asset?.id || catalogItem?.id || displayCode,
                                 catalogItem?.name || displayCode,
                                 "Inventory Tag",
                               )

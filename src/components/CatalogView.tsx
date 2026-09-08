@@ -362,7 +362,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   <button
                     onClick={() =>
                       onOpenQRGenerator(
-                        item.item_code,
+                        item.id,
                         item.name,
                         "Inventory Item",
                       )
