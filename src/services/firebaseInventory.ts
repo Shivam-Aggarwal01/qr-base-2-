@@ -348,7 +348,6 @@ export async function listCollection<T>(collectionName: string): Promise<T[]> {
 export async function createCatalogItemInFirestore(payload: {
   item_code: string;
   name: string;
-  type: "CONSUMABLE" | "REUSABLE" | "TOOL";
   description?: string;
   unit?: string;
   tracking_mode?: "BOX" | "INDIVIDUAL";

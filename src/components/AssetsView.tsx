@@ -50,9 +50,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   const [storageLocationDraft, setStorageLocationDraft] = useState("");
 
   useEffect(() => {
-    const availableCatalogItems = catalogItems.filter(
-      (c) => c.type !== "CONSUMABLE"
-    );
+    const availableCatalogItems = catalogItems;
 
     if (availableCatalogItems.length === 0) {
       setSelectedCatalogId("");
@@ -74,9 +72,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     }
   }, [locations, newLocationId]);
 
-  const availableCatalogItems = catalogItems.filter(
-    (c) => c.type !== "CONSUMABLE"
-  );
+  const availableCatalogItems = catalogItems;
 
   const filteredAssets = assets.filter((asset) => {
     if (statusFilter !== "ALL" && asset.status !== statusFilter) {
@@ -147,11 +143,14 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       case "DAMAGED":
         return "idea-error";
       case "LOST":
-      case "RETIRED":
-        return "bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] border border-[var(--color-idea-border)]";
       default:
         return "";
     }
+  };
+
+  const getStatusLabel = (status: AssetStatus | "ALL") => {
+    if (status === "ALL") return "All Assets";
+    return status === "LOST" ? "Missing" : status.replace("_", " ");
   };
 
   const handleAssetStatusChange = async (asset: Asset, nextStatus: AssetStatus) => {
@@ -253,7 +252,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
       {/* Filter Toolbar */}
       <div className="idea-card p-4 flex flex-col md:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-1.5 bg-[var(--color-idea-light-grey)] p-1.5 rounded-2xl w-full md:w-auto overflow-x-auto">
-          {(["ALL", "AVAILABLE", "ISSUED", "UNDER_REPAIR", "DAMAGED", "LOST", "RETIRED"] as const).map((m) => (
+          {(["ALL", "AVAILABLE", "ISSUED", "UNDER_REPAIR", "DAMAGED", "LOST"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setStatusFilter(m)}
@@ -263,7 +262,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   : "text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]"
               }`}
             >
-              {m === "ALL" ? "All Assets" : m.replace("_", " ")}
+              {getStatusLabel(m)}
             </button>
           ))}
         </div>
@@ -288,9 +287,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             <thead>
               <tr className="text-[10px] font-bold text-[var(--color-idea-muted)] uppercase tracking-[0.2em] border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]">
                 <th className="px-6 py-3.5">Asset Name</th>
-                <th className="px-6 py-3.5">Asset Type</th>
                 <th className="px-6 py-3.5">Condition</th>
-                <th className="px-6 py-3.5">Location / Assigned To</th>
+                <th className="px-6 py-3.5">Location</th>
+                <th className="px-6 py-3.5">Assigned To</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-idea-border)]">
@@ -304,8 +303,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 const user = users.find(
                   (u) => u.id === asset.assigned_to_user_id
                 );
-                const isBox = false;
-
                 return (
                   <tr
                     key={asset.id}
@@ -319,18 +316,13 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-[10px] font-bold px-2.5 py-1 rounded-full border border-[var(--color-idea-border)] text-[var(--color-idea-text)] uppercase tracking-wider">
-                        INDIVIDUAL
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
                       <div className="space-y-2">
                         <span
                           className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadge(
                             asset.status
                           )}`}
                         >
-                          {asset.status.replace("_", " ")}
+                          {getStatusLabel(asset.status)}
                         </span>
                         {asset.status === "ISSUED" ? (
                           <div className="w-full mt-1 rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-700">
@@ -338,7 +330,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                           </div>
                         ) : (
                           <div className="flex flex-wrap gap-1 mt-1">
-                            {(["AVAILABLE", "UNDER_REPAIR", "DAMAGED"] as const).map(
+                            {(["AVAILABLE", "UNDER_REPAIR", "DAMAGED", "LOST"] as const).map(
                               (status) => (
                                 <button
                                   key={status}
@@ -355,7 +347,9 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                                     ? "Available"
                                     : status === "UNDER_REPAIR"
                                       ? "Repair"
-                                      : "Damaged"}
+                                      : status === "DAMAGED"
+                                        ? "Damaged"
+                                        : "Missing"}
                                 </button>
                               ),
                             )}
@@ -404,21 +398,23 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                             )}
                           </>
                         )}
-                        <div
-                          className={
-                            asset.assigned_to_user_id
-                              ? "text-[var(--color-idea-blue)] font-bold"
-                              : asset.status === "AVAILABLE"
-                                ? "text-emerald-700 font-bold"
-                                : "text-[var(--color-idea-muted)] font-semibold"
-                          }
-                        >
-                          {asset.assigned_to_user_id
-                            ? `Assigned to: ${user?.name || "Student"}`
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-xs font-medium">
+                      <div
+                        className={
+                          asset.assigned_to_user_id
+                            ? "text-[var(--color-idea-blue)] font-bold"
                             : asset.status === "AVAILABLE"
-                              ? "Available for issue"
-                              : `Status: ${asset.status.replace("_", " ")}`}
-                        </div>
+                              ? "text-emerald-700 font-bold"
+                              : "text-[var(--color-idea-muted)] font-semibold"
+                        }
+                      >
+                        {asset.assigned_to_user_id
+                          ? user?.name || "Student"
+                          : asset.status === "AVAILABLE"
+                            ? "Available for issue"
+                            : `Status: ${getStatusLabel(asset.status)}`}
                       </div>
                     </td>
                   </tr>
@@ -457,7 +453,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   </option>
                   {availableCatalogItems.map((c) => (
                     <option key={c.id} value={c.id}>
-                      {c.name} ({c.type})
+                                  {c.name} ({c.item_code})
                     </option>
                   ))}
                 </select>

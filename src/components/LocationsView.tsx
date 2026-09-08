@@ -74,7 +74,8 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
     const q = searchFilter.toLowerCase();
     return (
       loc.name.toLowerCase().includes(q) ||
-      (loc.code || "").toLowerCase().includes(q)
+      (loc.code || "").toLowerCase().includes(q) ||
+      (loc.storage_path || "").toLowerCase().includes(q)
     );
   });
 
@@ -205,17 +206,21 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                           <MapPin className="w-5 h-5 text-[var(--color-idea-blue)]" />
                         </div>
                         <div className="min-w-0">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-idea-muted)]">
+                            Location Name
+                          </p>
                           <h3 className="font-bold text-[var(--color-idea-text)] text-base truncate">
                             {loc.name}
                           </h3>
-                          <p className="text-xs font-mono font-bold text-[var(--color-idea-blue)]">
+                          <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-idea-muted)] mt-2">
+                            Location Position
+                          </p>
+                          <p className="text-xs text-[var(--color-idea-blue)] truncate">
+                            {loc.storage_path || "Position not set"}
+                          </p>
+                          <p className="text-[10px] font-mono font-bold text-[var(--color-idea-muted)] mt-1">
                             {loc.code || loc.id}
                           </p>
-                          {loc.storage_path && (
-                            <p className="text-[10px] text-[var(--color-idea-muted)] truncate">
-                              {loc.storage_path}
-                            </p>
-                          )}
                         </div>
                       </div>
                       <span
@@ -247,7 +252,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                       <div className="flex items-center justify-between text-xs font-bold text-[var(--color-idea-text)] pt-1.5 border-t border-[var(--color-idea-border)]">
                         <span className="flex items-center gap-1.5 font-medium uppercase tracking-wider text-[10px] text-[var(--color-idea-muted)]">
                           <Box className="w-3.5 h-3.5 text-[var(--color-idea-green)]" />{" "}
-                          Consumable stock
+                          Items
                         </span>
                         <span className="font-mono text-[var(--color-idea-text)]">
                           {stockInLoc.length} types / {consumableQty} pcs
@@ -326,11 +331,14 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                 <h3 className="font-bold text-[var(--color-idea-text)] text-xl mt-0.5">
                   {selectedLocation.name}
                 </h3>
-                <p className="text-xs font-mono text-[var(--color-idea-blue)]">
-                  {selectedLocation.code || selectedLocation.id}
+                <p className="text-[10px] font-medium uppercase tracking-wider text-[var(--color-idea-muted)] mt-2">
+                  Location Position
                 </p>
-                <p className="text-xs text-[var(--color-idea-muted)] mt-1">
-                  {selectedLocation.storage_path || "No detailed storage path set"}
+                <p className="text-xs text-[var(--color-idea-blue)]">
+                  {selectedLocation.storage_path || "Position not set"}
+                </p>
+                <p className="text-xs font-mono text-[var(--color-idea-muted)] mt-1">
+                  {selectedLocation.code || selectedLocation.id}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -360,7 +368,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
             <div className="p-6 overflow-y-auto space-y-6">
               <div>
                 <h4 className="text-[10px] font-medium uppercase tracking-[0.2em] text-[var(--color-idea-muted)] mb-2">
-                  Consumables ({selectedContents.stockInLoc.length})
+                  Items ({selectedContents.stockInLoc.length})
                 </h4>
                 {selectedContents.stockInLoc.length === 0 ? (
                   <p className="text-xs text-[var(--color-idea-muted)] italic">
@@ -380,7 +388,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                               {cat?.name || s.catalog_item_id}
                             </p>
                             <p className="font-mono text-[10px] text-[var(--color-idea-muted)]">
-                              {cat?.item_code} • {cat?.type || "CONSUMABLE"}
+                              {cat?.item_code} • Item
                             </p>
                           </div>
                           <span className="font-mono font-bold text-[var(--color-idea-blue)]">
@@ -445,12 +453,12 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
             <form onSubmit={handleAddLocation} className="space-y-3">
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Location / Bin Name
+                  Location Name
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Drawer B3"
+                  placeholder="e.g. Electronics Lab"
                   value={locName}
                   onChange={(e) => setLocName(e.target.value)}
                   className="idea-input mt-1 p-2.5 text-xs"
@@ -458,15 +466,18 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
               </div>
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Room / Cupboard / Row / Container
+                  Location Position
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Room 2 / Cupboard B / Row 3 / Container 4"
+                  placeholder="e.g. Almirah > Row 3 > Bin 2"
                   value={storagePath}
                   onChange={(e) => setStoragePath(e.target.value)}
                   className="idea-input mt-1 p-2.5 text-xs"
                 />
+                <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
+                  Add as many levels as needed using <span className="font-mono">&gt;</span> between them.
+                </p>
               </div>
               <div className="pt-2 flex gap-2">
                 <button

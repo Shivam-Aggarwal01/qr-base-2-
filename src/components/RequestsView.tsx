@@ -110,7 +110,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     const catalog = catalogItems.find((entry) => entry.id === item.catalog_item_id);
     return {
       name: catalog?.name || "Item",
-      detail: `${item.requested_qty} ${catalog?.unit || "pcs"}`,
+      detail: `${item.requested_qty} ${catalog?.unit || "pcs"} · ${item.usage === "REUSABLE" ? "Reusable" : "Consumable"}`,
     };
   };
 

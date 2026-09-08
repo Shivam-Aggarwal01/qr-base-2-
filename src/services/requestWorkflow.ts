@@ -69,12 +69,71 @@ export async function reviewLabRequest(
 
 export async function completeLabRequest(
   request: Request,
-  _staff: User,
+  staff: User,
   remarks?: string,
 ): Promise<void> {
   requireSignedInUser();
   if (request.status !== "HANDED_OVER") {
     throw new Error("Only handed-over requests can be marked completed.");
+  }
+
+  const [transactionSnapshot, stockSnapshot] = await Promise.all([
+    getDocs(collection(db, "inventory_transactions")),
+    getDocs(collection(db, "stock_levels")),
+  ]);
+
+  const reusableLines = (request.items ?? []).filter(
+    (line) => getRequestLineKind(line) === "CATALOG" && line.usage === "REUSABLE",
+  );
+
+  for (const line of reusableLines) {
+    const transaction = transactionSnapshot.docs
+      .map((entry) => ({ id: entry.id, ...entry.data() }))
+      .find(
+        (entry: any) =>
+          entry.request_id === request.id &&
+          entry.catalog_item_id === line.catalog_item_id &&
+          entry.transaction_type === "ISSUE",
+      ) as { from_location_id?: string | null; quantity?: number } | undefined;
+    const locationId = transaction?.from_location_id;
+    const quantity = Number(line.requested_qty) || 0;
+    if (!line.catalog_item_id || !locationId || quantity <= 0) continue;
+
+    const stockDoc = stockSnapshot.docs.find((entry) => {
+      const data = entry.data();
+      return (
+        data.catalog_item_id === line.catalog_item_id &&
+        data.location_id === locationId
+      );
+    });
+
+    if (stockDoc) {
+      const currentQuantity = Number(stockDoc.data().quantity) || 0;
+      await updateDoc(doc(db, "stock_levels", stockDoc.id), {
+        quantity: currentQuantity + quantity,
+        updated_at: serverTimestamp(),
+      });
+    } else {
+      await addDoc(collection(db, "stock_levels"), {
+        catalog_item_id: line.catalog_item_id,
+        location_id: locationId,
+        quantity,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      });
+    }
+
+    await addDoc(collection(db, "inventory_transactions"), {
+      catalog_item_id: line.catalog_item_id,
+      transaction_type: "RETURN",
+      quantity,
+      to_location_id: locationId,
+      issued_to_user_id: request.user_id,
+      request_id: request.id,
+      processed_by_user_id: staff.id,
+      remarks: `Returned ${quantity} reusable unit(s) via ${request.request_number}`,
+      created_at: serverTimestamp(),
+    });
   }
 
   await updateDoc(doc(db, "requests", request.id), {
@@ -219,7 +278,7 @@ async function handoverCatalogLine(
     issued_to_user_id: request.user_id,
     request_id: request.id,
     processed_by_user_id: staff.id,
-    remarks: `Handed over ${quantity} unit(s) via ${request.request_number}`,
+    remarks: `Handed over ${quantity} unit(s) as ${line.usage === "REUSABLE" ? "reusable" : "consumable"} via ${request.request_number}`,
     created_at: serverTimestamp(),
   });
 }

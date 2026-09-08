@@ -606,10 +606,8 @@ export const UsersView: React.FC<UsersViewProps> = ({
                         const catalogItem =
                           catalogItems.find(
                             (item) =>
-                              String(item.id).trim() ===
-                              String(
-                                loan.catalogItemId,
-                              ).trim(),
+                              String(item.id).trim() === String(loan.catalogItemId).trim() ||
+                              String(item.item_code).trim() === String(loan.catalogItemId).trim(),
                           );
 
                         return (

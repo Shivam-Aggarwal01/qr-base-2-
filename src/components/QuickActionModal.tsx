@@ -674,7 +674,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
             <div>
               <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                CATALOG ITEM ({cat.type})
+                CATALOG ITEM
               </span>
               <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
                 {cat.name}
@@ -753,7 +753,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                   onOpenQRGenerator(
                     cat.item_code,
                     cat.name,
-                    `Type: ${cat.type}`,
+                    "Inventory Item",
                   )
                 }
                 className="px-4 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#D4AF37] hover:text-[#1A1A1A] text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
@@ -785,7 +785,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
           <div>
             <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-              CATALOG ITEM ({cat.type})
+              CATALOG ITEM
             </span>
             <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
               {cat.name}
@@ -897,9 +897,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     const assetsInLoc = assets.filter((a) => a.location_id === loc.id);
     const stockInLoc = stockLevels.filter((s) => s.location_id === loc.id);
 
-    // Student QR action: show consumable stock + request buttons. Students cannot mutate inventory.
+    // Student QR action: show item stock + request buttons. Students cannot mutate inventory.
     if (studentMode) {
-      const consumablesInLoc = stockInLoc
+      const itemsInLoc = stockInLoc
         .map((s) => {
           const cat = catalogItems.find(
             (c) =>
@@ -907,9 +907,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           );
           return { stock: s, catalogItem: cat };
         })
-        .filter(
-          (x) => x.catalogItem && x.catalogItem.type === "CONSUMABLE",
-        ) as { stock: StockLevel; catalogItem: CatalogItem }[];
+        .filter((x) => x.catalogItem) as { stock: StockLevel; catalogItem: CatalogItem }[];
 
       return (
         <div className="space-y-5">
@@ -943,15 +941,15 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
           <div>
             <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-              Consumables in Location ({consumablesInLoc.length})
+              Items in Location ({itemsInLoc.length})
             </h5>
             <div className="max-h-52 overflow-y-auto space-y-2">
-              {consumablesInLoc.length === 0 ? (
+              {itemsInLoc.length === 0 ? (
                 <p className="text-xs text-[#6C6863] italic">
                   No bulk stock in this location.
                 </p>
               ) : (
-                consumablesInLoc.map(({ stock, catalogItem }) => {
+                itemsInLoc.map(({ stock, catalogItem }) => {
                   const existing = myPendingRequestForCatalogItem(
                     catalogItem.id,
                   );
@@ -1060,7 +1058,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
         <div>
           <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-            Consumables Bulk Stock
+            Items in Stock
           </h5>
           <div className="max-h-40 overflow-y-auto space-y-2">
             {stockInLoc.length === 0 ? (

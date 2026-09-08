@@ -1,7 +1,7 @@
 export type UserRole =
   "ADMIN" | "STUDENT_AMBASSADOR" | "STUDENT_LEAD" | "STUDENT";
 
-export type ItemType = "CONSUMABLE" | "REUSABLE" | "TOOL";
+export type RequestUsage = "CONSUMABLE" | "REUSABLE";
 
 export type AssetStatus =
   | "AVAILABLE"
@@ -27,6 +27,7 @@ export interface RequestLineDraft {
   catalog_item_id?: string;
   asset_id?: string;
   requested_qty: number;
+  usage?: RequestUsage;
 }
 
 export type AccountRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
@@ -67,7 +68,6 @@ export interface CatalogItem {
   id: string;
   item_code: string;
   name: string;
-  type: ItemType;
   description: string;
   unit: string;
   tracking_mode?: AssetTrackingMode;
@@ -132,6 +132,7 @@ export interface RequestItem {
   catalog_item_id?: string;
   asset_id?: string;
   requested_qty: number;
+  usage?: RequestUsage;
   fulfilled_qty?: number;
   handed_over?: boolean;
 }

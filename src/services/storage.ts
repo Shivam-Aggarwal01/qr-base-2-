@@ -143,6 +143,16 @@ export class InventoryStorage {
     return this.load(STORAGE_KEYS.STOCK, [] as StockLevel[]);
   }
 
+  static deleteStockForItem(catalogItemId: string, itemCode?: string): void {
+    const stocks = this.getStockLevels();
+    const remaining = stocks.filter(
+      (stock) =>
+        stock.catalog_item_id !== catalogItemId &&
+        (!itemCode || stock.catalog_item_id !== itemCode),
+    );
+    this.save(STORAGE_KEYS.STOCK, remaining);
+  }
+
   static getAssets(): Asset[] {
     return this.load(STORAGE_KEYS.ASSETS, [] as Asset[]);
   }
@@ -202,7 +212,6 @@ export class InventoryStorage {
     item: Partial<CatalogItem> & {
       name: string;
       item_code: string;
-      type: CatalogItem["type"];
     },
   ): CatalogItem {
     const items = this.getCatalog();
@@ -221,7 +230,6 @@ export class InventoryStorage {
         id: `cat-${Date.now()}`,
         item_code: item.item_code,
         name: item.name,
-        type: item.type,
         description: item.description || "",
         unit: item.unit || "pcs",
         min_stock_alert: item.min_stock_alert || 10,

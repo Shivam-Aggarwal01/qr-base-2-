@@ -34,7 +34,7 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
       return catalogItems.map((c) => ({
         code: c.item_code,
         title: c.name,
-        subtitle: `Type: ${c.type}`,
+        subtitle: "Inventory Item",
       }));
     } else {
       return locations.map((l) => ({

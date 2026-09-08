@@ -4,6 +4,7 @@ import {
   Asset,
   CatalogItem,
   RequestLineDraft,
+  RequestUsage,
   User,
 } from "../types/inventory";
 import { createRequestFirestore } from "../services/firebaseCollections";
@@ -34,12 +35,19 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const availableAssets = assets.filter((asset) => asset.status === "AVAILABLE");
 
   const getInitialItems = (): RequestLineDraft[] => {
-    if (initialItems && initialItems.length > 0) return initialItems;
+    if (initialItems && initialItems.length > 0) {
+      return initialItems.map((item) =>
+        item.kind === "CATALOG"
+          ? { ...item, usage: item.usage || "CONSUMABLE" }
+          : item,
+      );
+    }
     return [
       {
         kind: "CATALOG",
         catalog_item_id: catalogItems[0]?.id || "",
         requested_qty: 1,
+        usage: "CONSUMABLE",
       },
     ];
   };
@@ -64,6 +72,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
         kind: "CATALOG",
         catalog_item_id: catalogItems[0]?.id || "",
         requested_qty: 1,
+        usage: "CONSUMABLE",
       },
     ]);
   };
@@ -88,6 +97,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
         kind: "CATALOG",
         catalog_item_id: catalogItems[0]?.id || "",
         requested_qty: 1,
+        usage: "CONSUMABLE",
       };
     }
     setRequestItems(updated);
@@ -95,13 +105,15 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
   const handleItemChange = (
     index: number,
-    field: "catalog_item_id" | "asset_id" | "requested_qty",
+    field: "catalog_item_id" | "asset_id" | "requested_qty" | "usage",
     value: string | number,
   ) => {
     const updated = [...requestItems];
     const current = { ...updated[index] };
     if (field === "requested_qty") {
       current.requested_qty = Number(value) || 1;
+    } else if (field === "usage") {
+      current.usage = value as RequestUsage;
     } else if (field === "asset_id") {
       const asset = assets.find((item) => item.id === value);
       current.asset_id = String(value);
@@ -145,6 +157,9 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             request_id: requestNumber,
             kind: item.kind,
             requested_qty: item.kind === "ASSET" ? 1 : item.requested_qty,
+            ...(item.kind === "CATALOG" && item.usage
+              ? { usage: item.usage }
+              : {}),
           };
           if (item.catalog_item_id) line.catalog_item_id = item.catalog_item_id;
           if (item.kind === "ASSET" && item.asset_id) line.asset_id = item.asset_id;
@@ -285,7 +300,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                       >
                         {catalogItems.map((cat) => (
                           <option key={cat.id} value={cat.id}>
-                            {cat.name} ({cat.type} - {cat.item_code})
+                            {cat.name} ({cat.item_code})
                           </option>
                         ))}
                       </select>
@@ -305,19 +320,31 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                       Individually tracked. Quantity is always 1.
                     </p>
                   ) : (
-                    <input
-                      type="number"
-                      min="1"
-                      value={item.requested_qty}
-                      onChange={(event) =>
-                        handleItemChange(
-                          idx,
-                          "requested_qty",
-                          Number(event.target.value),
-                        )
-                      }
-                      className="w-24 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none text-center"
-                    />
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        value={item.requested_qty}
+                        onChange={(event) =>
+                          handleItemChange(
+                            idx,
+                            "requested_qty",
+                            Number(event.target.value),
+                          )
+                        }
+                        className="w-24 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none text-center"
+                      />
+                      <select
+                        value={item.usage || "CONSUMABLE"}
+                        onChange={(event) =>
+                          handleItemChange(idx, "usage", event.target.value)
+                        }
+                        className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                      >
+                        <option value="CONSUMABLE">Consumable</option>
+                        <option value="REUSABLE">Reusable</option>
+                      </select>
+                    </div>
                   )}
                 </div>
               ))}
