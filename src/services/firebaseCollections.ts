@@ -10,7 +10,7 @@ import {
   setDoc,
   updateDoc,
   where,
-  FieldPath,
+  documentId,
 } from "firebase/firestore";
 import type { DocumentData, Query } from "firebase/firestore";
 import { auth, db } from "../firebase";
@@ -82,7 +82,7 @@ export async function getCollection<T>(name: string): Promise<T[]> {
       const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
       const userRole = userDoc.exists() ? (userDoc.data().role as string | undefined) : undefined;
       if (!userRole || userRole === "STUDENT") {
-        collectionRef = query(collectionRef, where(FieldPath.documentId(), "==", auth.currentUser.uid));
+        collectionRef = query(collectionRef, where(documentId(), "==", auth.currentUser.uid));
       }
     }
 

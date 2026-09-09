@@ -71,6 +71,7 @@ export async function completeLabRequest(
   request: Request,
   staff: User,
   remarks?: string,
+  returnLocationId?: string,
 ): Promise<void> {
   requireSignedInUser();
   if (request.status !== "HANDED_OVER") {
@@ -85,6 +86,55 @@ export async function completeLabRequest(
   const reusableLines = (request.items ?? []).filter(
     (line) => getRequestLineKind(line) === "CATALOG" && line.usage === "REUSABLE",
   );
+
+  const assetLines = (request.items ?? []).filter(
+    (line) => getRequestLineKind(line) === "ASSET" && line.asset_id,
+  );
+
+  if (assetLines.length > 0 && !returnLocationId) {
+    throw new Error("Choose the storage location where the returned asset was received.");
+  }
+
+  for (const line of assetLines) {
+    const assetRef = doc(db, "assets", line.asset_id as string);
+    const assetSnapshot = await getDoc(assetRef);
+    if (!assetSnapshot.exists()) continue;
+
+    const asset = assetSnapshot.data();
+    await updateDoc(assetRef, {
+      status: "AVAILABLE",
+      assigned_to_user_id: null,
+      location_id: returnLocationId,
+      updated_at: serverTimestamp(),
+    });
+
+    const assignmentSnapshot = await getDocs(collection(db, "asset_assignments"));
+    const activeAssignment = assignmentSnapshot.docs.find((entry) => {
+      const data = entry.data();
+      return data.asset_id === line.asset_id &&
+        data.assigned_to_user_id === request.user_id &&
+        !data.returned_at;
+    });
+    if (activeAssignment) {
+      await updateDoc(activeAssignment.ref, {
+        returned_at: new Date().toISOString(),
+        remarks: remarks || `Returned via ${request.request_number}`,
+      });
+    }
+
+    await addDoc(collection(db, "inventory_transactions"), {
+      asset_id: line.asset_id,
+      catalog_item_id: asset.catalog_item_id ?? line.catalog_item_id ?? null,
+      transaction_type: "RETURN",
+      quantity: 1,
+      to_location_id: returnLocationId,
+      issued_to_user_id: request.user_id,
+      request_id: request.id,
+      processed_by_user_id: staff.id,
+      remarks: `Returned asset ${asset.asset_code || line.asset_id} via ${request.request_number}`,
+      created_at: serverTimestamp(),
+    });
+  }
 
   for (const line of reusableLines) {
     const transaction = transactionSnapshot.docs

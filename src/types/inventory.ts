@@ -146,6 +146,7 @@ export interface Request {
   approved_by_user_id?: string | null;
   handed_over_by_user_id?: string | null;
   handed_over_at?: string | null;
+  deadline_at?: string | null;
   remarks?: string;
   created_at: string;
   updated_at: string;

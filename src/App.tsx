@@ -10,6 +10,7 @@ import {
   getUserProfile,
   reviewAccountRequest,
   submitAccountRequest,
+  STUDENT_SIGNUP_NAME_KEY,
   updateFirestoreDocument,
 } from "./services/firebaseInventory";
 import { readFirestoreState } from "./services/firebaseCollections";
@@ -30,6 +31,7 @@ import { QRScannerModal } from "./components/QRScannerModal";
 import { QRGeneratorModal } from "./components/QRGeneratorModal";
 import { QuickActionModal } from "./components/QuickActionModal";
 import { NewRequestModal } from "./components/NewRequestModal";
+import { StudentInventoryView } from "./components/StudentInventoryView";
 import {
   User,
   CatalogItem,
@@ -154,6 +156,7 @@ export default function App() {
         resolveRoleFromEmail(firebaseUser.email ?? "") ?? "STUDENT";
       try {
         if (isAdminAccount(firebaseUser.email, role)) {
+          window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
           let profile =
             (await getUserProfile(firebaseUser.uid)) ??
             (await ensureUserProfile(firebaseUser, "ADMIN"));
@@ -171,6 +174,7 @@ export default function App() {
 
         const existingProfile = await getUserProfile(firebaseUser.uid);
         if (existingProfile) {
+          window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
           setAccessNotice(null);
           setFirebaseUserProfile(existingProfile);
           setActiveUser(existingProfile);
@@ -178,9 +182,20 @@ export default function App() {
           return;
         }
 
-        const accessRequest = await submitAccountRequest(firebaseUser);
+        const requestedName = window.sessionStorage.getItem(
+          STUDENT_SIGNUP_NAME_KEY,
+        );
+        const accessRequest = await submitAccountRequest(
+          firebaseUser,
+          requestedName ?? undefined,
+        );
+        window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
         if (accessRequest.status === "APPROVED") {
-          const profile = await ensureUserProfile(firebaseUser, "STUDENT");
+          const profile = await ensureUserProfile(
+            firebaseUser,
+            "STUDENT",
+            requestedName ?? undefined,
+          );
           setAccessNotice(null);
           setFirebaseUserProfile(profile);
           setActiveUser(profile);
@@ -234,7 +249,8 @@ export default function App() {
     if (
       isStudentUser &&
       currentView !== "dashboard" &&
-      currentView !== "requests"
+      currentView !== "requests" &&
+      currentView !== "inventory"
     ) {
       setCurrentView("requests");
     }
@@ -422,21 +438,35 @@ export default function App() {
               stockLevels={stockLevels}
               currentUser={currentUser}
               onSelectView={setCurrentView}
+              onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
               onOpenNewRequest={() => openNewRequest()}
             />
           )}
           {/* Inventory */}
           {currentView === "inventory" && (
-            <CatalogView
-              catalogItems={catalogItems}
-              stockLevels={stockLevels}
-              locations={locations}
-              assets={assets}
-              userRole={effectiveRole ?? currentUser.role}
-              onOpenQRGenerator={handleOpenQRGenerator}
-              onRefreshData={refreshAllData}
-            />
+            isStudentUser ? (
+              <StudentInventoryView
+                catalogItems={catalogItems}
+                stockLevels={stockLevels}
+                assets={assets}
+                locations={locations}
+                users={users}
+                requests={requests}
+                currentUser={currentUser}
+                onOpenNewRequest={() => openNewRequest()}
+              />
+            ) : (
+              <CatalogView
+                catalogItems={catalogItems}
+                stockLevels={stockLevels}
+                locations={locations}
+                assets={assets}
+                userRole={effectiveRole ?? currentUser.role}
+                onOpenQRGenerator={handleOpenQRGenerator}
+                onRefreshData={refreshAllData}
+              />
+            )
           )}
           {/* Assets */}
           {currentView === "assets" && (
@@ -454,6 +484,7 @@ export default function App() {
               requests={requests}
               catalogItems={catalogItems}
               assets={assets}
+              locations={locations}
               users={users}
               activeUser={currentUser}
               onOpenNewRequest={() => openNewRequest()}
@@ -497,6 +528,7 @@ export default function App() {
               users={users}
               assets={assets}
               catalogItems={catalogItems}
+              requests={requests}
               activeUser={currentUser}
               onUpdateUserRole={handleUpdateUserRole}
               onDeleteUser={handleDeleteUser}

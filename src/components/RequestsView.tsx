@@ -12,6 +12,7 @@ import {
   User,
   RequestStatus,
   Asset,
+  Location,
 } from "../types/inventory";
 import { canApproveRequests, isStudent } from "../services/authRoles";
 import {
@@ -26,6 +27,7 @@ interface RequestsViewProps {
   requests: Request[];
   catalogItems: CatalogItem[];
   assets: Asset[];
+  locations: Location[];
   users: User[];
   activeUser: User;
   onOpenNewRequest: () => void;
@@ -46,6 +48,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   requests,
   catalogItems,
   assets,
+  locations,
   users,
   activeUser,
   onOpenNewRequest,
@@ -60,6 +63,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     "review",
   );
   const [remarks, setRemarks] = useState("");
+  const [returnLocationId, setReturnLocationId] = useState("");
   const [processingError, setProcessingError] = useState<string | null>(null);
   const canProcessRequests = canApproveRequests(activeUser?.role);
   const visibleRequests = isStudent(activeUser?.role)
@@ -73,6 +77,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     setSelectedRequest(req);
     setModalMode(mode);
     setProcessingError(null);
+    setReturnLocationId(locations[0]?.id || "");
     setRemarks(
       mode === "review"
         ? `Approved for ${req.request_number}. Inventory will change only after handover.`
@@ -117,6 +122,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   const closeModal = () => {
     setSelectedRequest(null);
     setRemarks("");
+    setReturnLocationId("");
     setProcessingError(null);
   };
 
@@ -135,7 +141,12 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
         await handoverLabRequest(selectedRequest, activeUser, remarks.trim());
         confetti({ particleCount: 30, spread: 50 });
       } else {
-        await completeLabRequest(selectedRequest, activeUser, remarks.trim());
+        await completeLabRequest(
+          selectedRequest,
+          activeUser,
+          remarks.trim(),
+          returnLocationId,
+        );
       }
       closeModal();
       onRefreshData();
@@ -293,7 +304,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                       onClick={() => openModal(req, "complete")}
                       className="px-4 py-2 border border-[var(--color-idea-green)] text-[#3d6b10] text-xs font-semibold rounded-xl cursor-pointer"
                     >
-                      Complete
+                      Accept Return
                     </button>
                   )}
                 </div>
@@ -348,7 +359,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                 ? "Approve or reject"
                 : modalMode === "handover"
                   ? "Hand over"
-                  : "Complete request"}{" "}
+                    : "Accept return"} {" "}
               {selectedRequest.request_number}
             </h3>
             {processingError && (
@@ -362,7 +373,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                 ? "Approval only gives permission. Inventory does not change yet."
                 : modalMode === "handover"
                   ? "This records the physical handover and updates stock, asset status, and the ledger."
-                  : "Mark this request closed after handover."}
+                    : "Confirm the student returned these items. Inventory will be restored and the request will be closed."}
             </p>
 
             <div className="space-y-2 max-h-40 overflow-y-auto">
@@ -394,6 +405,26 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               />
             </div>
 
+            {modalMode === "complete" && (
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Return location
+                </label>
+                <select
+                  value={returnLocationId}
+                  onChange={(event) => setReturnLocationId(event.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs"
+                >
+                  <option value="">Choose storage location</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="pt-2 flex gap-2">
               <button
                 onClick={closeModal}
@@ -417,7 +448,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                   ? "Approve"
                   : modalMode === "handover"
                     ? "Hand Over"
-                    : "Complete"}
+                    : "Accept Return"}
               </button>
             </div>
           </div>

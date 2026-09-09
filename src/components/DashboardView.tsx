@@ -85,6 +85,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const myAssigned = assets.filter(
       (a) => a.assigned_to_user_id === currentUser.id && a.status === "ISSUED",
     );
+    const myReusableCatalogLoans = myRequests
+      .filter((request) => request.status === "HANDED_OVER")
+      .flatMap((request) =>
+        (request.items ?? [])
+          .filter(
+            (item) => !item.asset_id && item.usage === "REUSABLE",
+          )
+          .map((item) => ({
+            id: `${request.id}-${item.id}`,
+            catalogItemId: item.catalog_item_id || "",
+            quantity: Number(item.requested_qty) || 0,
+          })),
+      )
+      .filter((loan) => loan.catalogItemId && loan.quantity > 0);
+    const assignedCount =
+      myAssigned.length +
+      myReusableCatalogLoans.reduce((total, loan) => total + loan.quantity, 0);
 
     return (
       <div className="flex-1 space-y-8 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
@@ -145,7 +162,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Assigned To Me
             </span>
             <h2 className="text-5xl font-bold text-[var(--color-idea-text)] mt-3">
-              {myAssigned.length}
+              {assignedCount}
             </h2>
             <p className="text-xs text-[var(--color-idea-muted)] mt-3">
               Reusable items currently issued to you
@@ -242,7 +259,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <Package className="w-4 h-4 text-[var(--color-idea-blue)]" />
             </div>
-            {myAssigned.length === 0 ? (
+            {assignedCount === 0 ? (
               <p className="text-xs text-[var(--color-idea-muted)] italic">
                 No reusable equipment is currently assigned to you.
               </p>
@@ -264,6 +281,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </p>
                       <p className="text-[10px] font-mono text-[var(--color-idea-blue)]">
                         {asset.asset_code}
+                      </p>
+                      <p className="text-[10px] font-mono text-[var(--color-idea-muted)] mt-1">
+                        Status: ISSUED
+                      </p>
+                    </div>
+                  );
+                })}
+                {myReusableCatalogLoans.map((loan) => {
+                  const cat = catalogItems.find(
+                    (item) =>
+                      item.id === loan.catalogItemId ||
+                      item.item_code === loan.catalogItemId,
+                  );
+                  return (
+                    <div
+                      key={loan.id}
+                      className="p-3 idea-gradient-soft border border-[var(--color-idea-blue)]/20 rounded-xl"
+                    >
+                      <p className="text-xs font-bold text-[var(--color-idea-text)]">
+                        {cat?.name || "Reusable item"}
+                      </p>
+                      <p className="text-[10px] font-mono text-[var(--color-idea-blue)]">
+                        Quantity: {loan.quantity} {cat?.unit || "items"}
                       </p>
                       <p className="text-[10px] font-mono text-[var(--color-idea-muted)] mt-1">
                         Status: ISSUED

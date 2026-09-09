@@ -1121,6 +1121,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         req,
         activeUser,
         remarksInput.trim() || `Completed ${req.request_number}`,
+        locations[0]?.id,
       );
       triggerSuccess();
     };

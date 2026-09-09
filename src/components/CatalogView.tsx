@@ -274,6 +274,52 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
     }
   };
 
+  const handleDeleteItem = async (item: CatalogItem) => {
+    const linkedAssets = assets.filter(
+      (asset) =>
+        asset.catalog_item_id === item.id ||
+        asset.catalog_item_id === item.item_code,
+    );
+
+    if (linkedAssets.length > 0) {
+      alert(
+        `Cannot delete ${item.name} because ${linkedAssets.length} asset(s) still use this catalog item. Remove or reassign those assets first.`,
+      );
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Delete the catalog item ${item.name}? This also removes its stock records and cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { getCollection } = await import("../services/firebaseCollections");
+      const allStocks = await getCollection<StockLevel>("stock_levels");
+      const matchingStocks = allStocks.filter(
+        (stock) =>
+          stock.catalog_item_id === item.id ||
+          stock.catalog_item_id === item.item_code,
+      );
+
+      await Promise.all(
+        matchingStocks
+          .filter((stock) => stock.id)
+          .map((stock) => deleteFirestoreDocument("stock_levels", stock.id)),
+      );
+      await deleteFirestoreDocument("catalog_items", item.id);
+      InventoryStorage.deleteStockForItem(item.id, item.item_code);
+      alert(`Deleted catalog item ${item.name}.`);
+      onRefreshData();
+    } catch (error: any) {
+      console.error("Failed to delete catalog item:", error);
+      alert(error?.message || "Failed to delete catalog item.");
+    }
+  };
+
   return (
     <div className="flex-1 space-y-8 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
       {/* Header Bar */}
@@ -423,6 +469,13 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                     Delete Stock
                   </button>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => void handleDeleteItem(item)}
+                  className="w-full mt-2 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold cursor-pointer"
+                >
+                  Delete Item
+                </button>
               </div>
             </div>
           );

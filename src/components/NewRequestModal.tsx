@@ -31,6 +31,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
 }) => {
   const [purpose, setPurpose] = useState("");
   const [remarks, setRemarks] = useState("");
+  const [deadlineAt, setDeadlineAt] = useState("");
 
   const availableAssets = assets.filter((asset) => asset.status === "AVAILABLE");
 
@@ -59,6 +60,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
     if (!isOpen) return;
     setPurpose("");
     setRemarks("");
+    setDeadlineAt("");
     setRequestItems(getInitialItems());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialItems, catalogItems, assets]);
@@ -129,6 +131,10 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!purpose.trim()) return alert("Please enter project purpose");
+    if (!deadlineAt) return alert("Please choose when you will return the items.");
+    if (new Date(deadlineAt).getTime() <= Date.now()) {
+      return alert("Return deadline must be in the future.");
+    }
 
     const invalidCatalog = requestItems.some(
       (item) =>
@@ -150,6 +156,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
         user_id: activeUser.id,
         purpose,
         status: "PENDING",
+        deadline_at: new Date(deadlineAt).toISOString(),
         remarks: remarks || "",
         items: requestItems.map((item, idx) => {
           const line: Record<string, unknown> = {
@@ -238,6 +245,23 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
               placeholder="e.g. Capstone IoT Wireless Sensor Mesh"
               className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
             />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-slate-700">
+              Return deadline
+            </label>
+            <input
+              type="datetime-local"
+              required
+              min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+              value={deadlineAt}
+              onChange={(e) => setDeadlineAt(e.target.value)}
+              className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <p className="text-[10px] text-slate-400 mt-1">
+              Choose the day and time you will return reusable items or assets.
+            </p>
           </div>
 
           <div>

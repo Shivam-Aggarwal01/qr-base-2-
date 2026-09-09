@@ -32,6 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const studentMode = isStudent(userRole);
   const menuItems = studentMode
     ? [
+      { id: "inventory" as ViewMode, label: "Inventory", icon: Box },
         {
           id: "requests" as ViewMode,
           label: "Requests",

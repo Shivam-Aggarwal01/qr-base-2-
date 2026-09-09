@@ -5,6 +5,7 @@ import {
   Asset,
   CatalogItem,
   AccountRequest,
+  Request,
 } from "../types/inventory";
 import { isAdminAccount } from "../services/roleConfig";
 
@@ -12,6 +13,7 @@ interface UsersViewProps {
   users: User[];
   assets: Asset[];
   catalogItems: CatalogItem[];
+  requests: Request[];
   activeUser: User | null;
   onUpdateUserRole?: (
     userId: string,
@@ -30,6 +32,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
   users,
   assets,
   catalogItems,
+  requests,
   activeUser,
   onUpdateUserRole,
   onDeleteUser,
@@ -429,6 +432,25 @@ export const UsersView: React.FC<UsersViewProps> = ({
             return belongsToUser && active;
           });
 
+          const reusableRequestLines = requests
+            .filter(
+              (request) =>
+                request.user_id === user.id &&
+                request.status === "HANDED_OVER",
+            )
+            .flatMap((request) =>
+              (request.items ?? [])
+                .filter(
+                  (item) =>
+                    !item.asset_id && item.usage === "REUSABLE",
+                )
+                .map((item) => ({
+                  catalogItemId: item.catalog_item_id || "",
+                  quantity: Number(item.requested_qty) || 0,
+                })),
+            )
+            .filter((loan) => loan.catalogItemId && loan.quantity > 0);
+
           // ---------------------------------------------------
           // GROUP SAME CATALOG ITEMS
           // ---------------------------------------------------
@@ -476,6 +498,28 @@ export const UsersView: React.FC<UsersViewProps> = ({
               >,
             ),
           );
+
+          reusableRequestLines.forEach((loan) => {
+            const existing = groupedLoans.find(
+              (entry) => entry.catalogItemId === loan.catalogItemId,
+            );
+            if (existing) {
+              existing.quantity += loan.quantity;
+              return;
+            }
+            groupedLoans.push({
+              catalogItemId: loan.catalogItemId,
+              quantity: loan.quantity,
+              assetCodes: [],
+            });
+          });
+
+          const activeLoanCount =
+            userLoans.length +
+            reusableRequestLines.reduce(
+              (total, loan) => total + loan.quantity,
+              0,
+            );
 
           const isEditing =
             editingUserId === user.id;
@@ -579,8 +623,8 @@ export const UsersView: React.FC<UsersViewProps> = ({
                     </span>
 
                     <span className="text-xs font-bold font-mono text-[var(--color-idea-text)]">
-                      {userLoans.length}{" "}
-                      {userLoans.length === 1
+                      {activeLoanCount}{" "}
+                      {activeLoanCount === 1
                         ? "item"
                         : "items"}
                     </span>

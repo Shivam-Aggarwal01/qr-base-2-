@@ -37,6 +37,8 @@ export const COLLECTIONS = {
   ACCOUNT_REQUESTS: "account_requests",
 } as const;
 
+export const STUDENT_SIGNUP_NAME_KEY = "lablogic-student-signup-name";
+
 export type FirebaseUserProfile = User;
 
 export function mapFirebaseUserToLabUser(
@@ -97,6 +99,7 @@ export async function getUserProfile(uid: string): Promise<User | null> {
 export async function ensureUserProfile(
   firebaseUser: FirebaseUser,
   role: UserRole = "STUDENT",
+  preferredName?: string,
 ): Promise<User> {
   const userRef = doc(db, COLLECTIONS.USERS, firebaseUser.uid);
   const snapshot = await getDoc(userRef);
@@ -146,6 +149,9 @@ export async function ensureUserProfile(
   }
 
   const profile = mapFirebaseUserToLabUser(firebaseUser, resolvedRole);
+  if (preferredName?.trim()) {
+    profile.name = preferredName.trim();
+  }
   try {
     await setDoc(userRef, {
       ...profile,
@@ -191,6 +197,7 @@ export async function getAccountRequest(
 
 export async function submitAccountRequest(
   firebaseUser: FirebaseUser,
+  preferredName?: string,
 ): Promise<AccountRequest> {
   const existing = await getAccountRequest(firebaseUser.uid);
   if (existing) return existing;
@@ -198,7 +205,11 @@ export async function submitAccountRequest(
   const request: AccountRequest = {
     id: firebaseUser.uid,
     email: firebaseUser.email ?? "",
-    name: firebaseUser.displayName ?? firebaseUser.email?.split("@")[0] ?? "Student",
+    name:
+      preferredName?.trim() ||
+      firebaseUser.displayName ||
+      firebaseUser.email?.split("@")[0] ||
+      "Student",
     status: "PENDING",
     reviewed_by_user_id: null,
     reviewed_at: null,
