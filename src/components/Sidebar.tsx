@@ -10,11 +10,13 @@ import {
   Users,
 } from "lucide-react";
 import { ViewMode } from "../types/inventory";
+import { isStudent } from "../services/authRoles";
 
 interface SidebarProps {
   currentView: ViewMode;
   onSelectView: (view: ViewMode) => void;
   pendingRequestsCount: number;
+  pendingAccountCount?: number;
   onOpenScanner: () => void;
   userRole?: "ADMIN" | "STUDENT_AMBASSADOR" | "STUDENT_LEAD" | "STUDENT";
 }
@@ -23,12 +25,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   currentView,
   onSelectView,
   pendingRequestsCount,
+  pendingAccountCount = 0,
   onOpenScanner,
   userRole = "STUDENT",
 }) => {
-  const isStudent = userRole === "STUDENT";
-  const menuItems = isStudent
+  const studentMode = isStudent(userRole);
+  const menuItems = studentMode
     ? [
+      { id: "inventory" as ViewMode, label: "Inventory", icon: Box },
         {
           id: "requests" as ViewMode,
           label: "Requests",
@@ -58,7 +62,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: "locations" as ViewMode, label: "Locations", icon: MapPin },
         { id: "activity" as ViewMode, label: "Activity", icon: History },
         { id: "qr-sheet" as ViewMode, label: "QR Labels", icon: QrCode },
-        { id: "users" as ViewMode, label: "User Directory", icon: Users },
+        {
+          id: "users" as ViewMode,
+          label: "User Directory",
+          icon: Users,
+          badge: pendingAccountCount > 0 ? pendingAccountCount : undefined,
+        },
       ];
 
   return (

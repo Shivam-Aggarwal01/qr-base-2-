@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { QrCode, Search, Plus, RefreshCw, ChevronDown } from "lucide-react";
+import { isStudent } from "../services/authRoles";
 import { User } from "../types/inventory";
 
 interface NavbarProps {
@@ -11,6 +12,7 @@ interface NavbarProps {
   onSearch: (query: string) => void;
   onResetData: () => void;
   onLogout?: () => void;
+  lockIdentity?: boolean;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -22,6 +24,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSearch,
   onResetData,
   onLogout,
+  lockIdentity = false,
 }) => {
   const [searchVal, setSearchVal] = useState("");
   const [showUserDropdown, setShowUserDropdown] = useState(false);
@@ -123,11 +126,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           <div className="absolute right-0 top-16 w-80 bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl py-2 z-50">
             <div className="px-4 py-2 border-b border-[var(--color-idea-border)] flex items-center justify-between">
               <span className="text-[10px] text-[var(--color-idea-muted)] uppercase tracking-wider">
-                {activeUser.role === "STUDENT"
+                {lockIdentity || isStudent(activeUser.role)
                   ? "Account"
                   : "Switch Active User"}
               </span>
-              {activeUser.role !== "STUDENT" && (
+              {!isStudent(activeUser.role) && (
                 <button
                   onClick={() => {
                     onResetData();
@@ -140,7 +143,10 @@ export const Navbar: React.FC<NavbarProps> = ({
               )}
             </div>
             <div className="max-h-64 overflow-y-auto divide-y divide-[var(--color-idea-border)]">
-              {(activeUser.role === "STUDENT" ? [activeUser] : users).map(
+              {(lockIdentity || isStudent(activeUser.role)
+                ? [activeUser]
+                : users
+              ).map(
                 (u) => (
                   <button
                     key={u.id}

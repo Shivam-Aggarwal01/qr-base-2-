@@ -20,14 +20,20 @@ import {
   AssetStatus,
   StockLevel,
   InventoryTransaction,
+  RequestLineDraft,
 } from "../types/inventory";
 import { InventoryStorage } from "../services/storage";
 import {
   canApproveRequests,
   canIssueInventory,
   canReturnOrRepairItems,
+  isStudent,
 } from "../services/authRoles";
-import { updateDocument } from "../services/firebaseCollections";
+import {
+  completeLabRequest,
+  handoverLabRequest,
+  reviewLabRequest,
+} from "../services/requestWorkflow";
 import confetti from "canvas-confetti";
 
 interface QuickActionModalProps {
@@ -45,9 +51,7 @@ interface QuickActionModalProps {
   stockLevels: StockLevel[];
   requests: Request[];
   activeUser: User;
-  onOpenNewRequest: (
-    items: { catalog_item_id: string; requested_qty: number }[],
-  ) => void;
+  onOpenNewRequest: (items: RequestLineDraft[]) => void;
   onRefreshData: () => void;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
 }
@@ -71,26 +75,43 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [selectedLoc, setSelectedLoc] = useState<string>("");
   const [qtyInput, setQtyInput] = useState<number>(1);
-  const [boxQtyInput, setBoxQtyInput] = useState<number>(1);
   const [remarksInput, setRemarksInput] = useState<string>("");
   const [statusInput, setStatusInput] = useState<AssetStatus>("DAMAGED");
 
   const role = activeUser?.role;
+  const quickStatusOptions: AssetStatus[] = [
+    "AVAILABLE",
+    "UNDER_REPAIR",
+    "DAMAGED",
+    "LOST",
+    "RETIRED",
+  ];
   const canApprove = canApproveRequests(role);
   const canIssue = canIssueInventory(role);
   const canReturnOrRepair = canReturnOrRepairItems(role);
+  const studentMode = isStudent(role);
 
-  const isStudent = role === "STUDENT";
+  const myPendingRequestForAsset = (assetId: string): Request | null => {
+      if (!activeUser || !isStudent(activeUser.role)) return null;
+      return (
+        requests.find(
+          (r) =>
+            r.user_id === activeUser.id &&
+            (r.status === "PENDING" || r.status === "APPROVED") &&
+            r.items?.some((it) => it.asset_id === assetId),
+        ) ?? null
+      );
+    };
 
   const myPendingRequestForCatalogItem = (
     catalogItemId: string,
   ): Request | null => {
-    if (!activeUser || activeUser.role !== "STUDENT") return null;
+    if (!activeUser || !isStudent(activeUser.role)) return null;
     return (
       requests.find(
         (r) =>
           r.user_id === activeUser.id &&
-          (r.status === "PENDING" || r.status === "PARTIAL") &&
+          (r.status === "PENDING" || r.status === "APPROVED") &&
           r.items?.some((it) => it.catalog_item_id === catalogItemId),
       ) ?? null
     );
@@ -100,7 +121,21 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     catalogItemId: string,
     requested_qty: number,
   ) => {
-    onOpenNewRequest([{ catalog_item_id: catalogItemId, requested_qty }]);
+    onOpenNewRequest([
+      { kind: "CATALOG", catalog_item_id: catalogItemId, requested_qty },
+    ]);
+    onClose();
+  };
+
+  const openRequestForAsset = (asset: Asset) => {
+    onOpenNewRequest([
+      {
+        kind: "ASSET",
+        asset_id: asset.id,
+        catalog_item_id: asset.catalog_item_id,
+        requested_qty: 1,
+      },
+    ]);
     onClose();
   };
 
@@ -121,22 +156,16 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     );
     const assignedUser = users.find((u) => u.id === asset.assigned_to_user_id);
     const location = locations.find((l) => l.id === asset.location_id);
-    const isBox =
-      asset.is_box ||
-      asset.tracking_mode === "BOX" ||
-      (asset.box_capacity && asset.box_capacity > 1);
-
-    const availableInBox = asset.available_in_box ?? asset.box_capacity ?? 10;
-    const boxCap = asset.box_capacity ?? 15;
 
     // Student QR action: they can request the catalog item, but they cannot issue/return or change status.
-    if (isStudent) {
-      const requestCatalogItemId = catalogItem?.id;
-      const existingRequest = requestCatalogItemId
-        ? myPendingRequestForCatalogItem(requestCatalogItemId)
-        : null;
+    if (studentMode) {
+      const existingRequest = myPendingRequestForAsset(asset.id);
       const requestBlockedByAssetStatus =
-        asset.status === "DISPOSED" || asset.status === "LOST";
+        asset.status === "LOST" ||
+        asset.status === "RETIRED" ||
+        asset.status === "ISSUED" ||
+        asset.status === "DAMAGED" ||
+        asset.status === "UNDER_REPAIR";
 
       return (
         <div className="space-y-6">
@@ -146,13 +175,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                    {isBox ? "BOX BATCH ASSET" : "INDIVIDUAL TRACKED ASSET"}
+                    INDIVIDUAL TRACKED ASSET
                   </span>
-                  {isBox && (
-                    <span className="bg-[#D4AF37] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5">
-                      Storage Box
-                    </span>
-                  )}
                 </div>
                 <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1 truncate">
                   {catalogItem?.name || asset.asset_code}
@@ -182,9 +206,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                   {asset.status.replace("_", " ")}
                 </span>
                 <p className="text-xs text-[#6C6863] mt-2 font-medium">
-                  {asset.status === "ISSUED" && !isBox
-                    ? `Held by: ${assignedUser?.name || "Student"}`
-                    : `Location: ${location?.name || "Unassigned"}`}
+                  {asset.assigned_to_user_id
+                    ? `Assigned to: ${assignedUser?.name || "Student"}`
+                    : `Location: ${location?.name || "Location not set"}`}
                 </p>
               </div>
             </div>
@@ -202,32 +226,26 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               </div>
             ) : (
               <div className="p-3 bg-white border border-[#1A1A1A]/10 text-xs rounded-xl">
-                Request this catalog item (quantity: 1) and track approval in{" "}
-                <span className="font-bold">Requests</span>.
+                Request this specific asset and track approval in{" "}
+                <span className="font-bold">Requests</span>. Quantity is not required.
               </div>
             )}
 
             <div className="flex gap-3 pt-1">
               <button
                 type="button"
-                disabled={
-                  !requestCatalogItemId ||
-                  !!existingRequest ||
-                  requestBlockedByAssetStatus
-                }
-                onClick={() =>
-                  openRequestForCatalogItem(requestCatalogItemId || "", 1)
-                }
+                disabled={!!existingRequest || requestBlockedByAssetStatus}
+                onClick={() => openRequestForAsset(asset)}
                 className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 disabled:hover:bg-[#1A1A1A]"
               >
-                {existingRequest ? "Request Submitted" : "Request This Item"}
+                {existingRequest ? "Request Submitted" : "Request This Asset"}
               </button>
 
               <button
                 type="button"
                 onClick={() =>
                   onOpenQRGenerator(
-                    asset.asset_code,
+                    asset.id,
                     catalogItem?.name || asset.asset_code,
                     `SN: ${asset.serial_number || "N/A"}`,
                   )
@@ -249,21 +267,19 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         asset.id,
         selectedUser,
         remarksInput,
-        undefined,
-        isBox ? boxQtyInput : 1,
       );
       triggerSuccess();
     };
 
     const handleReturnSubmit = (e: React.FormEvent) => {
       e.preventDefault();
-      if (!selectedLoc && !isBox)
+      if (!selectedLoc && !location?.id) {
         return alert("Please select a storage location");
+      }
       InventoryStorage.returnAsset(
         asset.id,
         selectedLoc || location?.id || locations[0]?.id,
         remarksInput,
-        isBox ? boxQtyInput : 1,
       );
       triggerSuccess();
     };
@@ -288,13 +304,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                  {isBox ? "BOX BATCH ASSET" : "INDIVIDUAL TRACKED ASSET"}
+                  INDIVIDUAL TRACKED ASSET
                 </span>
-                {isBox && (
-                  <span className="bg-[#D4AF37] text-white text-[9px] font-bold uppercase tracking-wider px-2 py-0.5">
-                    Storage Box
-                  </span>
-                )}
               </div>
               <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
                 {catalogItem?.name || asset.asset_code}
@@ -323,34 +334,56 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 {asset.status.replace("_", " ")}
               </span>
               <p className="text-xs text-[#6C6863] mt-2 font-medium">
-                {asset.status === "ISSUED" && !isBox
-                  ? `Held by: ${assignedUser?.name || "Student"}`
-                  : `Location: ${location?.name || "Unassigned"}`}
+                {asset.status === "ISSUED"
+                  ? `Assigned to: ${assignedUser?.name || "Student"}`
+                  : `Location: ${location?.name || "Location not set"}`}
               </p>
             </div>
           </div>
+        </div>
 
-          {/* Box Capacity Visualizer */}
-          {isBox && (
-            <div className="mt-4 pt-4 border-t border-[#1A1A1A]/10 space-y-2">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-[11px] font-mono uppercase tracking-wider text-[#6C6863]">
-                  Box Stock Available
-                </span>
-                <span className="font-mono font-bold text-[#1A1A1A]">
-                  {availableInBox} / {boxCap} Units Inside Box
-                </span>
-              </div>
-              <div className="w-full bg-[#EBE5DE] h-2">
-                <div
-                  className="bg-[#D4AF37] h-2 transition-all duration-500"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, (availableInBox / boxCap) * 100))}%`,
+        <div className="border border-[#1A1A1A]/10 bg-white p-4 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">
+              Quick Status
+            </p>
+            <span className="text-[9px] text-[#6C6863]">
+              {asset.status.replace("_", " ")}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {quickStatusOptions.map((status) => {
+              const selected = asset.status === status;
+              const label = status.replace("_", " ");
+              const isDanger = status === "DAMAGED" || status === "LOST" || status === "RETIRED";
+              const isRepair = status === "UNDER_REPAIR";
+              const isAvailable = status === "AVAILABLE";
+
+              return (
+                <button
+                  key={status}
+                  type="button"
+                  onClick={() => {
+                    setStatusInput(status);
+                    setSubAction("status");
                   }}
-                />
-              </div>
-            </div>
-          )}
+                  className={`py-2 px-2 text-[10px] font-bold uppercase tracking-wider border rounded-lg transition-colors cursor-pointer ${
+                    selected
+                      ? isAvailable
+                        ? "bg-emerald-600 text-white border-emerald-600"
+                        : isRepair
+                          ? "bg-amber-500 text-white border-amber-500"
+                          : isDanger
+                            ? "bg-red-600 text-white border-red-600"
+                            : "bg-slate-900 text-white border-slate-900"
+                      : "bg-[#F9F8F6] text-[#1A1A1A] border-[#1A1A1A]/10 hover:border-[#1A1A1A]"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Sub Action Forms */}
@@ -360,43 +393,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className="space-y-4 bg-white p-5 border border-[#1A1A1A]"
           >
             <h5 className="font-serif text-sm font-bold text-[#1A1A1A] uppercase tracking-wider border-b border-[#1A1A1A]/10 pb-2">
-              {isBox
-                ? `Check Out Units from ${asset.asset_code}`
-                : `Issue Individual Asset to Student`}
+              Issue Individual Asset to Student
             </h5>
-
-            {isBox && (
-              <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                  Select Quantity to Take Out (Max {availableInBox})
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="1"
-                    max={Math.max(1, availableInBox)}
-                    value={boxQtyInput}
-                    onChange={(e) => setBoxQtyInput(Number(e.target.value))}
-                    className="flex-1 accent-[#D4AF37]"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    max={availableInBox}
-                    value={boxQtyInput}
-                    onChange={(e) =>
-                      setBoxQtyInput(
-                        Math.min(
-                          availableInBox,
-                          Math.max(1, Number(e.target.value)),
-                        ),
-                      )
-                    }
-                    className="w-20 p-2 border border-[#1A1A1A] font-mono font-bold text-center text-sm outline-none"
-                  />
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
@@ -454,44 +452,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className="space-y-4 bg-white p-5 border border-[#1A1A1A]"
           >
             <h5 className="font-serif text-sm font-bold text-[#1A1A1A] uppercase tracking-wider border-b border-[#1A1A1A]/10 pb-2">
-              {isBox
-                ? `Return Units Back to Box (${asset.asset_code})`
-                : `Return Asset to Lab Storage`}
+              Return Asset to Lab Storage
             </h5>
-
-            {isBox && (
-              <div>
-                <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                  Select Quantity Returning (Max {boxCap - availableInBox}{" "}
-                  missing)
-                </label>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="range"
-                    min="1"
-                    max={Math.max(1, boxCap - availableInBox)}
-                    value={boxQtyInput}
-                    onChange={(e) => setBoxQtyInput(Number(e.target.value))}
-                    className="flex-1 accent-[#D4AF37]"
-                  />
-                  <input
-                    type="number"
-                    min="1"
-                    max={boxCap - availableInBox}
-                    value={boxQtyInput}
-                    onChange={(e) =>
-                      setBoxQtyInput(
-                        Math.min(
-                          boxCap - availableInBox,
-                          Math.max(1, Number(e.target.value)),
-                        ),
-                      )
-                    }
-                    className="w-20 p-2 border border-[#1A1A1A] font-mono font-bold text-center text-sm outline-none"
-                  />
-                </div>
-              </div>
-            )}
 
             <div>
               <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
@@ -501,13 +463,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 value={selectedLoc}
                 onChange={(e) => setSelectedLoc(e.target.value)}
                 className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A] text-xs font-medium outline-none focus:border-[#D4AF37]"
-                required={!isBox}
+                required
               >
-                <option value="">
-                  {isBox
-                    ? `-- Current Box Location (${location?.name || "Bin"}) --`
-                    : "-- Select Return Storage --"}
-                </option>
+                <option value="">-- Select Return Storage --</option>
                 {locations.map((l) => (
                   <option key={l.id} value={l.id}>
                     {l.name} ({l.code})
@@ -570,7 +528,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 </option>
                 <option value="DAMAGED">DAMAGED (Faulty)</option>
                 <option value="LOST">LOST (Missing from Lab)</option>
-                <option value="DISPOSED">DISPOSED (Scrapped)</option>
+                <option value="RETIRED">RETIRED (Retired from Service)</option>
               </select>
             </div>
             <div>
@@ -623,42 +581,35 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         {/* Primary Action Button Bar */}
         {!subAction && (
           <div className="grid grid-cols-2 gap-3">
-            {(asset.status === "AVAILABLE" || isBox) && (
+            {asset.status === "AVAILABLE" && (
               <button
                 onClick={() => {
-                  setBoxQtyInput(1);
                   setSubAction("issue");
                 }}
                 className="p-4 bg-[#1A1A1A] text-white flex items-center gap-3 font-bold text-xs uppercase tracking-wider hover:bg-[#D4AF37] transition-colors cursor-pointer"
               >
                 <UserCheck className="w-5 h-5 text-[#D4AF37] shrink-0" />
                 <div className="text-left">
-                  <p>{isBox ? "Take Out Units" : "Issue to Student"}</p>
+                  <p>Issue to Student</p>
                   <p className="text-[10px] font-normal opacity-70 capitalize">
-                    {isBox
-                      ? "Check out Y items from box"
-                      : "Assign loan record"}
+                    Assign loan record
                   </p>
                 </div>
               </button>
             )}
 
-            {(asset.status === "ISSUED" ||
-              (isBox && availableInBox < boxCap)) && (
+            {asset.status === "ISSUED" && (
               <button
                 onClick={() => {
-                  setBoxQtyInput(1);
                   setSubAction("return");
                 }}
                 className="p-4 bg-emerald-950 text-white flex items-center gap-3 font-bold text-xs uppercase tracking-wider hover:bg-emerald-900 transition-colors cursor-pointer"
               >
                 <Check className="w-5 h-5 text-emerald-400 shrink-0" />
                 <div className="text-left">
-                  <p>{isBox ? "Return Units to Box" : "Return Asset"}</p>
+                  <p>Return Asset</p>
                   <p className="text-[10px] font-normal opacity-70 capitalize">
-                    {isBox
-                      ? "Put Y items back into box"
-                      : "Return to storage bin"}
+                    Return to storage bin
                   </p>
                 </div>
               </button>
@@ -680,7 +631,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             <button
               onClick={() =>
                 onOpenQRGenerator(
-                  asset.asset_code,
+                  asset.id,
                   catalogItem?.name || asset.asset_code,
                   `SN: ${asset.serial_number || "N/A"}`,
                 )
@@ -713,7 +664,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     );
 
     // Student QR action: request the catalog item, don't mutate stock.
-    if (isStudent) {
+    if (studentMode) {
       const existingRequest = myPendingRequestForCatalogItem(cat.id);
       const alreadyRequested = !!existingRequest;
 
@@ -723,7 +674,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
             <div>
               <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                CATALOG ITEM ({cat.type})
+                CATALOG ITEM
               </span>
               <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
                 {cat.name}
@@ -800,9 +751,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 type="button"
                 onClick={() =>
                   onOpenQRGenerator(
-                    cat.item_code,
+                    cat.id,
                     cat.name,
-                    `Type: ${cat.type}`,
+                    "Inventory Item",
                   )
                 }
                 className="px-4 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#D4AF37] hover:text-[#1A1A1A] text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
@@ -834,7 +785,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
           <div>
             <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-              CATALOG ITEM ({cat.type})
+              CATALOG ITEM
             </span>
             <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
               {cat.name}
@@ -946,9 +897,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     const assetsInLoc = assets.filter((a) => a.location_id === loc.id);
     const stockInLoc = stockLevels.filter((s) => s.location_id === loc.id);
 
-    // Student QR action: show consumable stock + request buttons. Students cannot mutate inventory.
-    if (isStudent) {
-      const consumablesInLoc = stockInLoc
+    // Student QR action: show item stock + request buttons. Students cannot mutate inventory.
+    if (studentMode) {
+      const itemsInLoc = stockInLoc
         .map((s) => {
           const cat = catalogItems.find(
             (c) =>
@@ -956,9 +907,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           );
           return { stock: s, catalogItem: cat };
         })
-        .filter(
-          (x) => x.catalogItem && x.catalogItem.type === "CONSUMABLE",
-        ) as { stock: StockLevel; catalogItem: CatalogItem }[];
+        .filter((x) => x.catalogItem) as { stock: StockLevel; catalogItem: CatalogItem }[];
 
       return (
         <div className="space-y-5">
@@ -978,7 +927,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             <button
               onClick={() =>
                 onOpenQRGenerator(
-                  loc.code || loc.name,
+                  loc.id,
                   loc.name,
                   "Storage Location",
                 )
@@ -992,15 +941,15 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
           <div>
             <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-              Consumables in Location ({consumablesInLoc.length})
+              Items in Location ({itemsInLoc.length})
             </h5>
             <div className="max-h-52 overflow-y-auto space-y-2">
-              {consumablesInLoc.length === 0 ? (
+              {itemsInLoc.length === 0 ? (
                 <p className="text-xs text-[#6C6863] italic">
                   No bulk stock in this location.
                 </p>
               ) : (
-                consumablesInLoc.map(({ stock, catalogItem }) => {
+                itemsInLoc.map(({ stock, catalogItem }) => {
                   const existing = myPendingRequestForCatalogItem(
                     catalogItem.id,
                   );
@@ -1056,7 +1005,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           <button
             onClick={() =>
               onOpenQRGenerator(
-                loc.code || loc.name,
+                loc.id,
                 loc.name,
                 "Storage Location",
               )
@@ -1109,7 +1058,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
         <div>
           <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-            Consumables Bulk Stock
+            Items in Stock
           </h5>
           <div className="max-h-40 overflow-y-auto space-y-2">
             {stockInLoc.length === 0 ? (
@@ -1148,21 +1097,32 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const renderRequestActions = (req: Request) => {
     const student = users.find((u) => u.id === req.user_id);
 
-    const handleFulfill = async (status: "COMPLETED" | "CANCELLED") => {
-      const finalRemark = remarksInput.trim() || `Fulfilling request via scan`;
+    const handleReview = async (status: "APPROVED" | "REJECTED") => {
+      const finalRemark =
+        remarksInput.trim() ||
+        (status === "APPROVED"
+          ? "Approved. Inventory will change at handover."
+          : "Request rejected.");
+      await reviewLabRequest(req, status, activeUser, finalRemark);
+      triggerSuccess();
+    };
 
-      // QR-based staff actions should still persist to Firestore so students see updated statuses.
-      if (canApprove) {
-        await updateDocument("requests", req.id, {
-          status,
-          approved_by_user_id: activeUser.id,
-          remarks: finalRemark,
-          updated_at: new Date().toISOString(),
-        });
-      }
+    const handleHandover = async () => {
+      await handoverLabRequest(
+        req,
+        activeUser,
+        remarksInput.trim() || `Handed over via scan for ${req.request_number}`,
+      );
+      triggerSuccess();
+    };
 
-      // Keep existing local inventory behavior (stock/transactions) for now.
-      InventoryStorage.fulfillRequest(req.id, status, finalRemark);
+    const handleComplete = async () => {
+      await completeLabRequest(
+        req,
+        activeUser,
+        remarksInput.trim() || `Completed ${req.request_number}`,
+        locations[0]?.id,
+      );
       triggerSuccess();
     };
 
@@ -1188,9 +1148,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className={`text-[10px] px-3 py-1 font-mono uppercase tracking-widest border ${
               req.status === "PENDING"
                 ? "border-amber-700 bg-amber-50 text-amber-800 animate-pulse"
-                : req.status === "COMPLETED"
-                  ? "border-emerald-700 bg-emerald-50 text-emerald-800"
-                  : "border-red-700 bg-red-50 text-red-800"
+                : req.status === "APPROVED"
+                  ? "border-blue-700 bg-blue-50 text-blue-800"
+                  : req.status === "HANDED_OVER" || req.status === "COMPLETED"
+                    ? "border-emerald-700 bg-emerald-50 text-emerald-800"
+                    : "border-red-700 bg-red-50 text-red-800"
             }`}
           >
             {req.status}
@@ -1229,30 +1191,59 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               type="text"
               value={remarksInput}
               onChange={(e) => setRemarksInput(e.target.value)}
-              placeholder="Approval notes / issuance remarks..."
+              placeholder="Approval notes..."
               className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs outline-none focus:border-[#D4AF37]"
             />
             <div className="flex gap-3">
               <button
-                onClick={() => handleFulfill("CANCELLED")}
+                onClick={() => void handleReview("REJECTED")}
                 className="flex-1 py-3 border border-red-800 text-red-800 hover:bg-red-800 hover:text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
               >
-                Reject Request
+                Reject
               </button>
               <button
-                onClick={() => handleFulfill("COMPLETED")}
+                onClick={() => void handleReview("APPROVED")}
                 className="flex-1 py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
               >
-                Approve & Issue
+                Approve
               </button>
             </div>
+          </div>
+        )}
+
+        {req.status === "APPROVED" && canApprove && (
+          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
+            <input
+              type="text"
+              value={remarksInput}
+              onChange={(e) => setRemarksInput(e.target.value)}
+              placeholder="Handover notes..."
+              className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs outline-none focus:border-[#D4AF37]"
+            />
+            <button
+              onClick={() => void handleHandover()}
+              className="w-full py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Hand Over
+            </button>
+          </div>
+        )}
+
+        {req.status === "HANDED_OVER" && canApprove && (
+          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
+            <button
+              onClick={() => void handleComplete()}
+              className="w-full py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
+            >
+              Complete
+            </button>
           </div>
         )}
 
         {req.status === "PENDING" && !canApprove && (
           <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
             <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
-              Waiting for authorized staff to approve and issue this request.
+              Waiting for staff to approve this request. Inventory will not change until handover.
             </div>
           </div>
         )}
@@ -1266,7 +1257,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
       (a) => a.assigned_to_user_id === user.id && !a.returned_at,
     );
 
-    if (isStudent) {
+    if (studentMode) {
       return (
         <div className="space-y-5">
           <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">

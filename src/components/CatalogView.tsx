@@ -13,11 +13,13 @@ import {
   Location,
   StockLevel,
   Asset,
-  ItemType,
   UserRole,
 } from "../types/inventory";
 import { InventoryStorage } from "../services/storage";
-import { createCatalogItemInFirestore } from "../services/firebaseInventory";
+import {
+  createCatalogItemInFirestore,
+  deleteFirestoreDocument,
+} from "../services/firebaseInventory";
 
 interface CatalogViewProps {
   catalogItems: CatalogItem[];
@@ -38,7 +40,6 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   onOpenQRGenerator,
   onRefreshData,
 }) => {
-  const [selectedType, setSelectedType] = useState<ItemType | "ALL">("ALL");
   const [searchFilter, setSearchFilter] = useState("");
   const [onlyLowStock, setOnlyLowStock] = useState(false);
 
@@ -46,7 +47,6 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   const [showAddModal, setShowAddModal] = useState(false);
   const [newItemCode, setNewItemCode] = useState("");
   const [newItemName, setNewItemName] = useState("");
-  const [newItemType, setNewItemType] = useState<ItemType>("CONSUMABLE");
   const [newItemDesc, setNewItemDesc] = useState("");
   const [newItemUnit, setNewItemUnit] = useState("pcs");
   const [newItemMinStock, setNewItemMinStock] = useState(10);
@@ -60,7 +60,6 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   const [restockQty, setRestockQty] = useState(10);
 
   const filteredItems = catalogItems.filter((item) => {
-    if (selectedType !== "ALL" && item.type !== selectedType) return false;
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
       if (
@@ -106,13 +105,10 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       const payload = {
         item_code: newItemCode.trim().toUpperCase(),
         name: newItemName.trim(),
-        type: newItemType,
         description: newItemDesc,
         unit: newItemUnit,
         min_stock_alert: newItemMinStock,
         storage_place: newItemStoragePlace.trim() || locations[0]?.name || null,
-        tracking_mode:
-          newItemType === "CONSUMABLE" ? undefined : ("INDIVIDUAL" as const),
       };
 
       console.log("📤 Sending to Firebase:", payload);
@@ -149,7 +145,6 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         InventoryStorage.saveCatalogItem({
           item_code: newItemCode.trim().toUpperCase(),
           name: newItemName.trim(),
-          type: newItemType,
           description: newItemDesc,
           unit: newItemUnit,
           min_stock_alert: newItemMinStock,
@@ -247,14 +242,81 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
     }
   };
 
-  const getItemTypeBadge = (type: ItemType) => {
-    switch (type) {
-      case "CONSUMABLE":
-        return "bg-[rgba(10,174,240,0.1)] text-[var(--color-idea-deep-blue)] border border-[var(--color-idea-blue)]/30";
-      case "REUSABLE":
-        return "bg-[rgba(133,180,64,0.12)] text-[#3d6b10] border border-[var(--color-idea-green)]/30";
-      case "TOOL":
-        return "bg-[var(--color-idea-deep-blue)] text-white border border-[var(--color-idea-deep-blue)]";
+  const handleDeleteStock = async (item: CatalogItem) => {
+    if (
+      !window.confirm(
+        `Delete all stock records for ${item.name}? The catalog item and assets will remain.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { getCollection } = await import("../services/firebaseCollections");
+      const allStocks = await getCollection<StockLevel>("stock_levels");
+      const matchingStocks = allStocks.filter(
+        (stock) =>
+          stock.catalog_item_id === item.id ||
+          stock.catalog_item_id === item.item_code,
+      );
+
+      await Promise.all(
+        matchingStocks
+          .filter((stock) => stock.id)
+          .map((stock) => deleteFirestoreDocument("stock_levels", stock.id)),
+      );
+      InventoryStorage.deleteStockForItem(item.id, item.item_code);
+      alert(`Deleted stock records for ${item.name}.`);
+      onRefreshData();
+    } catch (error: any) {
+      console.error("Failed to delete stock:", error);
+      alert(error?.message || "Failed to delete stock records.");
+    }
+  };
+
+  const handleDeleteItem = async (item: CatalogItem) => {
+    const linkedAssets = assets.filter(
+      (asset) =>
+        asset.catalog_item_id === item.id ||
+        asset.catalog_item_id === item.item_code,
+    );
+
+    if (linkedAssets.length > 0) {
+      alert(
+        `Cannot delete ${item.name} because ${linkedAssets.length} asset(s) still use this catalog item. Remove or reassign those assets first.`,
+      );
+      return;
+    }
+
+    if (
+      !window.confirm(
+        `Delete the catalog item ${item.name}? This also removes its stock records and cannot be undone.`,
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { getCollection } = await import("../services/firebaseCollections");
+      const allStocks = await getCollection<StockLevel>("stock_levels");
+      const matchingStocks = allStocks.filter(
+        (stock) =>
+          stock.catalog_item_id === item.id ||
+          stock.catalog_item_id === item.item_code,
+      );
+
+      await Promise.all(
+        matchingStocks
+          .filter((stock) => stock.id)
+          .map((stock) => deleteFirestoreDocument("stock_levels", stock.id)),
+      );
+      await deleteFirestoreDocument("catalog_items", item.id);
+      InventoryStorage.deleteStockForItem(item.id, item.item_code);
+      alert(`Deleted catalog item ${item.name}.`);
+      onRefreshData();
+    } catch (error: any) {
+      console.error("Failed to delete catalog item:", error);
+      alert(error?.message || "Failed to delete catalog item.");
     }
   };
 
@@ -281,23 +343,6 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
       {/* Filter Tabs & Search Toolbar */}
       <div className="idea-card p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        {/* Type Tabs */}
-        <div className="flex items-center gap-1.5 bg-[var(--color-idea-light-grey)] p-1.5 rounded-2xl w-full md:w-auto overflow-x-auto">
-          {(["ALL", "CONSUMABLE", "REUSABLE", "TOOL"] as const).map((t) => (
-            <button
-              key={t}
-              onClick={() => setSelectedType(t)}
-              className={`px-4 py-2 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                selectedType === t
-                  ? "bg-white text-[var(--color-idea-blue)] shadow-sm"
-                  : "text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]"
-              }`}
-            >
-              {t === "ALL" ? "All Items" : t}
-            </button>
-          ))}
-        </div>
-
         {/* Search & Checkbox */}
         <div className="flex items-center gap-4 w-full md:w-auto">
           <div className="relative flex-1 md:w-72">
@@ -353,11 +398,6 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
-                    <span
-                      className={`text-[9px] px-2.5 py-0.5 rounded-full font-bold uppercase tracking-widest ${getItemTypeBadge(item.type)}`}
-                    >
-                      {item.type}
-                    </span>
                     <h3 className="text-base font-bold text-[var(--color-idea-text)] mt-2 group-hover:text-[var(--color-idea-blue)] transition-colors">
                       {item.name}
                     </h3>
@@ -368,9 +408,9 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   <button
                     onClick={() =>
                       onOpenQRGenerator(
-                        item.item_code,
+                        item.id,
                         item.name,
-                        `Type: ${item.type}`,
+                        "Inventory Item",
                       )
                     }
                     className="p-2 idea-button rounded-xl cursor-pointer"
@@ -388,16 +428,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <div className="pt-3 border-t border-[var(--color-idea-border)]">
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-medium uppercase tracking-widest text-[var(--color-idea-muted)]">
-                      {item.type === "CONSUMABLE"
-                        ? "Bulk Inventory Stock"
-                        : "Tracked Physical Assets"}
+                      Items in stock
                     </span>
                     <span
                       className={`text-base font-mono font-bold ${isLowStock ? "text-[var(--color-idea-red)]" : "text-[var(--color-idea-text)]"}`}
                     >
-                      {item.type === "CONSUMABLE"
-                        ? `${totalStock} ${item.unit}`
-                        : `${availableAssetsCount} / ${itemAssets.length} Avail`}
+                      {totalStock} {item.unit}
                     </span>
                   </div>
 
@@ -414,15 +450,31 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
               {/* Card Footer Actions */}
               <div className="pt-4 mt-4 border-t border-[var(--color-idea-border)]">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setSelectedCatalogItem(item);
+                      setTargetLocId(locations[0]?.id || "");
+                      setShowRestockModal(true);
+                    }}
+                    className="flex-1 py-2.5 idea-button rounded-xl text-xs font-semibold cursor-pointer"
+                  >
+                    + Add Stock / Restock
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDeleteStock(item)}
+                    className="px-3 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold cursor-pointer"
+                  >
+                    Delete Stock
+                  </button>
+                </div>
                 <button
-                  onClick={() => {
-                    setSelectedCatalogItem(item);
-                    setTargetLocId(locations[0]?.id || "");
-                    setShowRestockModal(true);
-                  }}
-                  className="w-full py-2.5 idea-button rounded-xl text-xs font-semibold cursor-pointer"
+                  type="button"
+                  onClick={() => void handleDeleteItem(item)}
+                  className="w-full mt-2 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold cursor-pointer"
                 >
-                  + Add Stock / Restock
+                  Delete Item
                 </button>
               </div>
             </div>
@@ -466,21 +518,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Category Type
-                  </label>
-                  <select
-                    value={newItemType}
-                    onChange={(e) => setNewItemType(e.target.value as ItemType)}
-                    className="idea-input mt-1 p-2.5 text-xs"
-                  >
-                    <option value="CONSUMABLE">CONSUMABLE</option>
-                    <option value="REUSABLE">REUSABLE</option>
-                    <option value="TOOL">TOOL</option>
-                  </select>
-                </div>
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                     Unit

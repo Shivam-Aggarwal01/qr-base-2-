@@ -9,7 +9,10 @@ import {
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
+  documentId,
 } from "firebase/firestore";
+import type { DocumentData, Query } from "firebase/firestore";
 import { auth, db } from "../firebase";
 import type {
   Asset,
@@ -20,6 +23,7 @@ import type {
   Request,
   StockLevel,
   User,
+  AccountRequest,
 } from "../types/inventory";
 
 const collectionName = {
@@ -64,7 +68,25 @@ function tsToString(val: any): string {
 export async function getCollection<T>(name: string): Promise<T[]> {
   try {
     requireSignedInUser();
-    const snapshot = await getDocs(collection(db, name));
+
+    let collectionRef: Query<DocumentData, DocumentData> = collection(db, name);
+    if (name === "requests" && auth.currentUser) {
+      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+      const userRole = userDoc.exists() ? (userDoc.data().role as string | undefined) : undefined;
+      if (!userRole || userRole === "STUDENT") {
+        collectionRef = query(collectionRef, where("user_id", "==", auth.currentUser.uid));
+      }
+    }
+
+    if (name === "account_requests" && auth.currentUser) {
+      const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
+      const userRole = userDoc.exists() ? (userDoc.data().role as string | undefined) : undefined;
+      if (!userRole || userRole === "STUDENT") {
+        collectionRef = query(collectionRef, where(documentId(), "==", auth.currentUser.uid));
+      }
+    }
+
+    const snapshot = await getDocs(collectionRef);
     console.log(`📂 Firestore read ${name}: ${snapshot.size} docs`);
 
     const items = snapshot.docs.map((document) => {
@@ -260,6 +282,7 @@ export async function readFirestoreState() {
       requests: [],
       transactions: [],
       users: [],
+      accountRequests: [],
     };
   }
 
@@ -272,6 +295,7 @@ export async function readFirestoreState() {
     requests,
     transactions,
     users,
+    accountRequests,
   ] = await Promise.all([
     getCollection<CatalogItem>("catalog_items"),
     getCollection<Location>("locations"),
@@ -281,6 +305,7 @@ export async function readFirestoreState() {
     getCollection<Request>("requests"),
     getCollection<InventoryTransaction>("inventory_transactions"),
     getCollection<User>("users"),
+    getCollection<AccountRequest>("account_requests"),
   ]);
 
   return {
@@ -292,6 +317,7 @@ export async function readFirestoreState() {
     requests,
     transactions,
     users,
+    accountRequests,
   };
 }
 

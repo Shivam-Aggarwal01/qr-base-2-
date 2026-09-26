@@ -20,8 +20,8 @@ import {
   deleteDoc,
 } from "firebase/firestore";
 import { auth, db } from "../firebase";
-import type { User, UserRole } from "../types/inventory";
-import { resolveRoleFromEmail } from "./roleConfig";
+import type { AccountRequest, User, UserRole } from "../types/inventory";
+import { isAdminAccount, resolveRoleFromEmail } from "./roleConfig";
 
 export const COLLECTIONS = {
   USERS: "users",
@@ -34,7 +34,10 @@ export const COLLECTIONS = {
   REQUEST_ITEMS: "request_items",
   INVENTORY_TRANSACTIONS: "inventory_transactions",
   AUDIT_LOGS: "audit_logs",
+  ACCOUNT_REQUESTS: "account_requests",
 } as const;
+
+export const STUDENT_SIGNUP_NAME_KEY = "lablogic-student-signup-name";
 
 export type FirebaseUserProfile = User;
 
@@ -76,14 +79,18 @@ export async function getUserProfile(uid: string): Promise<User | null> {
   };
 
   if (current.role !== resolvedRole || current.email !== email) {
-    await setDoc(
-      userRef,
-      {
-        ...normalizedProfile,
-        updated_at: serverTimestamp(),
-      },
-      { merge: true },
-    );
+    try {
+      await setDoc(
+        userRef,
+        {
+          ...normalizedProfile,
+          updated_at: serverTimestamp(),
+        },
+        { merge: true },
+      );
+    } catch (error) {
+      console.warn("Could not sync user profile role:", error);
+    }
   }
 
   return normalizedProfile;
@@ -92,6 +99,7 @@ export async function getUserProfile(uid: string): Promise<User | null> {
 export async function ensureUserProfile(
   firebaseUser: FirebaseUser,
   role: UserRole = "STUDENT",
+  preferredName?: string,
 ): Promise<User> {
   const userRef = doc(db, COLLECTIONS.USERS, firebaseUser.uid);
   const snapshot = await getDoc(userRef);
@@ -116,27 +124,146 @@ export async function ensureUserProfile(
       current.role !== finalRole ||
       current.email !== normalizedProfile.email
     ) {
-      await setDoc(
-        userRef,
-        {
-          ...normalizedProfile,
-          updated_at: serverTimestamp(),
-        },
-        { merge: true },
-      );
+      try {
+        await setDoc(
+          userRef,
+          {
+            ...normalizedProfile,
+            updated_at: serverTimestamp(),
+          },
+          { merge: true },
+        );
+      } catch (error) {
+        console.warn("Could not sync existing user profile:", error);
+      }
     }
 
     return normalizedProfile;
   }
 
+  if (!isAdminAccount(email, resolvedRole)) {
+    const accessRequest = await getAccountRequest(firebaseUser.uid);
+    if (accessRequest?.status !== "APPROVED") {
+      throw new Error("Student account is waiting for admin approval.");
+    }
+  }
+
   const profile = mapFirebaseUserToLabUser(firebaseUser, resolvedRole);
+  if (preferredName?.trim()) {
+    profile.name = preferredName.trim();
+  }
+  try {
+    await setDoc(userRef, {
+      ...profile,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    });
+  } catch (error) {
+    console.warn("Could not create user profile document:", error);
+  }
+
+  return profile;
+}
+
+function mapAccountRequest(
+  id: string,
+  data: Record<string, unknown>,
+): AccountRequest {
+  return {
+    id,
+    email: String(data.email ?? ""),
+    name: String(data.name ?? "Student"),
+    status: (data.status as AccountRequest["status"]) || "PENDING",
+    reviewed_by_user_id: (data.reviewed_by_user_id as string | null) ?? null,
+    reviewed_at: (data.reviewed_at as string | null) ?? null,
+    created_at:
+      typeof data.created_at === "string"
+        ? data.created_at
+        : new Date().toISOString(),
+    updated_at:
+      typeof data.updated_at === "string"
+        ? data.updated_at
+        : new Date().toISOString(),
+  };
+}
+
+export async function getAccountRequest(
+  uid: string,
+): Promise<AccountRequest | null> {
+  const snapshot = await getDoc(doc(db, COLLECTIONS.ACCOUNT_REQUESTS, uid));
+  if (!snapshot.exists()) return null;
+  return mapAccountRequest(snapshot.id, snapshot.data() as Record<string, unknown>);
+}
+
+export async function submitAccountRequest(
+  firebaseUser: FirebaseUser,
+  preferredName?: string,
+): Promise<AccountRequest> {
+  const existing = await getAccountRequest(firebaseUser.uid);
+  if (existing) return existing;
+
+  const request: AccountRequest = {
+    id: firebaseUser.uid,
+    email: firebaseUser.email ?? "",
+    name:
+      preferredName?.trim() ||
+      firebaseUser.displayName ||
+      firebaseUser.email?.split("@")[0] ||
+      "Student",
+    status: "PENDING",
+    reviewed_by_user_id: null,
+    reviewed_at: null,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
+  await setDoc(doc(db, COLLECTIONS.ACCOUNT_REQUESTS, firebaseUser.uid), {
+    ...request,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+
+  return request;
+}
+
+export async function reviewAccountRequest(
+  requestId: string,
+  status: "APPROVED" | "REJECTED",
+  reviewer: User,
+): Promise<void> {
+  const request = await getAccountRequest(requestId);
+  if (!request) {
+    throw new Error("Account request was not found.");
+  }
+
+  await updateDoc(doc(db, COLLECTIONS.ACCOUNT_REQUESTS, requestId), {
+    status,
+    reviewed_by_user_id: reviewer.id,
+    reviewed_at: new Date().toISOString(),
+    updated_at: serverTimestamp(),
+  });
+
+  if (status !== "APPROVED") return;
+
+  const userRef = doc(db, COLLECTIONS.USERS, requestId);
+  const existingUser = await getDoc(userRef);
+  if (existingUser.exists()) return;
+
+  const profile: User = {
+    id: requestId,
+    user_code: `STU-${Date.now().toString().slice(-6)}`,
+    name: request.name,
+    email: request.email,
+    role: resolveRoleFromEmail(request.email) || "STUDENT",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+
   await setDoc(userRef, {
     ...profile,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });
-
-  return profile;
 }
 
 export async function createFirebaseAccount(
@@ -184,13 +311,12 @@ export async function loginToFirebase(
   return profile;
 }
 
-export async function completeGoogleRedirect(): Promise<User | null> {
+export async function completeGoogleRedirect(): Promise<FirebaseUser | null> {
   const result = await getRedirectResult(auth);
-  if (!result?.user) return null;
-  return ensureUserProfile(result.user, "STUDENT");
+  return result?.user ?? null;
 }
 
-export async function loginWithGoogle(): Promise<User | null> {
+export async function loginWithGoogle(): Promise<FirebaseUser | null> {
   const provider = new GoogleAuthProvider();
   provider.setCustomParameters({
     prompt: "select_account",
@@ -198,7 +324,7 @@ export async function loginWithGoogle(): Promise<User | null> {
 
   try {
     const result = await signInWithPopup(auth, provider);
-    return ensureUserProfile(result.user, "STUDENT");
+    return result.user;
   } catch (error: any) {
     const shouldUseRedirect =
       error?.code === "auth/popup-blocked" ||
@@ -233,7 +359,6 @@ export async function listCollection<T>(collectionName: string): Promise<T[]> {
 export async function createCatalogItemInFirestore(payload: {
   item_code: string;
   name: string;
-  type: "CONSUMABLE" | "REUSABLE" | "TOOL";
   description?: string;
   unit?: string;
   tracking_mode?: "BOX" | "INDIVIDUAL";
@@ -263,6 +388,7 @@ export async function createCatalogItemInFirestore(payload: {
 
     await updateDoc(doc(db, COLLECTIONS.CATALOG_ITEMS, docRef.id), {
       id: docRef.id,
+      qr_code: docRef.id,
     });
 
     console.log("✅ Document ID field updated");
@@ -279,22 +405,30 @@ export async function createCatalogItemInFirestore(payload: {
 export async function createLocationInFirestore(payload: {
   name: string;
   code?: string;
+  storage_path?: string | null;
 }): Promise<void> {
-  await addDoc(collection(db, COLLECTIONS.LOCATIONS), {
+  const docRef = await addDoc(collection(db, COLLECTIONS.LOCATIONS), {
     id: "",
     name: payload.name,
     code: payload.code ?? "",
+    storage_path: payload.storage_path ?? "",
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
+  });
+  await updateDoc(doc(db, COLLECTIONS.LOCATIONS, docRef.id), {
+    id: docRef.id,
+    qr_code: docRef.id,
   });
 }
 
 export async function createAssetInFirestore(payload: {
   asset_code: string;
+  qr_code?: string;
   catalog_item_id: string;
   serial_number?: string;
   status?: string;
   location_id?: string | null;
+  storage_location?: string | null;
   assigned_to_user_id?: string | null;
   tracking_mode?: "BOX" | "INDIVIDUAL";
   is_box?: boolean;
@@ -302,11 +436,13 @@ export async function createAssetInFirestore(payload: {
   available_in_box?: number;
   notes?: string;
 }): Promise<void> {
-  await addDoc(collection(db, COLLECTIONS.ASSETS), {
+  const docRef = await addDoc(collection(db, COLLECTIONS.ASSETS), {
     id: "",
     ...payload,
+    qr_code: "",
     status: payload.status ?? "AVAILABLE",
     location_id: payload.location_id ?? null,
+    storage_location: payload.storage_location ?? "",
     assigned_to_user_id: payload.assigned_to_user_id ?? null,
     tracking_mode: payload.tracking_mode ?? null,
     is_box: payload.is_box ?? false,
@@ -315,6 +451,11 @@ export async function createAssetInFirestore(payload: {
     notes: payload.notes ?? "",
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
+  });
+  await updateDoc(doc(db, COLLECTIONS.ASSETS, docRef.id), {
+    id: docRef.id,
+    asset_code: docRef.id,
+    qr_code: docRef.id,
   });
 }
 

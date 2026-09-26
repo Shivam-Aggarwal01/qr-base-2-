@@ -39,10 +39,12 @@ function getStatusBadge(status: string) {
   switch (status) {
     case "PENDING":
       return "idea-warning";
-    case "PARTIAL":
+    case "APPROVED":
       return "idea-info";
+    case "HANDED_OVER":
     case "COMPLETED":
       return "idea-success";
+    case "REJECTED":
     case "CANCELLED":
       return "idea-error";
     default:
@@ -69,11 +71,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   if (studentMode && currentUser) {
     const myRequests = requests.filter((r) => r.user_id === currentUser.id);
     const myPending = myRequests.filter((r) => r.status === "PENDING");
-    const myPartial = myRequests.filter((r) => r.status === "PARTIAL");
-    const myCompleted = myRequests.filter((r) => r.status === "COMPLETED");
+    const myApproved = myRequests.filter((r) => r.status === "APPROVED");
+    const myCompleted = myRequests.filter(
+      (r) => r.status === "COMPLETED" || r.status === "HANDED_OVER",
+    );
+    const myVisible = myRequests.filter(
+      (r) =>
+        r.status === "PENDING" ||
+        r.status === "APPROVED" ||
+        r.status === "HANDED_OVER" ||
+        r.status === "COMPLETED",
+    );
     const myAssigned = assets.filter(
       (a) => a.assigned_to_user_id === currentUser.id && a.status === "ISSUED",
     );
+    const myReusableCatalogLoans = myRequests
+      .filter((request) => request.status === "HANDED_OVER")
+      .flatMap((request) =>
+        (request.items ?? [])
+          .filter(
+            (item) => !item.asset_id && item.usage === "REUSABLE",
+          )
+          .map((item) => ({
+            id: `${request.id}-${item.id}`,
+            catalogItemId: item.catalog_item_id || "",
+            quantity: Number(item.requested_qty) || 0,
+          })),
+      )
+      .filter((loan) => loan.catalogItemId && loan.quantity > 0);
+    const assignedCount =
+      myAssigned.length +
+      myReusableCatalogLoans.reduce((total, loan) => total + loan.quantity, 0);
 
     return (
       <div className="flex-1 space-y-8 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
@@ -87,8 +115,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span className="text-[var(--color-idea-blue)]">Requests</span>
             </h1>
             <p className="text-xs text-[var(--color-idea-muted)] mt-1">
-              Request items and check whether they are pending, issued, or
-              completed.
+              Request items or a specific asset, then wait for approval and handover.
             </p>
           </div>
           {onOpenNewRequest && (
@@ -119,13 +146,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="idea-card p-6 relative overflow-hidden">
             <div className="absolute top-0 left-0 w-full h-1 bg-[var(--color-idea-blue)]" />
             <span className="text-[10px] font-bold text-[var(--color-idea-muted)] uppercase tracking-[0.2em]">
-              Partial / In Progress
+              Approved
             </span>
             <h2 className="text-5xl font-bold text-[var(--color-idea-text)] mt-3">
-              {myPartial.length}
+              {myApproved.length}
             </h2>
             <p className="text-xs text-[var(--color-idea-muted)] mt-3">
-              Some items still outstanding
+              Ready to collect at handover
             </p>
           </div>
           {/* Assigned */}
@@ -135,7 +162,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               Assigned To Me
             </span>
             <h2 className="text-5xl font-bold text-[var(--color-idea-text)] mt-3">
-              {myAssigned.length}
+              {assignedCount}
             </h2>
             <p className="text-xs text-[var(--color-idea-muted)] mt-3">
               Reusable items currently issued to you
@@ -161,7 +188,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 View all <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>
-            {myRequests.length === 0 ? (
+            {myVisible.length === 0 ? (
               <div className="p-8 text-center space-y-2">
                 <ClipboardList className="w-8 h-8 text-[var(--color-idea-blue)] mx-auto" />
                 <p className="text-sm font-semibold text-[var(--color-idea-text)]">
@@ -173,7 +200,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             ) : (
               <div className="divide-y divide-[var(--color-idea-border)]">
-                {myRequests.slice(0, 8).map((req) => (
+                {myVisible.slice(0, 8).map((req) => (
                   <div
                     key={req.id}
                     className="px-6 py-4 flex items-start justify-between gap-4"
@@ -195,6 +222,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       <p className="text-[11px] text-[var(--color-idea-muted)] mt-1">
                         {(req.items ?? [])
                           .map((item) => {
+                            if (item.asset_id) {
+                              const asset = assets.find((a) => a.id === item.asset_id);
+                              return asset?.asset_code || "Asset";
+                            }
                             const cat = catalogItems.find(
                               (c) => c.id === item.catalog_item_id,
                             );
@@ -211,7 +242,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
             )}
             <p className="px-6 py-3 text-[10px] font-mono text-[var(--color-idea-muted)] border-t border-[var(--color-idea-border)]">
-              {myCompleted.length} completed of {myRequests.length} total
+              {myCompleted.length} completed of {myVisible.length} visible
               requests
             </p>
           </div>
@@ -228,7 +259,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <Package className="w-4 h-4 text-[var(--color-idea-blue)]" />
             </div>
-            {myAssigned.length === 0 ? (
+            {assignedCount === 0 ? (
               <p className="text-xs text-[var(--color-idea-muted)] italic">
                 No reusable equipment is currently assigned to you.
               </p>
@@ -250,6 +281,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                       </p>
                       <p className="text-[10px] font-mono text-[var(--color-idea-blue)]">
                         {asset.asset_code}
+                      </p>
+                      <p className="text-[10px] font-mono text-[var(--color-idea-muted)] mt-1">
+                        Status: ISSUED
+                      </p>
+                    </div>
+                  );
+                })}
+                {myReusableCatalogLoans.map((loan) => {
+                  const cat = catalogItems.find(
+                    (item) =>
+                      item.id === loan.catalogItemId ||
+                      item.item_code === loan.catalogItemId,
+                  );
+                  return (
+                    <div
+                      key={loan.id}
+                      className="p-3 idea-gradient-soft border border-[var(--color-idea-blue)]/20 rounded-xl"
+                    >
+                      <p className="text-xs font-bold text-[var(--color-idea-text)]">
+                        {cat?.name || "Reusable item"}
+                      </p>
+                      <p className="text-[10px] font-mono text-[var(--color-idea-blue)]">
+                        Quantity: {loan.quantity} {cat?.unit || "items"}
                       </p>
                       <p className="text-[10px] font-mono text-[var(--color-idea-muted)] mt-1">
                         Status: ISSUED
@@ -477,7 +531,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           <button
                             onClick={() =>
                               onOpenQRGenerator(
-                                displayCode,
+                                asset?.id || catalogItem?.id || displayCode,
                                 catalogItem?.name || displayCode,
                                 "Inventory Tag",
                               )

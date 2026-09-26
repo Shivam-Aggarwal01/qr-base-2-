@@ -23,7 +23,7 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
       return assets.map((a) => {
         const cat = catalogItems.find((c) => c.id === a.catalog_item_id);
         return {
-          code: a.asset_code,
+          code: a.id,
           title: cat?.name || a.asset_code,
           subtitle: a.serial_number
             ? `SN: ${a.serial_number}`
@@ -32,13 +32,13 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
       });
     } else if (filterType === "CATALOG") {
       return catalogItems.map((c) => ({
-        code: c.item_code,
+        code: c.id,
         title: c.name,
-        subtitle: `Type: ${c.type}`,
+        subtitle: "Inventory Item",
       }));
     } else {
       return locations.map((l) => ({
-        code: l.code || l.name,
+        code: l.id,
         title: l.name,
         subtitle: "Storage Location",
       }));

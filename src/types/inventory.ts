@@ -1,12 +1,47 @@
 export type UserRole =
   "ADMIN" | "STUDENT_AMBASSADOR" | "STUDENT_LEAD" | "STUDENT";
 
-export type ItemType = "CONSUMABLE" | "REUSABLE" | "TOOL";
+export type RequestUsage = "CONSUMABLE" | "REUSABLE";
 
 export type AssetStatus =
-  "AVAILABLE" | "ISSUED" | "UNDER_REPAIR" | "DAMAGED" | "LOST" | "DISPOSED";
+  | "AVAILABLE"
+  | "ISSUED"
+  | "UNDER_REPAIR"
+  | "DAMAGED"
+  | "LOST"
+  | "RETIRED";
 
-export type RequestStatus = "PENDING" | "COMPLETED" | "PARTIAL" | "CANCELLED";
+export type RequestStatus =
+  | "PENDING"
+  | "APPROVED"
+  | "REJECTED"
+  | "HANDED_OVER"
+  | "COMPLETED"
+  | "PARTIAL"
+  | "CANCELLED";
+
+export type RequestLineKind = "CATALOG" | "ASSET";
+
+export interface RequestLineDraft {
+  kind: RequestLineKind;
+  catalog_item_id?: string;
+  asset_id?: string;
+  requested_qty: number;
+  usage?: RequestUsage;
+}
+
+export type AccountRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+
+export interface AccountRequest {
+  id: string;
+  email: string;
+  name: string;
+  status: AccountRequestStatus;
+  reviewed_by_user_id?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+}
 
 export type TransactionType =
   | "RECEIVE"
@@ -33,7 +68,6 @@ export interface CatalogItem {
   id: string;
   item_code: string;
   name: string;
-  type: ItemType;
   description: string;
   unit: string;
   tracking_mode?: AssetTrackingMode;
@@ -47,6 +81,7 @@ export interface Location {
   id: string;
   name: string;
   code?: string;
+  storage_path?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -62,10 +97,13 @@ export interface StockLevel {
 export interface Asset {
   id: string;
   asset_code: string;
+  qr_code?: string;
   catalog_item_id: string;
   serial_number?: string;
   status: AssetStatus;
   location_id?: string | null;
+  /** Human-readable path such as "Room 2 / Cupboard B / Row 3 / Bin 4". */
+  storage_location?: string | null;
   assigned_to_user_id?: string | null;
   tracking_mode?: AssetTrackingMode; // 'BOX' or 'INDIVIDUAL'
   is_box?: boolean;
@@ -90,9 +128,13 @@ export interface AssetAssignment {
 export interface RequestItem {
   id: string;
   request_id: string;
-  catalog_item_id: string;
+  kind?: RequestLineKind;
+  catalog_item_id?: string;
+  asset_id?: string;
   requested_qty: number;
+  usage?: RequestUsage;
   fulfilled_qty?: number;
+  handed_over?: boolean;
 }
 
 export interface Request {
@@ -102,6 +144,9 @@ export interface Request {
   purpose: string;
   status: RequestStatus;
   approved_by_user_id?: string | null;
+  handed_over_by_user_id?: string | null;
+  handed_over_at?: string | null;
+  deadline_at?: string | null;
   remarks?: string;
   created_at: string;
   updated_at: string;
