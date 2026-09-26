@@ -1,25 +1,8 @@
-import React, { useState } from "react";
-import {
-  Plus,
-  Search,
-  QrCode,
-  AlertTriangle,
-  Box,
-  Wrench,
-  Package,
-} from "lucide-react";
-import {
-  CatalogItem,
-  Location,
-  StockLevel,
-  Asset,
-  UserRole,
-} from "../types/inventory";
-import { InventoryStorage } from "../services/storage";
-import {
-  createCatalogItemInFirestore,
-  deleteFirestoreDocument,
-} from "../services/firebaseInventory";
+import React, { useState } from 'react';
+import { Plus, Search, QrCode, AlertTriangle } from 'lucide-react';
+import { CatalogItem, Location, StockLevel, Asset, UserRole } from '../types/inventory';
+import { createCatalogItemInFirestore, deleteFirestoreDocument } from '../services/firebaseInventory';
+import { InventoryStorage } from '../services/storage';
 
 interface CatalogViewProps {
   catalogItems: CatalogItem[];
@@ -40,41 +23,32 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   onOpenQRGenerator,
   onRefreshData,
 }) => {
-  const [searchFilter, setSearchFilter] = useState("");
+  const [searchFilter, setSearchFilter] = useState('');
   const [onlyLowStock, setOnlyLowStock] = useState(false);
 
   // New Item Modal
   const [showAddModal, setShowAddModal] = useState(false);
-  const [newItemCode, setNewItemCode] = useState("");
-  const [newItemName, setNewItemName] = useState("");
-  const [newItemDesc, setNewItemDesc] = useState("");
-  const [newItemUnit, setNewItemUnit] = useState("pcs");
+  const [newItemName, setNewItemName] = useState('');
+  const [newItemDesc, setNewItemDesc] = useState('');
+  const [newItemUnit, setNewItemUnit] = useState('pcs');
   const [newItemMinStock, setNewItemMinStock] = useState(10);
-  const [newItemStoragePlace, setNewItemStoragePlace] = useState("");
+  const [newLocationId, setNewLocationId] = useState('');
 
   // Restock Modal
   const [showRestockModal, setShowRestockModal] = useState(false);
-  const [selectedCatalogItem, setSelectedCatalogItem] =
-    useState<CatalogItem | null>(null);
-  const [targetLocId, setTargetLocId] = useState("");
+  const [selectedCatalogItem, setSelectedCatalogItem] = useState<CatalogItem | null>(null);
+  const [targetLocId, setTargetLocId] = useState('');
   const [restockQty, setRestockQty] = useState(10);
 
   const filteredItems = catalogItems.filter((item) => {
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
-      if (
-        !(item.name || "").toLowerCase().includes(q) &&
-        !(item.item_code || "").toLowerCase().includes(q)
-      )
+      if (!(item.name || '').toLowerCase().includes(q) && !(item.item_code || '').toLowerCase().includes(q))
         return false;
     }
     if (onlyLowStock) {
       const totalStock = stockLevels
-        .filter(
-          (s) =>
-            s.catalog_item_id === item.id ||
-            s.catalog_item_id === item.item_code,
-        )
+        .filter((s) => s.catalog_item_id === item.id || s.catalog_item_id === item.item_code)
         .reduce((sum, s) => sum + s.quantity, 0);
       const minStock = item.min_stock_alert ?? 10;
       if (totalStock > minStock) return false;
@@ -84,104 +58,44 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
   const handleCreateCatalogItem = async (e: React.FormEvent) => {
     e.preventDefault();
-    console.log("🔍 Form submitted. userRole:", userRole);
 
-    if (!newItemCode.trim() || !newItemName.trim()) {
-      alert("Code and Name are required");
+    if (!newItemName.trim()) {
+      alert('Item name is required');
       return;
     }
 
-    if (
-      !userRole ||
-      (userRole !== "ADMIN" && userRole !== "STUDENT_AMBASSADOR")
-    ) {
-      alert(
-        `Only admins and student ambassadors can add items. Your role: ${userRole || "NOT SET"}`,
-      );
+    if (!userRole || (userRole !== 'ADMIN' && userRole !== 'STUDENT_AMBASSADOR')) {
+      alert(`Only admins and student ambassadors can add items. Your role: ${userRole || 'NOT SET'}`);
       return;
     }
 
     try {
-      const payload = {
-        item_code: newItemCode.trim().toUpperCase(),
+      const selectedLoc = locations.find((l) => l.id === newLocationId) || locations[0];
+      await createCatalogItemInFirestore({
         name: newItemName.trim(),
         description: newItemDesc,
+        category: 'Uncategorized',
+        is_consumable: false,
         unit: newItemUnit,
         min_stock_alert: newItemMinStock,
-        storage_place: newItemStoragePlace.trim() || locations[0]?.name || null,
-      };
-
-      console.log("📤 Sending to Firebase:", payload);
-      await createCatalogItemInFirestore(payload);
-      console.log("✅ Firebase write succeeded");
-
-      try {
-        const { createFirestoreDocument } =
-          await import("../services/firebaseCollections");
-        await createFirestoreDocument("stock_levels", {
-          catalog_item_id: payload.item_code,
-          location_id: "default-location-1",
-          quantity: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        });
-        console.log("✅ Created stock level entry");
-      } catch (stockError) {
-        console.warn("⚠️ Stock level creation skipped:", stockError);
-      }
-
-      alert(`✓ Successfully created ${newItemCode} in Firebase catalog.`);
+        storage_place: selectedLoc ? selectedLoc.name : null,
+      });
 
       setShowAddModal(false);
-      setNewItemCode("");
-      setNewItemName("");
-      setNewItemDesc("");
-      setNewItemStoragePlace("");
+      setNewItemName('');
+      setNewItemDesc('');
+      setNewLocationId('');
       onRefreshData();
     } catch (error: any) {
-      console.error("❌ Firebase write failed:", error?.message || error);
-      try {
-        console.log("💾 Falling back to local storage...");
-        InventoryStorage.saveCatalogItem({
-          item_code: newItemCode.trim().toUpperCase(),
-          name: newItemName.trim(),
-          description: newItemDesc,
-          unit: newItemUnit,
-          min_stock_alert: newItemMinStock,
-          storage_place:
-            newItemStoragePlace.trim() || locations[0]?.name || null,
-        });
-
-        InventoryStorage.adjustStock(
-          newItemCode.trim().toUpperCase(),
-          "default-location-1",
-          0,
-          "RECEIVE",
-          "Initial stock entry",
-        );
-
-        setShowAddModal(false);
-        setNewItemCode("");
-        setNewItemName("");
-        setNewItemDesc("");
-        setNewItemStoragePlace("");
-        onRefreshData();
-        alert(
-          `✓ Saved locally (Firebase blocked: ${error?.message || "permission denied"})`,
-        );
-      } catch (localError: any) {
-        console.error("❌ Local save also failed:", localError?.message);
-        alert(
-          `✗ Failed to save. Error: ${localError?.message || "unknown error"}`,
-        );
-      }
+      console.error('Failed to create catalog item:', error?.message || error);
+      alert(`Failed to create item. ${error?.message || 'Check Firebase permissions.'}`);
     }
   };
 
   const handleRestockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCatalogItem || !targetLocId) {
-      alert("Please select a target location");
+      alert('Please select a target location');
       return;
     }
 
@@ -192,35 +106,31 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         selectedCatalogItem.id,
         targetLocId,
         restockQty,
-        "RECEIVE",
-        `Restocked ${restockQty} ${selectedCatalogItem.unit}`,
+        'RECEIVE',
+        `Restocked ${restockQty} ${selectedCatalogItem.unit}`
       );
 
-      const { createFirestoreDocument, updateDocument } =
-        await import("../services/firebaseCollections");
+      const { createFirestoreDocument, updateDocument } = await import('../services/firebaseCollections');
 
       try {
-        const { getCollection } =
-          await import("../services/firebaseCollections");
+        const { getCollection } = await import('../services/firebaseCollections');
         const allStocks = await getCollection<{
           id: string;
           catalog_item_id: string;
           location_id: string;
           quantity: number;
-        }>("stock_levels");
+        }>('stock_levels');
         const existingStock = allStocks.find(
-          (s: any) =>
-            s.catalog_item_id === selectedCatalogItem.id &&
-            s.location_id === targetLocId,
+          (s: any) => s.catalog_item_id === selectedCatalogItem.id && s.location_id === targetLocId
         );
 
         if (existingStock) {
-          await updateDocument("stock_levels", existingStock.id, {
+          await updateDocument('stock_levels', existingStock.id, {
             quantity: existingStock.quantity + restockQty,
             updated_at: new Date().toISOString(),
           });
         } else {
-          await createFirestoreDocument("stock_levels", {
+          await createFirestoreDocument('stock_levels', {
             catalog_item_id: selectedCatalogItem.id,
             location_id: targetLocId,
             quantity: restockQty,
@@ -229,7 +139,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
           });
         }
       } catch (fbError) {
-        console.warn("⚠️ Firestore update skipped:", fbError);
+        console.warn('⚠️ Firestore update skipped:', fbError);
       }
 
       alert(`✓ Added ${restockQty} ${selectedCatalogItem.unit} to stock`);
@@ -237,86 +147,70 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       setSelectedCatalogItem(null);
       onRefreshData();
     } catch (error: any) {
-      console.error("❌ Restock failed:", error);
-      alert(`Error: ${error?.message || "Failed to restock"}`);
+      console.error('❌ Restock failed:', error);
+      alert(`Error: ${error?.message || 'Failed to restock'}`);
     }
   };
 
   const handleDeleteStock = async (item: CatalogItem) => {
-    if (
-      !window.confirm(
-        `Delete all stock records for ${item.name}? The catalog item and assets will remain.`,
-      )
-    ) {
+    if (!window.confirm(`Delete all stock records for ${item.name}? The catalog item and assets will remain.`)) {
       return;
     }
 
     try {
-      const { getCollection } = await import("../services/firebaseCollections");
-      const allStocks = await getCollection<StockLevel>("stock_levels");
+      const { getCollection } = await import('../services/firebaseCollections');
+      const allStocks = await getCollection<StockLevel>('stock_levels');
       const matchingStocks = allStocks.filter(
-        (stock) =>
-          stock.catalog_item_id === item.id ||
-          stock.catalog_item_id === item.item_code,
+        (stock) => stock.catalog_item_id === item.id || stock.catalog_item_id === item.item_code
       );
 
       await Promise.all(
-        matchingStocks
-          .filter((stock) => stock.id)
-          .map((stock) => deleteFirestoreDocument("stock_levels", stock.id)),
+        matchingStocks.filter((stock) => stock.id).map((stock) => deleteFirestoreDocument('stock_levels', stock.id))
       );
       InventoryStorage.deleteStockForItem(item.id, item.item_code);
       alert(`Deleted stock records for ${item.name}.`);
       onRefreshData();
     } catch (error: any) {
-      console.error("Failed to delete stock:", error);
-      alert(error?.message || "Failed to delete stock records.");
+      console.error('Failed to delete stock:', error);
+      alert(error?.message || 'Failed to delete stock records.');
     }
   };
 
   const handleDeleteItem = async (item: CatalogItem) => {
     const linkedAssets = assets.filter(
-      (asset) =>
-        asset.catalog_item_id === item.id ||
-        asset.catalog_item_id === item.item_code,
+      (asset) => asset.catalog_item_id === item.id || asset.catalog_item_id === item.item_code
     );
 
     if (linkedAssets.length > 0) {
       alert(
-        `Cannot delete ${item.name} because ${linkedAssets.length} asset(s) still use this catalog item. Remove or reassign those assets first.`,
+        `Cannot delete ${item.name} because ${linkedAssets.length} asset(s) still use this catalog item. Remove or reassign those assets first.`
       );
       return;
     }
 
     if (
-      !window.confirm(
-        `Delete the catalog item ${item.name}? This also removes its stock records and cannot be undone.`,
-      )
+      !window.confirm(`Delete the catalog item ${item.name}? This also removes its stock records and cannot be undone.`)
     ) {
       return;
     }
 
     try {
-      const { getCollection } = await import("../services/firebaseCollections");
-      const allStocks = await getCollection<StockLevel>("stock_levels");
+      const { getCollection } = await import('../services/firebaseCollections');
+      const allStocks = await getCollection<StockLevel>('stock_levels');
       const matchingStocks = allStocks.filter(
-        (stock) =>
-          stock.catalog_item_id === item.id ||
-          stock.catalog_item_id === item.item_code,
+        (stock) => stock.catalog_item_id === item.id || stock.catalog_item_id === item.item_code
       );
 
       await Promise.all(
-        matchingStocks
-          .filter((stock) => stock.id)
-          .map((stock) => deleteFirestoreDocument("stock_levels", stock.id)),
+        matchingStocks.filter((stock) => stock.id).map((stock) => deleteFirestoreDocument('stock_levels', stock.id))
       );
-      await deleteFirestoreDocument("catalog_items", item.id);
+      await deleteFirestoreDocument('catalog_items', item.id);
       InventoryStorage.deleteStockForItem(item.id, item.item_code);
       alert(`Deleted catalog item ${item.name}.`);
       onRefreshData();
     } catch (error: any) {
-      console.error("Failed to delete catalog item:", error);
-      alert(error?.message || "Failed to delete catalog item.");
+      console.error('Failed to delete catalog item:', error);
+      alert(error?.message || 'Failed to delete catalog item.');
     }
   };
 
@@ -326,11 +220,10 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
         <div>
           <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
-            CATALOG INDEX
+            ITEMS INDEX
           </span>
           <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-            Master Component{" "}
-            <span className="text-[var(--color-idea-blue)]">Directory</span>
+            Master Items <span className="text-[var(--color-idea-blue)]">Directory</span>
           </h2>
         </div>
         <button
@@ -350,7 +243,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Search catalog directory..."
+              placeholder="Search items directory..."
               className="idea-input pl-9 pr-4 py-2 text-xs"
             />
             <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-2.5" />
@@ -372,47 +265,26 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map((item) => {
           const itemStocks = stockLevels.filter(
-            (s) =>
-              s.catalog_item_id === item.id ||
-              s.catalog_item_id === item.item_code,
+            (s) => s.catalog_item_id === item.id || s.catalog_item_id === item.item_code
           );
-          const totalStock = itemStocks.reduce(
-            (a, b) => a + (b.quantity || 0),
-            0,
-          );
+          const totalStock = itemStocks.reduce((a, b) => a + (b.quantity || 0), 0);
           const minStock = item.min_stock_alert ?? 10;
           const isLowStock = totalStock <= minStock;
 
-          const itemAssets = assets.filter(
-            (a) => a.catalog_item_id === item.id,
-          );
-          const availableAssetsCount = itemAssets.filter(
-            (a) => a.status === "AVAILABLE",
-          ).length;
+          const itemAssets = assets.filter((a) => a.catalog_item_id === item.id);
+          const availableAssetsCount = itemAssets.filter((a) => a.status === 'AVAILABLE').length;
 
           return (
-            <div
-              key={item.id}
-              className="idea-card p-6 flex flex-col justify-between relative overflow-hidden group"
-            >
+            <div key={item.id} className="idea-card p-6 flex flex-col justify-between relative overflow-hidden group">
               <div className="space-y-4">
                 <div className="flex items-start justify-between">
                   <div>
                     <h3 className="text-base font-bold text-[var(--color-idea-text)] mt-2 group-hover:text-[var(--color-idea-blue)] transition-colors">
                       {item.name}
                     </h3>
-                    <p className="text-xs font-mono font-bold text-[var(--color-idea-blue)] mt-0.5">
-                      {item.item_code}
-                    </p>
                   </div>
                   <button
-                    onClick={() =>
-                      onOpenQRGenerator(
-                        item.id,
-                        item.name,
-                        "Inventory Item",
-                      )
-                    }
+                    onClick={() => onOpenQRGenerator(item.id, item.name, 'Inventory Item')}
                     className="p-2 idea-button rounded-xl cursor-pointer"
                     title="Generate QR Label"
                   >
@@ -431,7 +303,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                       Items in stock
                     </span>
                     <span
-                      className={`text-base font-mono font-bold ${isLowStock ? "text-[var(--color-idea-red)]" : "text-[var(--color-idea-text)]"}`}
+                      className={`text-base font-mono font-bold ${isLowStock ? 'text-[var(--color-idea-red)]' : 'text-[var(--color-idea-text)]'}`}
                     >
                       {totalStock} {item.unit}
                     </span>
@@ -449,30 +321,33 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               </div>
 
               {/* Card Footer Actions */}
-              <div className="pt-4 mt-4 border-t border-[var(--color-idea-border)]">
-                <div className="flex gap-2">
+              <div className="pt-4 mt-4 border-t border-[var(--color-idea-border)] space-y-2">
+                <div className="grid grid-cols-[1fr_auto] gap-2">
                   <button
+                    type="button"
                     onClick={() => {
                       setSelectedCatalogItem(item);
-                      setTargetLocId(locations[0]?.id || "");
+                      setTargetLocId(locations[0]?.id || '');
                       setShowRestockModal(true);
                     }}
-                    className="flex-1 py-2.5 idea-button rounded-xl text-xs font-semibold cursor-pointer"
+                    className="idea-button min-w-0 py-2.5 px-3 rounded-xl text-xs font-semibold cursor-pointer truncate"
                   >
                     + Add Stock / Restock
                   </button>
+
                   <button
                     type="button"
                     onClick={() => void handleDeleteStock(item)}
-                    className="px-3 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold cursor-pointer"
+                    className="px-3 py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold cursor-pointer whitespace-nowrap"
                   >
                     Delete Stock
                   </button>
                 </div>
+
                 <button
                   type="button"
                   onClick={() => void handleDeleteItem(item)}
-                  className="w-full mt-2 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold cursor-pointer"
+                  className="w-full py-2.5 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 text-xs font-semibold cursor-pointer"
                 >
                   Delete Item
                 </button>
@@ -486,24 +361,13 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       {showAddModal && (
         <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
-            <h3 className="font-bold text-[var(--color-idea-text)] text-lg border-b border-[var(--color-idea-border)] pb-2">
-              Create New Catalog Entry
-            </h3>
+            <div className="border-b border-[var(--color-idea-border)] pb-2">
+              <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Add Item</h3>
+              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">
+                A unique item code will be generated automatically.
+              </p>
+            </div>
             <form onSubmit={handleCreateCatalogItem} className="space-y-3">
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Item Code (Unique)
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. CON-100K-X or ARD-DUE-01"
-                  value={newItemCode}
-                  onChange={(e) => setNewItemCode(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs font-mono uppercase"
-                />
-              </div>
-
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Item Name
@@ -511,6 +375,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <input
                   type="text"
                   required
+                  autoFocus
                   placeholder="e.g. 100k Ohm 1/4W Metal Film Resistors"
                   value={newItemName}
                   onChange={(e) => setNewItemName(e.target.value)}
@@ -518,19 +383,17 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-3">
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Unit
-                  </label>
-                  <input
-                    type="text"
-                    value={newItemUnit}
-                    onChange={(e) => setNewItemUnit(e.target.value)}
-                    placeholder="pcs, packs, meters"
-                    className="idea-input mt-1 p-2.5 text-xs"
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Unit
+                </label>
+                <input
+                  type="text"
+                  value={newItemUnit}
+                  onChange={(e) => setNewItemUnit(e.target.value)}
+                  placeholder="pcs, packs, meters"
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                />
               </div>
 
               <div>
@@ -563,13 +426,21 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Storage Place
                 </label>
-                <input
-                  type="text"
-                  value={newItemStoragePlace}
-                  onChange={(e) => setNewItemStoragePlace(e.target.value)}
-                  placeholder="e.g. Shelf A / Cabinet B / Room 204"
-                  className="idea-input mt-1 p-2.5 text-xs"
-                />
+                <select
+                  value={newLocationId}
+                  onChange={(e) => setNewLocationId(e.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                  required
+                >
+                  <option value="" disabled>
+                    Select Storage Location
+                  </option>
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="pt-2 flex gap-3">
@@ -584,7 +455,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   type="submit"
                   className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
                 >
-                  Create Record
+                  Add Item
                 </button>
               </div>
             </form>
@@ -600,10 +471,8 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               Receive Shipment / Add Stock
             </h3>
             <p className="text-xs text-[var(--color-idea-muted)]">
-              Adding stock to catalog item:{" "}
-              <span className="font-bold text-[var(--color-idea-text)]">
-                {selectedCatalogItem.name}
-              </span>
+              Adding stock to catalog item:{' '}
+              <span className="font-bold text-[var(--color-idea-text)]">{selectedCatalogItem.name}</span>
             </p>
 
             <form onSubmit={handleRestockSubmit} className="space-y-3">

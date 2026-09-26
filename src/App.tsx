@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "./firebase";
-import { InventoryStorage, parseQRCodeFromEntities } from "./services/storage";
+import { useEffect, useState } from 'react';
+import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { auth, functions } from './firebase';
+import { httpsCallable } from 'firebase/functions';
+import { InventoryStorage, parseQRCodeFromEntities } from './services/storage';
 import {
   COLLECTIONS,
   completeGoogleRedirect,
@@ -12,26 +13,25 @@ import {
   submitAccountRequest,
   STUDENT_SIGNUP_NAME_KEY,
   updateFirestoreDocument,
-} from "./services/firebaseInventory";
-import { readFirestoreState } from "./services/firebaseCollections";
-import { isAdminAccount, resolveRoleFromEmail } from "./services/roleConfig";
-import { isStudent } from "./services/authRoles";
-import { FirebaseAuthPanel } from "./components/FirebaseAuthPanel";
-import { Navbar } from "./components/Navbar";
-import { Sidebar } from "./components/Sidebar";
-import { DashboardView } from "./components/DashboardView";
-import { CatalogView } from "./components/CatalogView";
-import { AssetsView } from "./components/AssetsView";
-import { RequestsView } from "./components/RequestsView";
-import { LocationsView } from "./components/LocationsView";
-import { ActivityView } from "./components/ActivityView";
-import { UsersView } from "./components/UsersView";
-import { BatchQRLabelsModal } from "./components/BatchQRLabelsModal";
-import { QRScannerModal } from "./components/QRScannerModal";
-import { QRGeneratorModal } from "./components/QRGeneratorModal";
-import { QuickActionModal } from "./components/QuickActionModal";
-import { NewRequestModal } from "./components/NewRequestModal";
-import { StudentInventoryView } from "./components/StudentInventoryView";
+} from './services/firebaseInventory';
+import { readFirestoreState } from './services/firebaseCollections';
+import { isStudent } from './services/authRoles';
+import { FirebaseAuthPanel } from './components/FirebaseAuthPanel';
+import { Navbar } from './components/Navbar';
+import { Sidebar } from './components/Sidebar';
+import { DashboardView } from './components/DashboardView';
+import { CatalogView } from './components/CatalogView';
+import { AssetsView } from './components/AssetsView';
+import { RequestsView } from './components/RequestsView';
+import { LocationsView } from './components/LocationsView';
+import { ActivityView } from './components/ActivityView';
+import { UsersView } from './components/UsersView';
+import { BatchQRLabelsModal } from './components/BatchQRLabelsModal';
+import { QRScannerModal } from './components/QRScannerModal';
+import { QRGeneratorModal } from './components/QRGeneratorModal';
+import { QuickActionModal } from './components/QuickActionModal';
+import { NewRequestModal } from './components/NewRequestModal';
+import { StudentInventoryView } from './components/StudentInventoryView';
 import {
   User,
   CatalogItem,
@@ -45,79 +45,83 @@ import {
   AccountRequest,
   AccountRequestStatus,
   RequestLineDraft,
-} from "./types/inventory";
+} from './types/inventory';
+
+type QRResult = ReturnType<typeof parseQRCodeFromEntities>;
+type AccessNotice = {
+  status: AccountRequestStatus;
+  name?: string;
+  email?: string;
+};
+type QRGeneratorData = {
+  isOpen: boolean;
+  code: string;
+  title: string;
+  subtitle?: string;
+};
+type QuickActionData = {
+  isOpen: boolean;
+  qrResult: QRResult | null;
+};
 
 export default function App() {
-  // Data
+  // ---------------------------------------------------------------------------
+  // Application data
+  // ---------------------------------------------------------------------------
   const [users, setUsers] = useState<User[]>([]);
   const [accountRequests, setAccountRequests] = useState<AccountRequest[]>([]);
   const [locations, setLocations] = useState<Location[]>([]);
   const [catalogItems, setCatalogItems] = useState<CatalogItem[]>([]);
   const [stockLevels, setStockLevels] = useState<StockLevel[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [assignments, setAssignments] = useState<AssetAssignment[]>([]);
+  const [, setAssignments] = useState<AssetAssignment[]>([]);
   const [requests, setRequests] = useState<Request[]>([]);
   const [transactions, setTransactions] = useState<InventoryTransaction[]>([]);
+
+  // ---------------------------------------------------------------------------
   // Authentication
+  // ---------------------------------------------------------------------------
   const [activeUser, setActiveUser] = useState<User | null>(null);
-  const [firebaseUserProfile, setFirebaseUserProfile] = useState<User | null>(
-    null,
-  );
+  const [firebaseUserProfile, setFirebaseUserProfile] = useState<User | null>(null);
   const [authReady, setAuthReady] = useState(false);
-  const [accessNotice, setAccessNotice] = useState<{
-    status: AccountRequestStatus;
-    name?: string;
-    email?: string;
-  } | null>(null);
-  // Navigation
-  const [currentView, setCurrentView] = useState<ViewMode>("dashboard");
-  // Scanner
+  const [accessNotice, setAccessNotice] = useState<AccessNotice | null>(null);
+  const [authRole, setAuthRole] = useState<User['role'] | undefined>();
+
+  // ---------------------------------------------------------------------------
+  // Navigation and modals
+  // ---------------------------------------------------------------------------
+  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
-  // New request
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
-  const [newRequestPrefillItems, setNewRequestPrefillItems] = useState<
-    RequestLineDraft[]
-  >([]);
-  // QR generator
-  const [qrGenData, setQrGenData] = useState<{
-    isOpen: boolean;
-    code: string;
-    title: string;
-    subtitle?: string;
-  }>({
+  const [newRequestPrefillItems, setNewRequestPrefillItems] = useState<RequestLineDraft[]>([]);
+  const [qrGenData, setQrGenData] = useState<QRGeneratorData>({
     isOpen: false,
-    code: "",
-    title: "",
+    code: '',
+    title: '',
   });
-  // Quick actions
-  const [quickActionData, setQuickActionData] = useState<{
-    isOpen: boolean;
-    qrResult: any;
-  }>({
+  const [quickActionData, setQuickActionData] = useState<QuickActionData>({
     isOpen: false,
     qrResult: null,
   });
-  //  DERIVED STATE
+
+  // ---------------------------------------------------------------------------
+  // Derived state
+  // ---------------------------------------------------------------------------
   const currentUser = firebaseUserProfile ?? activeUser;
-  const effectiveRole = currentUser
-    ? resolveRoleFromEmail(currentUser.email) ?? currentUser.role
-    : undefined;
+  // The Firebase Auth custom claim is the source of truth for authorization.
+  const effectiveRole = authRole ?? currentUser?.role;
   const isStudentUser = isStudent(effectiveRole);
-  const pendingAccountCount = accountRequests.filter(
-    (request) => request.status === "PENDING",
-  ).length;
+  const pendingAccountCount = accountRequests.filter((request) => request.status === 'PENDING').length;
   const pendingRequestsCount = isStudentUser
     ? requests.filter(
         (request) =>
-          (request.status === "PENDING" || request.status === "APPROVED") &&
-          request.user_id === currentUser?.id,
+          (request.status === 'PENDING' || request.status === 'APPROVED') && request.user_id === currentUser?.id
       ).length
-    : requests.filter(
-        (request) =>
-          request.status === "PENDING" || request.status === "APPROVED",
-      ).length;
+    : requests.filter((request) => request.status === 'PENDING' || request.status === 'APPROVED').length;
 
-  //  DATA LOADING
+  // ---------------------------------------------------------------------------
+  // Firestore data
+  // ---------------------------------------------------------------------------
   const loadFirestoreData = async () => {
     const state = await readFirestoreState();
     setCatalogItems(state.catalogItems ?? []);
@@ -137,42 +141,46 @@ export default function App() {
     try {
       await loadFirestoreData();
     } catch (error) {
-      console.warn("Could not refresh Firestore data:", error);
+      console.warn('Could not refresh Firestore data:', error);
     }
   };
 
-  //  AUTHENTICATION
+  // ---------------------------------------------------------------------------
+  // Authentication
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
-    const applyFirebaseSession = async (
-      firebaseUser: typeof auth.currentUser,
-    ) => {
+
+    const applyFirebaseSession = async (firebaseUser: FirebaseUser | null) => {
       if (!firebaseUser) {
         setFirebaseUserProfile(null);
         setActiveUser(null);
+        setAuthRole(undefined);
         return;
       }
-      const role =
-        resolveRoleFromEmail(firebaseUser.email ?? "") ?? "STUDENT";
       try {
-        if (isAdminAccount(firebaseUser.email, role)) {
+        /*
+         * Custom claims are the authorization source of truth.
+         * Firestore user documents remain profile data only.
+         */
+        const tokenResult = await firebaseUser.getIdTokenResult();
+        const role = tokenResult.claims.role as User['role'] | undefined;
+        setAuthRole(role);
+        const existingProfile = await getUserProfile(firebaseUser.uid);
+        if (role === 'ADMIN') {
           window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
-          let profile =
-            (await getUserProfile(firebaseUser.uid)) ??
-            (await ensureUserProfile(firebaseUser, "ADMIN"));
-          profile = {
+          const profile = existingProfile ?? (await ensureUserProfile(firebaseUser, 'ADMIN'));
+          const adminProfile: User = {
             ...profile,
             email: firebaseUser.email ?? profile.email,
-            role: "ADMIN",
+            role: 'ADMIN',
           };
           setAccessNotice(null);
-          setFirebaseUserProfile(profile);
-          setActiveUser(profile);
+          setFirebaseUserProfile(adminProfile);
+          setActiveUser(adminProfile);
           await refreshAllData();
           return;
         }
-
-        const existingProfile = await getUserProfile(firebaseUser.uid);
         if (existingProfile) {
           window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
           setAccessNotice(null);
@@ -181,21 +189,15 @@ export default function App() {
           await refreshAllData();
           return;
         }
-
-        const requestedName = window.sessionStorage.getItem(
-          STUDENT_SIGNUP_NAME_KEY,
-        );
-        const accessRequest = await submitAccountRequest(
-          firebaseUser,
-          requestedName ?? undefined,
-        );
+        /*
+         * A newly authenticated student does not receive a profile
+         * until their account request is approved.
+         */
+        const requestedName = window.sessionStorage.getItem(STUDENT_SIGNUP_NAME_KEY);
+        const accessRequest = await submitAccountRequest(firebaseUser, requestedName ?? undefined);
         window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
-        if (accessRequest.status === "APPROVED") {
-          const profile = await ensureUserProfile(
-            firebaseUser,
-            "STUDENT",
-            requestedName ?? undefined,
-          );
+        if (accessRequest.status === 'APPROVED') {
+          const profile = await ensureUserProfile(firebaseUser, 'STUDENT', requestedName ?? undefined);
           setAccessNotice(null);
           setFirebaseUserProfile(profile);
           setActiveUser(profile);
@@ -211,72 +213,76 @@ export default function App() {
         setActiveUser(null);
         await signOut(auth);
       } catch (error) {
-        console.error("❌ Failed to initialise Firebase user:", error);
+        console.error('Failed to initialise Firebase user:', error);
         setFirebaseUserProfile(null);
         setActiveUser(null);
+        setAuthRole(undefined);
         try {
           await signOut(auth);
         } catch {
-          // already signed out
+          // The session may already be signed out.
         }
       }
     };
+
     const initialiseAuth = async () => {
       try {
         await completeGoogleRedirect();
       } catch (error) {
-        console.warn("Google redirect sign-in did not complete:", error);
+        console.warn('Google redirect sign-in did not complete:', error);
       }
       try {
         await auth.authStateReady();
       } catch (error) {
-        console.warn("Firebase auth persistence was not ready:", error);
+        console.warn('Firebase auth persistence was not ready:', error);
       }
       await applyFirebaseSession(auth.currentUser);
       setAuthReady(true);
-      unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      unsubscribe = onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
         void applyFirebaseSession(firebaseUser);
       });
     };
     void initialiseAuth();
+
     return () => {
       unsubscribe?.();
     };
   }, []);
 
-  //  NAVIGATION
+  // ---------------------------------------------------------------------------
+  // Navigation
+  // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (
-      isStudentUser &&
-      currentView !== "dashboard" &&
-      currentView !== "requests" &&
-      currentView !== "inventory"
-    ) {
-      setCurrentView("requests");
+    if (isStudentUser && currentView !== 'dashboard' && currentView !== 'requests' && currentView !== 'inventory') {
+      setCurrentView('requests');
     }
   }, [isStudentUser, currentView]);
 
-  //  USER ACTIONS
+  // ---------------------------------------------------------------------------
+  // User actions
+  // ---------------------------------------------------------------------------
   const handleUserChange = (user: User) => {
+    // Firebase-authenticated users cannot switch identity from the UI.
     if (auth.currentUser) {
       return;
     }
     const newActiveUser = InventoryStorage.setActiveUser(user.id);
     setActiveUser(newActiveUser);
   };
+
   const handleLogout = async () => {
     try {
       await signOut(auth);
       setFirebaseUserProfile(null);
       setActiveUser(null);
+      setAuthRole(undefined);
     } catch (error) {
-      console.error("❌ Logout failed:", error);
+      console.error('Logout failed:', error);
     }
   };
+
   const handleResetData = () => {
-    const confirmed = confirm(
-      "Reset all electronics lab data back to initial seed state?",
-    );
+    const confirmed = window.confirm('Reset all electronics lab data back to initial seed state?');
     if (!confirmed) {
       return;
     }
@@ -284,12 +290,10 @@ export default function App() {
     void refreshAllData();
   };
 
-  //  QR / REQUEST ACTIONS
-  const handleOpenQRGenerator = (
-    code: string,
-    title: string,
-    subtitle?: string,
-  ) => {
+  // ---------------------------------------------------------------------------
+  // QR and request actions
+  // ---------------------------------------------------------------------------
+  const handleOpenQRGenerator = (code: string, title: string, subtitle?: string) => {
     setQrGenData({
       isOpen: true,
       code,
@@ -297,10 +301,12 @@ export default function App() {
       subtitle,
     });
   };
+
   const openNewRequest = (items: RequestLineDraft[] = []) => {
     setNewRequestPrefillItems(items);
     setIsNewRequestOpen(true);
   };
+
   const handleScanResult = (code: string) => {
     const result = parseQRCodeFromEntities(code, {
       assets,
@@ -314,6 +320,7 @@ export default function App() {
       qrResult: result,
     });
   };
+
   const handleGlobalSearch = (query: string) => {
     const searchQuery = query.trim();
     if (!searchQuery) {
@@ -326,7 +333,7 @@ export default function App() {
       requests,
       users,
     });
-    if (result.type !== "unknown") {
+    if (result.type !== 'unknown') {
       setQuickActionData({
         isOpen: true,
         qrResult: result,
@@ -334,60 +341,61 @@ export default function App() {
       return;
     }
     if (!isStudentUser) {
-      setCurrentView("inventory");
+      setCurrentView('inventory');
     }
   };
 
-  //  USER MANAGEMENT
-  const handleUpdateUserRole = async (
-    userId: string,
-    newRole: User["role"],
-  ) => {
+  // ---------------------------------------------------------------------------
+  // User management
+  // ---------------------------------------------------------------------------
+  const handleUpdateUserRole = async (userId: string, newRole: User['role']) => {
     try {
-      await updateFirestoreDocument(COLLECTIONS.USERS, userId, {
-        role: newRole,
-      });
+      const updateUserRoleFn = httpsCallable(functions, 'updateUserRole');
+      await updateUserRoleFn({ userId, newRole });
       await refreshAllData();
     } catch (error) {
-      console.error("❌ Failed to update user role:", error);
-      alert("Failed to update user role.");
+      console.error('Failed to update user role:', error);
+      window.alert('Failed to update user role.');
     }
   };
+
   const handleDeleteUser = async (userId: string) => {
     try {
       if (currentUser?.id === userId) {
-        throw new Error("You cannot delete your own account.");
+        throw new Error('You cannot delete your own account.');
       }
-      const target = users.find((user) => user.id === userId);
-      if (target && isAdminAccount(target.email, target.role)) {
-        throw new Error("Admin accounts cannot be removed from the directory.");
+      const targetUser = users.find((user) => user.id === userId);
+      if (targetUser?.role === 'ADMIN') {
+        throw new Error('Admin accounts cannot be removed from the directory.');
       }
       await deleteFirestoreDocument(COLLECTIONS.USERS, userId);
-      setUsers((previous) => previous.filter((user) => user.id !== userId));
+      setUsers((previousUsers) => previousUsers.filter((user) => user.id !== userId));
       await refreshAllData();
-    } catch (error: any) {
-      console.error("❌ Failed to delete user:", error);
-      const denied =
-        error?.code === "permission-denied" ||
-        String(error?.message || "").includes("permission-denied");
-      alert(
-        denied
-          ? "Permission denied. Publish the latest Firestore rules and make sure your users/{uid} profile has role ADMIN."
-          : error?.message || "Failed to delete user.",
+    } catch (error) {
+      console.error('Failed to delete user:', error);
+      const errorCode = typeof error === 'object' && error !== null && 'code' in error ? String(error.code) : '';
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const permissionDenied = errorCode === 'permission-denied' || errorMessage.includes('permission-denied');
+      window.alert(
+        permissionDenied
+          ? 'Permission denied. Publish the latest Firestore rules and make sure your account has the required role.'
+          : errorMessage || 'Failed to delete user.'
       );
       throw error;
     }
   };
-  const handleReviewAccountRequest = async (
-    requestId: string,
-    status: "APPROVED" | "REJECTED",
-  ) => {
-    if (!currentUser) return;
+
+  const handleReviewAccountRequest = async (requestId: string, status: 'APPROVED' | 'REJECTED') => {
+    if (!currentUser) {
+      return;
+    }
     await reviewAccountRequest(requestId, status, currentUser);
     await refreshAllData();
   };
 
-  //  AUTH SCREEN
+  // ---------------------------------------------------------------------------
+  // Authentication screens
+  // ---------------------------------------------------------------------------
   if (!authReady) {
     return (
       <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
@@ -395,15 +403,15 @@ export default function App() {
       </div>
     );
   }
-
   if (!currentUser) {
     return <FirebaseAuthPanel accessNotice={accessNotice} />;
   }
 
-  //  APPLICATION
+  // ---------------------------------------------------------------------------
+  // Application
+  // ---------------------------------------------------------------------------
   return (
     <div className="flex flex-col h-screen w-screen bg-[#f8fafc] text-slate-900 font-sans overflow-hidden antialiased select-none">
-      {/* NAVBAR */}
       <Navbar
         activeUser={currentUser}
         users={users}
@@ -415,19 +423,16 @@ export default function App() {
         onResetData={handleResetData}
         onLogout={handleLogout}
       />
-      {/* MAIN LAYOUT */}
       <div className="flex flex-1 overflow-hidden">
         <Sidebar
           currentView={currentView}
           onSelectView={setCurrentView}
           pendingRequestsCount={pendingRequestsCount}
           pendingAccountCount={pendingAccountCount}
-          onOpenScanner={() => setIsScannerOpen(true)}
           userRole={effectiveRole ?? currentUser.role}
         />
         <main className="flex-1 flex flex-col overflow-hidden relative">
-          {/* Dashboard */}
-          {currentView === "dashboard" && (
+          {currentView === 'dashboard' && (
             <DashboardView
               assets={assets}
               catalogItems={catalogItems}
@@ -443,9 +448,8 @@ export default function App() {
               onOpenNewRequest={() => openNewRequest()}
             />
           )}
-          {/* Inventory */}
-          {currentView === "inventory" && (
-            isStudentUser ? (
+          {currentView === 'inventory' &&
+            (isStudentUser ? (
               <StudentInventoryView
                 catalogItems={catalogItems}
                 stockLevels={stockLevels}
@@ -466,20 +470,18 @@ export default function App() {
                 onOpenQRGenerator={handleOpenQRGenerator}
                 onRefreshData={refreshAllData}
               />
-            )
-          )}
-          {/* Assets */}
-          {currentView === "assets" && (
+            ))}
+          {currentView === 'assets' && (
             <AssetsView
               assets={assets}
               catalogItems={catalogItems}
               locations={locations}
               users={users}
               onRefreshData={refreshAllData}
+              onOpenQRGenerator={handleOpenQRGenerator}
             />
           )}
-          {/* Requests */}
-          {currentView === "requests" && (
+          {currentView === 'requests' && (
             <RequestsView
               requests={requests}
               catalogItems={catalogItems}
@@ -488,12 +490,10 @@ export default function App() {
               users={users}
               activeUser={currentUser}
               onOpenNewRequest={() => openNewRequest()}
-              onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
             />
           )}
-          {/* Locations */}
-          {currentView === "locations" && (
+          {currentView === 'locations' && (
             <LocationsView
               locations={locations}
               catalogItems={catalogItems}
@@ -503,8 +503,7 @@ export default function App() {
               onRefreshData={refreshAllData}
             />
           )}
-          {/* Activity */}
-          {currentView === "activity" && (
+          {currentView === 'activity' && (
             <ActivityView
               transactions={transactions}
               catalogItems={catalogItems}
@@ -514,22 +513,17 @@ export default function App() {
               onOpenQRGenerator={handleOpenQRGenerator}
             />
           )}
-          {/* QR Sheet */}
-          {currentView === "qr-sheet" && (
-            <BatchQRLabelsModal
-              assets={assets}
-              catalogItems={catalogItems}
-              locations={locations}
-            />
+          {currentView === 'qr-sheet' && (
+            <BatchQRLabelsModal assets={assets} catalogItems={catalogItems} locations={locations} />
           )}
-          {/* Users */}
-          {currentView === "users" && (
+          {currentView === 'users' && (
             <UsersView
               users={users}
               assets={assets}
               catalogItems={catalogItems}
               requests={requests}
               activeUser={currentUser}
+              userRole={currentUser?.role}
               onUpdateUserRole={handleUpdateUserRole}
               onDeleteUser={handleDeleteUser}
               accountRequests={accountRequests}
@@ -539,12 +533,8 @@ export default function App() {
           )}
         </main>
       </div>
-      {/* GLOBAL MODALS */}
-      <QRScannerModal
-        isOpen={isScannerOpen}
-        onClose={() => setIsScannerOpen(false)}
-        onScanResult={handleScanResult}
-      />
+      {/* Global modals */}
+      <QRScannerModal isOpen={isScannerOpen} onClose={() => setIsScannerOpen(false)} onScanResult={handleScanResult} />
       <QRGeneratorModal
         isOpen={qrGenData.isOpen}
         onClose={() =>
@@ -583,9 +573,7 @@ export default function App() {
         activeUser={currentUser}
         catalogItems={catalogItems}
         assets={assets}
-        initialItems={
-          newRequestPrefillItems.length > 0 ? newRequestPrefillItems : undefined
-        }
+        initialItems={newRequestPrefillItems.length > 0 ? newRequestPrefillItems : undefined}
         onRefreshData={refreshAllData}
       />
     </div>

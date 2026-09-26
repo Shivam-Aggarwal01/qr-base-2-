@@ -1,10 +1,7 @@
-import React, { useState } from "react";
-import {
-  loginWithGoogle,
-  STUDENT_SIGNUP_NAME_KEY,
-} from "../services/firebaseInventory";
-import { StudentLoginRequest } from "./StudentLoginRequest";
-import type { AccountRequestStatus } from "../types/inventory";
+import React, { useState } from 'react';
+import { loginWithGoogle, STUDENT_SIGNUP_NAME_KEY } from '../services/firebaseInventory';
+import { StudentLoginRequest } from './StudentLoginRequest';
+import type { AccountRequestStatus } from '../types/inventory';
 
 interface FirebaseAuthPanelProps {
   accessNotice?: {
@@ -14,22 +11,20 @@ interface FirebaseAuthPanelProps {
   } | null;
 }
 
-export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
-  accessNotice,
-}) => {
-  const [error, setError] = useState("");
+export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ accessNotice }) => {
+  const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [authMode, setAuthMode] = useState<"login" | "signup">("login");
-  const [fullName, setFullName] = useState("");
+  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [fullName, setFullName] = useState('');
 
   const handleGoogleLogin = async () => {
-    if (authMode === "signup" && !fullName.trim()) {
-      setError("Please enter your full name before continuing.");
+    if (authMode === 'signup' && !fullName.trim()) {
+      setError('Please enter your full name before continuing.');
       return;
     }
     setLoading(true);
-    setError("");
-    if (authMode === "signup") {
+    setError('');
+    if (authMode === 'signup') {
       window.sessionStorage.setItem(STUDENT_SIGNUP_NAME_KEY, fullName.trim());
     } else {
       window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
@@ -37,7 +32,7 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
     try {
       await loginWithGoogle();
     } catch (err: any) {
-      setError(err?.message || "Google sign-in failed. Please try again.");
+      setError(err?.message || 'Google sign-in failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -50,19 +45,13 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
           <div className="h-1 bg-gradient-to-r from-idea-blue via-idea-deep-blue to-idea-green" />
           <div className="p-7 sm:p-9">
             <div className="text-center">
-              <img
-                src="/logo.png"
-                alt="AICTE IDEA Lab"
-                className="h-24 sm:h-28 w-auto mx-auto object-contain"
-              />
+              <img src="/logo.png" alt="AICTE IDEA Lab" className="h-24 sm:h-28 w-auto mx-auto object-contain" />
               <div className="mt-6 sm:mt-8">
-                <h1 className="text-2xl sm:text-[27px] font-bold tracking-tight text-idea-text">
-                  Welcome
-                </h1>
+                <h1 className="text-2xl sm:text-[27px] font-bold tracking-tight text-idea-text">Welcome</h1>
                 <p className="mt-2 text-sm text-idea-muted">
-                  {authMode === "signup"
-                    ? "Create your student access request"
-                    : "Sign in to access the AICTE IDEA Lab"}
+                  {authMode === 'signup'
+                    ? 'Create your student access request'
+                    : 'Sign in to access the AICTE IDEA Lab'}
                 </p>
               </div>
             </div>
@@ -74,20 +63,13 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
             )}
 
             {accessNotice && (
-              <StudentLoginRequest
-                status={accessNotice.status}
-                name={accessNotice.name}
-                email={accessNotice.email}
-              />
+              <StudentLoginRequest status={accessNotice.status} name={accessNotice.name} email={accessNotice.email} />
             )}
 
             <div className="mt-8">
-              {authMode === "signup" && (
+              {authMode === 'signup' && (
                 <>
-                  <label
-                    htmlFor="student-full-name"
-                    className="block text-left text-xs font-bold text-idea-text mb-2"
-                  >
+                  <label htmlFor="student-full-name" className="block text-left text-xs font-bold text-idea-text mb-2">
                     Full name
                     <span className="ml-1 text-idea-red">*</span>
                   </label>
@@ -110,9 +92,9 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
                 className="w-full h-12 rounded-xl border border-idea-border bg-white text-idea-text text-sm sm:text-base font-semibold transition-all hover:bg-idea-background hover:border-[#b9c9d1] focus:outline-none focus:ring-4 focus:ring-idea-blue/10 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 cursor-pointer"
               >
                 {loading ? (
-                    <span className="text-sm text-idea-muted">
-                      {authMode === "signup" ? "Creating request…" : "Signing in…"}
-                    </span>
+                  <span className="text-sm text-idea-muted">
+                    {authMode === 'signup' ? 'Creating request…' : 'Signing in…'}
+                  </span>
                 ) : (
                   <>
                     <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24">
@@ -133,28 +115,24 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
                         d="M12 6.37c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.46 14.63 2.5 12 2.5a9.74 9.74 0 00-8.72 5.37l3.26 2.53C7.31 8.09 9.46 6.37 12 6.37z"
                       />
                     </svg>
-                    {authMode === "signup"
-                      ? "Sign up with Google"
-                      : "Log in with Google"}
+                    {authMode === 'signup' ? 'Sign up with Google' : 'Log in with Google'}
                   </>
                 )}
               </button>
               <p className="mt-3 text-center text-[11px] text-idea-muted">
-                {authMode === "signup"
-                  ? "Students need admin approval before their account is created."
-                  : "Use the Google account already approved for lab access."}
+                {authMode === 'signup'
+                  ? 'Students need admin approval before their account is created.'
+                  : 'Use the Google account already approved for lab access.'}
               </p>
               <button
                 type="button"
                 onClick={() => {
-                  setAuthMode(authMode === "signup" ? "login" : "signup");
-                  setError("");
+                  setAuthMode(authMode === 'signup' ? 'login' : 'signup');
+                  setError('');
                 }}
                 className="w-full mt-4 text-xs font-semibold text-idea-deep-blue hover:text-idea-blue cursor-pointer"
               >
-                {authMode === "signup"
-                  ? "Already have an account? Log in"
-                  : "New student? Sign up here"}
+                {authMode === 'signup' ? 'Already have an account? Log in' : 'New student? Sign up here'}
               </button>
             </div>
           </div>
@@ -166,9 +144,7 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
             <span className="w-1.5 h-1.5 rounded-full bg-idea-yellow" />
             <span className="w-1.5 h-1.5 rounded-full bg-idea-red" />
           </div>
-          <p className="mt-3 text-[11px] sm:text-xs text-[#8b9aa3] tracking-wide">
-            AICTE IDEA Lab
-          </p>
+          <p className="mt-3 text-[11px] sm:text-xs text-[#8b9aa3] tracking-wide">AICTE IDEA Lab</p>
         </div>
       </div>
     </div>

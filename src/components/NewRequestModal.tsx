@@ -1,14 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { X, Plus, Trash2, Send, Package } from "lucide-react";
-import {
-  Asset,
-  CatalogItem,
-  RequestLineDraft,
-  RequestUsage,
-  User,
-} from "../types/inventory";
-import { createRequestFirestore } from "../services/firebaseCollections";
-import confetti from "canvas-confetti";
+import React, { useEffect, useState } from 'react';
+import { X, Plus, Trash2, Send, Package } from 'lucide-react';
+import { Asset, CatalogItem, RequestLineDraft, RequestUsage, User } from '../types/inventory';
+import { createRequestFirestore } from '../services/firebaseCollections';
+import confetti from 'canvas-confetti';
 
 interface NewRequestModalProps {
   isOpen: boolean;
@@ -29,40 +23,31 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   onRefreshData,
   initialItems,
 }) => {
-  const [purpose, setPurpose] = useState("");
-  const [remarks, setRemarks] = useState("");
-  const [deadlineAt, setDeadlineAt] = useState("");
+  const [purpose, setPurpose] = useState('');
+  const [remarks, setRemarks] = useState('');
+  const [deadlineAt, setDeadlineAt] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const availableAssets = assets.filter((asset) => asset.status === "AVAILABLE");
+  const availableAssets = assets.filter((asset) => asset.status === 'AVAILABLE');
 
   const getInitialItems = (): RequestLineDraft[] => {
     if (initialItems && initialItems.length > 0) {
       return initialItems.map((item) =>
-        item.kind === "CATALOG"
-          ? { ...item, usage: item.usage || "CONSUMABLE" }
-          : item,
+        item.kind === 'CATALOG' ? { ...item, usage: item.usage || 'CONSUMABLE' } : item
       );
     }
-    return [
-      {
-        kind: "CATALOG",
-        catalog_item_id: catalogItems[0]?.id || "",
-        requested_qty: 1,
-        usage: "CONSUMABLE",
-      },
-    ];
+    return [{ kind: 'CATALOG', catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1, usage: 'CONSUMABLE' }];
   };
 
-  const [requestItems, setRequestItems] =
-    useState<RequestLineDraft[]>(getInitialItems());
+  const [requestItems, setRequestItems] = useState<RequestLineDraft[]>(getInitialItems());
 
   useEffect(() => {
     if (!isOpen) return;
-    setPurpose("");
-    setRemarks("");
-    setDeadlineAt("");
+    setPurpose('');
+    setRemarks('');
+    setDeadlineAt('');
+    setIsSubmitting(false);
     setRequestItems(getInitialItems());
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, initialItems, catalogItems, assets]);
 
   if (!isOpen) return null;
@@ -70,12 +55,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const handleAddItem = () => {
     setRequestItems([
       ...requestItems,
-      {
-        kind: "CATALOG",
-        catalog_item_id: catalogItems[0]?.id || "",
-        requested_qty: 1,
-        usage: "CONSUMABLE",
-      },
+      { kind: 'CATALOG', catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1, usage: 'CONSUMABLE' },
     ]);
   };
 
@@ -84,22 +64,21 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
     setRequestItems(requestItems.filter((_, idx) => idx !== index));
   };
 
-  const handleKindChange = (index: number, kind: RequestLineDraft["kind"]) => {
+  const handleKindChange = (index: number, kind: RequestLineDraft['kind']) => {
     const updated = [...requestItems];
-    if (kind === "ASSET") {
+    if (kind === 'ASSET') {
       updated[index] = {
-        kind: "ASSET",
-        asset_id: availableAssets[0]?.id || "",
-        catalog_item_id:
-          availableAssets[0]?.catalog_item_id || catalogItems[0]?.id,
+        kind: 'ASSET',
+        asset_id: availableAssets[0]?.id || '',
+        catalog_item_id: availableAssets[0]?.catalog_item_id || catalogItems[0]?.id,
         requested_qty: 1,
       };
     } else {
       updated[index] = {
-        kind: "CATALOG",
-        catalog_item_id: catalogItems[0]?.id || "",
+        kind: 'CATALOG',
+        catalog_item_id: catalogItems[0]?.id || '',
         requested_qty: 1,
-        usage: "CONSUMABLE",
+        usage: 'CONSUMABLE',
       };
     }
     setRequestItems(updated);
@@ -107,16 +86,16 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
   const handleItemChange = (
     index: number,
-    field: "catalog_item_id" | "asset_id" | "requested_qty" | "usage",
-    value: string | number,
+    field: 'catalog_item_id' | 'asset_id' | 'requested_qty' | 'usage',
+    value: string | number
   ) => {
     const updated = [...requestItems];
     const current = { ...updated[index] };
-    if (field === "requested_qty") {
+    if (field === 'requested_qty') {
       current.requested_qty = Number(value) || 1;
-    } else if (field === "usage") {
+    } else if (field === 'usage') {
       current.usage = value as RequestUsage;
-    } else if (field === "asset_id") {
+    } else if (field === 'asset_id') {
       const asset = assets.find((item) => item.id === value);
       current.asset_id = String(value);
       current.catalog_item_id = asset?.catalog_item_id;
@@ -130,112 +109,100 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!purpose.trim()) return alert("Please enter project purpose");
-    if (!deadlineAt) return alert("Please choose when you will return the items.");
-    if (new Date(deadlineAt).getTime() <= Date.now()) {
-      return alert("Return deadline must be in the future.");
-    }
+    if (!purpose.trim()) return alert('Please enter project purpose');
+    if (!deadlineAt) return alert('Please choose when you will return the items.');
+    if (new Date(deadlineAt).getTime() <= Date.now()) return alert('Return deadline must be in the future.');
 
     const invalidCatalog = requestItems.some(
-      (item) =>
-        item.kind !== "ASSET" &&
-        (!item.catalog_item_id || item.requested_qty <= 0),
+      (item) => item.kind !== 'ASSET' && (!item.catalog_item_id || item.requested_qty <= 0)
     );
-    const invalidAsset = requestItems.some(
-      (item) => item.kind === "ASSET" && !item.asset_id,
-    );
-    if (invalidCatalog || invalidAsset) {
-      return alert("Please select valid items or available assets.");
-    }
+    const invalidAsset = requestItems.some((item) => item.kind === 'ASSET' && !item.asset_id);
+    if (invalidCatalog || invalidAsset) return alert('Please select valid items or available assets.');
 
-    const requestNumber = `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`;
+    const requestNumber = `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
 
+    setIsSubmitting(true);
     try {
       await createRequestFirestore({
         request_number: requestNumber,
         user_id: activeUser.id,
         purpose,
-        status: "PENDING",
+        status: 'PENDING',
         deadline_at: new Date(deadlineAt).toISOString(),
-        remarks: remarks || "",
+        remarks: remarks || '',
         items: requestItems.map((item, idx) => {
           const line: Record<string, unknown> = {
             id: `reqi-${Date.now()}-${idx}`,
             request_id: requestNumber,
             kind: item.kind,
-            requested_qty: item.kind === "ASSET" ? 1 : item.requested_qty,
-            ...(item.kind === "CATALOG" && item.usage
-              ? { usage: item.usage }
-              : {}),
+            requested_qty: item.kind === 'ASSET' ? 1 : item.requested_qty,
+            ...(item.kind === 'CATALOG' && item.usage ? { usage: item.usage } : {}),
           };
           if (item.catalog_item_id) line.catalog_item_id = item.catalog_item_id;
-          if (item.kind === "ASSET" && item.asset_id) line.asset_id = item.asset_id;
+          if (item.kind === 'ASSET' && item.asset_id) line.asset_id = item.asset_id;
           return line;
         }),
       });
 
-      confetti({ particleCount: 30, spread: 50 });
+      confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
       onRefreshData();
       onClose();
     } catch (error: any) {
-      console.error("Request creation failed:", error);
-      alert(
-        error?.message ||
-          "Request could not be created. Please check your Firebase permissions and login session.",
-      );
+      alert(error?.message || 'Request could not be created. Please check your Firebase permissions.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const assetLabel = (asset: Asset) => {
     const catalog = catalogItems.find(
-      (item) =>
-        item.id === asset.catalog_item_id ||
-        item.item_code === asset.catalog_item_id,
+      (item) => item.id === asset.catalog_item_id || item.item_code === asset.catalog_item_id
     );
-    return `${asset.asset_code}${catalog ? ` · ${catalog.name}` : ""}`;
+    return `${asset.asset_code}${catalog ? ` · ${catalog.name}` : ''}`;
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-lg overflow-hidden flex flex-col">
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-          <div className="flex items-center gap-2">
-            <div className="p-2 bg-blue-600 text-white rounded-xl">
-              <Package className="w-4 h-4" />
+    <div className="fixed inset-0 bg-[var(--color-idea-text)]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl border border-[var(--color-idea-border)] w-full max-w-lg overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between bg-[var(--color-idea-light-grey)]/50">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-[var(--color-idea-blue)] text-white rounded-xl flex items-center justify-center shadow-md">
+              <Package className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="font-bold text-slate-900 text-lg">New Request</h3>
-              <p className="text-[10px] text-slate-400">
-                Request catalog items or a specific tracked asset
+              <h3 className="font-bold text-[var(--color-idea-text)] text-lg leading-tight">New Request</h3>
+              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">
+                Requisition inventory items or specific tracked assets
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+            className="p-2 rounded-full hover:bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          {/* Requested By */}
           <div>
-            <label className="text-xs font-bold text-slate-700">
-              Student / Requestor
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
+              Requested By
             </label>
-            <div className="mt-1 p-2.5 bg-slate-100 rounded-xl text-xs font-semibold text-slate-800 flex justify-between items-center">
-              <span>
-                {activeUser.name} ({activeUser.user_code})
-              </span>
-              <span className="text-[9px] bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-md uppercase">
+            <div className="p-3 bg-[var(--color-idea-light-grey)]/60 border border-[var(--color-idea-border)] rounded-xl text-xs font-semibold text-[var(--color-idea-text)] flex justify-between items-center">
+              <span>{activeUser.name}</span>
+              <span className="text-[9px] bg-[var(--color-idea-blue)]/10 text-[var(--color-idea-blue)] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider">
                 {activeUser.role}
               </span>
             </div>
           </div>
 
+          {/* Purpose */}
           <div>
-            <label className="text-xs font-bold text-slate-700">
-              Project / Lab Purpose
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
+              Purpose <span className="text-[var(--color-idea-red)]">*</span>
             </label>
             <input
               type="text"
@@ -243,13 +210,14 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
               value={purpose}
               onChange={(e) => setPurpose(e.target.value)}
               placeholder="e.g. Capstone IoT Wireless Sensor Mesh"
-              className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+              className="idea-input w-full px-3 py-2.5 text-xs"
             />
           </div>
 
+          {/* Deadline */}
           <div>
-            <label className="text-xs font-bold text-slate-700">
-              Return deadline
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
+              Return Deadline <span className="text-[var(--color-idea-red)]">*</span>
             </label>
             <input
               type="datetime-local"
@@ -257,53 +225,51 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
               min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
               value={deadlineAt}
               onChange={(e) => setDeadlineAt(e.target.value)}
-              className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+              className="idea-input w-full px-3 py-2.5 text-xs"
             />
-            <p className="text-[10px] text-slate-400 mt-1">
-              Choose the day and time you will return reusable items or assets.
+            <p className="text-[9px] text-[var(--color-idea-muted)] mt-1.5 ml-1">
+              When will reusable items and assets be returned to the lab?
             </p>
           </div>
 
+          {/* Items */}
           <div>
             <div className="flex items-center justify-between mb-2">
-              <label className="text-xs font-bold text-slate-700">
-                Requested items and assets
+              <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
+                Requested Items &amp; Assets
               </label>
               <button
                 type="button"
                 onClick={handleAddItem}
-                className="text-xs text-blue-600 font-bold hover:text-blue-800 flex items-center gap-1 cursor-pointer"
+                className="text-[10px] text-[var(--color-idea-blue)] font-bold hover:text-[var(--color-idea-deep-blue)] flex items-center gap-1 cursor-pointer bg-[var(--color-idea-blue)]/10 px-2 py-1 rounded-lg"
               >
-                <Plus className="w-3.5 h-3.5" /> Add line
+                <Plus className="w-3 h-3" /> Add Line
               </button>
             </div>
 
-            <div className="space-y-2 max-h-56 overflow-y-auto">
+            <div className="space-y-2.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
               {requestItems.map((item, idx) => (
-                <div key={idx} className="space-y-2 rounded-xl border border-slate-200 p-2">
+                <div
+                  key={idx}
+                  className="p-3 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/30 space-y-2.5 hover:border-[var(--color-idea-blue)]/30 transition-colors"
+                >
                   <div className="flex gap-2">
                     <select
                       value={item.kind}
-                      onChange={(event) =>
-                        handleKindChange(
-                          idx,
-                          event.target.value as RequestLineDraft["kind"],
-                        )
-                      }
-                      className="w-28 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                      onChange={(event) => handleKindChange(idx, event.target.value as RequestLineDraft['kind'])}
+                      className="idea-input w-28 px-2 py-2 text-[11px] font-bold"
                     >
                       <option value="CATALOG">Item</option>
                       <option value="ASSET">Asset</option>
                     </select>
-                    {item.kind === "ASSET" ? (
+
+                    {item.kind === 'ASSET' ? (
                       <select
-                        value={item.asset_id || ""}
-                        onChange={(event) =>
-                          handleItemChange(idx, "asset_id", event.target.value)
-                        }
-                        className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                        value={item.asset_id || ''}
+                        onChange={(event) => handleItemChange(idx, 'asset_id', event.target.value)}
+                        className="flex-1 px-2 py-2 text-[11px]"
                       >
-                        <option value="">Select asset</option>
+                        <option value="">Select available asset</option>
                         {availableAssets.map((asset) => (
                           <option key={asset.id} value={asset.id}>
                             {assetLabel(asset)}
@@ -312,61 +278,54 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                       </select>
                     ) : (
                       <select
-                        value={item.catalog_item_id || ""}
-                        onChange={(event) =>
-                          handleItemChange(
-                            idx,
-                            "catalog_item_id",
-                            event.target.value,
-                          )
-                        }
-                        className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium outline-none focus:ring-2 focus:ring-blue-500"
+                        value={item.catalog_item_id || ''}
+                        onChange={(event) => handleItemChange(idx, 'catalog_item_id', event.target.value)}
+                        className="idea-input flex-1 px-2 py-2 text-[11px]"
                       >
                         {catalogItems.map((cat) => (
                           <option key={cat.id} value={cat.id}>
-                            {cat.name} ({cat.item_code})
+                            {cat.name}
                           </option>
                         ))}
                       </select>
                     )}
+
                     {requestItems.length > 1 && (
                       <button
                         type="button"
                         onClick={() => handleRemoveItem(idx)}
-                        className="p-2 text-slate-400 hover:text-red-600 transition-colors cursor-pointer"
+                        className="p-2 text-[var(--color-idea-muted)] hover:bg-[var(--color-idea-red)]/10 hover:text-[var(--color-idea-red)] rounded-lg transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     )}
                   </div>
-                  {item.kind === "ASSET" ? (
-                    <p className="text-[10px] text-slate-400 px-1">
-                      Individually tracked. Quantity is always 1.
+
+                  {item.kind === 'ASSET' ? (
+                    <p className="text-[9px] text-[var(--color-idea-muted)] px-1">
+                      Individually tracked asset. Quantity is fixed at 1.
                     </p>
                   ) : (
                     <div className="flex gap-2">
-                      <input
-                        type="number"
-                        min="1"
-                        value={item.requested_qty}
-                        onChange={(event) =>
-                          handleItemChange(
-                            idx,
-                            "requested_qty",
-                            Number(event.target.value),
-                          )
-                        }
-                        className="w-24 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none text-center"
-                      />
+                      <div className="relative w-28">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[var(--color-idea-muted)]">
+                          Qty
+                        </span>
+                        <input
+                          type="number"
+                          min="1"
+                          value={item.requested_qty}
+                          onChange={(event) => handleItemChange(idx, 'requested_qty', Number(event.target.value))}
+                          className="idea-input w-full pl-9 pr-2 py-2 text-[11px] font-bold text-center"
+                        />
+                      </div>
                       <select
-                        value={item.usage || "CONSUMABLE"}
-                        onChange={(event) =>
-                          handleItemChange(idx, "usage", event.target.value)
-                        }
-                        className="flex-1 p-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none"
+                        value={item.usage || 'CONSUMABLE'}
+                        onChange={(event) => handleItemChange(idx, 'usage', event.target.value)}
+                        className="idea-input flex-1 px-3 py-2 text-[11px] font-bold"
                       >
-                        <option value="CONSUMABLE">Consumable</option>
-                        <option value="REUSABLE">Reusable</option>
+                        <option value="CONSUMABLE">Consumable (Consumed in project)</option>
+                        <option value="REUSABLE">Reusable (Will be returned)</option>
                       </select>
                     </div>
                   )}
@@ -375,32 +334,42 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             </div>
           </div>
 
+          {/* Remarks */}
           <div>
-            <label className="text-xs font-bold text-slate-700">
-              Remarks / Deadline (Optional)
+            <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
+              Remarks <span className="font-normal normal-case">(Optional)</span>
             </label>
             <input
               type="text"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               placeholder="e.g. Needed for Friday lab demonstration"
-              className="w-full mt-1 p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:ring-2 focus:ring-blue-500"
+              className="idea-input w-full px-3 py-2.5 text-xs"
             />
           </div>
 
-          <div className="pt-2 flex gap-3">
+          {/* Footer Actions */}
+          <div className="pt-3 border-t border-[var(--color-idea-border)] flex gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 py-3 bg-slate-100 text-slate-700 text-xs font-bold rounded-2xl hover:bg-slate-200 transition-all cursor-pointer"
+              disabled={isSubmitting}
+              className="flex-1 py-3 bg-[var(--color-idea-light-grey)] border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-bold rounded-xl hover:brightness-95 transition-all cursor-pointer disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-2xl transition-all shadow-md flex items-center justify-center gap-2 cursor-pointer"
+              disabled={isSubmitting}
+              className="flex-1 py-3 idea-button text-xs font-bold rounded-xl shadow-md flex items-center justify-center gap-2 cursor-pointer disabled:opacity-70"
             >
-              <Send className="w-4 h-4" /> Submit Request
+              {isSubmitting ? (
+                <span>Submitting…</span>
+              ) : (
+                <>
+                  <Send className="w-4 h-4" /> Submit Request
+                </>
+              )}
             </button>
           </div>
         </form>

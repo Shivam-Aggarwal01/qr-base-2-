@@ -1,46 +1,15 @@
-import React, { useState } from "react";
-import {
-  X,
-  Check,
-  AlertTriangle,
-  QrCode,
-  UserCheck,
-  Package,
-  Layers,
-  ArrowUpRight,
-  ShieldCheck,
-  CornerDownLeft,
-} from "lucide-react";
-import {
-  Asset,
-  CatalogItem,
-  Location,
-  Request,
-  User,
-  AssetStatus,
-  StockLevel,
-  InventoryTransaction,
-  RequestLineDraft,
-} from "../types/inventory";
-import { InventoryStorage } from "../services/storage";
-import {
-  canApproveRequests,
-  canIssueInventory,
-  canReturnOrRepairItems,
-  isStudent,
-} from "../services/authRoles";
-import {
-  completeLabRequest,
-  handoverLabRequest,
-  reviewLabRequest,
-} from "../services/requestWorkflow";
-import confetti from "canvas-confetti";
+import React, { useState } from 'react';
+import { X, AlertTriangle, QrCode } from 'lucide-react';
+import { Asset, CatalogItem, Location, User, AssetStatus, StockLevel, RequestLineDraft } from '../types/inventory';
+import { InventoryStorage } from '../services/storage';
+import { canApproveRequests, canIssueInventory, canReturnOrRepairItems, isStudent } from '../services/authRoles';
+import confetti from 'canvas-confetti';
 
 interface QuickActionModalProps {
   isOpen: boolean;
   onClose: () => void;
   qrData: {
-    type: "asset" | "catalog" | "location" | "request" | "user" | "unknown";
+    type: 'asset' | 'catalog' | 'location' | 'user' | 'unknown';
     entity: any;
     rawCode: string;
   } | null;
@@ -49,7 +18,6 @@ interface QuickActionModalProps {
   catalogItems: CatalogItem[];
   assets: Asset[];
   stockLevels: StockLevel[];
-  requests: Request[];
   activeUser: User;
   onOpenNewRequest: (items: RequestLineDraft[]) => void;
   onRefreshData: () => void;
@@ -65,299 +33,252 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   catalogItems,
   assets,
   stockLevels,
-  requests,
   activeUser,
   onOpenNewRequest,
   onRefreshData,
   onOpenQRGenerator,
 }) => {
   const [subAction, setSubAction] = useState<string | null>(null);
-  const [selectedUser, setSelectedUser] = useState<string>("");
-  const [selectedLoc, setSelectedLoc] = useState<string>("");
-  const [qtyInput, setQtyInput] = useState<number>(1);
-  const [remarksInput, setRemarksInput] = useState<string>("");
-  const [statusInput, setStatusInput] = useState<AssetStatus>("DAMAGED");
+  const [selectedUser, setSelectedUser] = useState('');
+  const [selectedLoc, setSelectedLoc] = useState('');
+  const [qtyInput, setQtyInput] = useState(1);
+  const [remarksInput, setRemarksInput] = useState('');
+  const [statusInput, setStatusInput] = useState<AssetStatus>('DAMAGED');
 
   const role = activeUser?.role;
-  const quickStatusOptions: AssetStatus[] = [
-    "AVAILABLE",
-    "UNDER_REPAIR",
-    "DAMAGED",
-    "LOST",
-    "RETIRED",
-  ];
-  const canApprove = canApproveRequests(role);
+  const quickStatusOptions: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST', 'RETIRED'];
+
   const canIssue = canIssueInventory(role);
   const canReturnOrRepair = canReturnOrRepairItems(role);
   const studentMode = isStudent(role);
 
-  const myPendingRequestForAsset = (assetId: string): Request | null => {
-      if (!activeUser || !isStudent(activeUser.role)) return null;
-      return (
-        requests.find(
-          (r) =>
-            r.user_id === activeUser.id &&
-            (r.status === "PENDING" || r.status === "APPROVED") &&
-            r.items?.some((it) => it.asset_id === assetId),
-        ) ?? null
-      );
-    };
+  // canApproveRequests is still imported/used implicitly via role checks elsewhere if needed;
+  // kept here only if referenced. Remove if truly unused.
+  void canApproveRequests;
 
-  const myPendingRequestForCatalogItem = (
-    catalogItemId: string,
-  ): Request | null => {
-    if (!activeUser || !isStudent(activeUser.role)) return null;
-    return (
-      requests.find(
-        (r) =>
-          r.user_id === activeUser.id &&
-          (r.status === "PENDING" || r.status === "APPROVED") &&
-          r.items?.some((it) => it.catalog_item_id === catalogItemId),
-      ) ?? null
-    );
-  };
+  const findCatalogItem = (catalogItemId?: string) =>
+    catalogItems.find((item) => item.id === catalogItemId || item.item_code === catalogItemId);
 
-  const openRequestForCatalogItem = (
-    catalogItemId: string,
-    requested_qty: number,
-  ) => {
+  const openRequestForCatalogItem = (catalogItemId: string, requestedQty: number) => {
     onOpenNewRequest([
-      { kind: "CATALOG", catalog_item_id: catalogItemId, requested_qty },
+      {
+        kind: 'CATALOG',
+        catalog_item_id: catalogItemId,
+        requested_qty: requestedQty,
+      },
     ]);
+
     onClose();
   };
 
   const openRequestForAsset = (asset: Asset) => {
     onOpenNewRequest([
       {
-        kind: "ASSET",
+        kind: 'ASSET',
         asset_id: asset.id,
         catalog_item_id: asset.catalog_item_id,
         requested_qty: 1,
       },
     ]);
+
     onClose();
   };
 
-  if (!isOpen || !qrData) return null;
+  if (!isOpen || !qrData) {
+    return null;
+  }
 
   const triggerSuccess = () => {
-    confetti({ particleCount: 35, spread: 50, origin: { y: 0.7 } });
+    confetti({
+      particleCount: 35,
+      spread: 50,
+      origin: { y: 0.7 },
+    });
+
     onRefreshData();
     setSubAction(null);
+    setRemarksInput('');
     onClose();
   };
 
-  // 1. ASSET QUICK ACTIONS (Supports Box-based Reusables + Individual Standalone Tools)
   const renderAssetActions = (asset: Asset) => {
-    const catalogItem = catalogItems.find(
-      (c) =>
-        c.id === asset.catalog_item_id || c.item_code === asset.catalog_item_id,
-    );
-    const assignedUser = users.find((u) => u.id === asset.assigned_to_user_id);
-    const location = locations.find((l) => l.id === asset.location_id);
+    const catalogItem = findCatalogItem(asset.catalog_item_id);
 
-    // Student QR action: they can request the catalog item, but they cannot issue/return or change status.
+    const assignedUser = users.find((user) => user.id === asset.assigned_to_user_id);
+
+    const location = locations.find((item) => item.id === asset.location_id);
+
     if (studentMode) {
-      const existingRequest = myPendingRequestForAsset(asset.id);
-      const requestBlockedByAssetStatus =
-        asset.status === "LOST" ||
-        asset.status === "RETIRED" ||
-        asset.status === "ISSUED" ||
-        asset.status === "DAMAGED" ||
-        asset.status === "UNDER_REPAIR";
+      const requestBlockedByAssetStatus = asset.status !== 'AVAILABLE';
 
       return (
         <div className="space-y-6">
-          <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
-            <div className="flex justify-between items-start gap-3">
+          <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-5">
+            <div className="absolute left-0 top-0 h-1 w-full bg-[var(--color-idea-blue)]" />
+
+            <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                    INDIVIDUAL TRACKED ASSET
-                  </span>
-                </div>
-                <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1 truncate">
+                <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">
+                  ASSET
+                </span>
+
+                <h4 className="mt-1 truncate text-xl font-bold text-[var(--color-idea-text)]">
                   {catalogItem?.name || asset.asset_code}
                 </h4>
-                <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5 break-words">
+
+                <p className="mt-0.5 break-words text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
                   {asset.asset_code}
                 </p>
+
                 {asset.serial_number && (
-                  <p className="text-[11px] text-[#6C6863] font-mono mt-0.5">
-                    SERIAL: {asset.serial_number}
+                  <p className="mt-1 text-[11px] font-mono text-[var(--color-idea-muted)]">
+                    Serial: {asset.serial_number}
                   </p>
                 )}
               </div>
 
-              <div className="text-right shrink-0">
-                <span
-                  className={`text-[10px] px-3 py-1 font-bold uppercase tracking-widest border ${
-                    asset.status === "AVAILABLE"
-                      ? "border-emerald-700 bg-emerald-50 text-emerald-800"
-                      : asset.status === "ISSUED"
-                        ? "border-blue-700 bg-blue-50 text-blue-800"
-                        : asset.status === "UNDER_REPAIR"
-                          ? "border-amber-700 bg-amber-50 text-amber-800"
-                          : "border-red-700 bg-red-50 text-red-800"
-                  }`}
-                >
-                  {asset.status.replace("_", " ")}
+              <div className="shrink-0 text-right">
+                <span className="border border-[var(--color-idea-border)] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-text)]">
+                  {asset.status.replace('_', ' ')}
                 </span>
-                <p className="text-xs text-[#6C6863] mt-2 font-medium">
-                  {asset.assigned_to_user_id
-                    ? `Assigned to: ${assignedUser?.name || "Student"}`
-                    : `Location: ${location?.name || "Location not set"}`}
+
+                <p className="mt-2 text-xs font-medium text-[var(--color-idea-muted)]">
+                  {asset.status === 'ISSUED'
+                    ? `Assigned to: ${assignedUser?.name || 'User'}`
+                    : `Location: ${location?.name || 'Not assigned'}`}
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="space-y-3">
-            {existingRequest ? (
-              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
-                Already requested in {existingRequest.request_number} (
-                {existingRequest.status})
-              </div>
-            ) : requestBlockedByAssetStatus ? (
-              <div className="p-3 bg-red-50 border border-red-200 text-red-800 text-xs rounded-xl font-mono">
-                This asset cannot be issued right now ({asset.status}).
-              </div>
-            ) : (
-              <div className="p-3 bg-white border border-[#1A1A1A]/10 text-xs rounded-xl">
-                Request this specific asset and track approval in{" "}
-                <span className="font-bold">Requests</span>. Quantity is not required.
-              </div>
-            )}
-
-            <div className="flex gap-3 pt-1">
-              <button
-                type="button"
-                disabled={!!existingRequest || requestBlockedByAssetStatus}
-                onClick={() => openRequestForAsset(asset)}
-                className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50 disabled:hover:bg-[#1A1A1A]"
-              >
-                {existingRequest ? "Request Submitted" : "Request This Asset"}
-              </button>
-
-              <button
-                type="button"
-                onClick={() =>
-                  onOpenQRGenerator(
-                    asset.id,
-                    catalogItem?.name || asset.asset_code,
-                    `SN: ${asset.serial_number || "N/A"}`,
-                  )
-                }
-                className="px-4 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#D4AF37] hover:text-[#1A1A1A] text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Print Label
-              </button>
+          {requestBlockedByAssetStatus ? (
+            <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+              This asset is not currently available for request.
             </div>
+          ) : (
+            <div className="rounded-xl border border-[var(--color-idea-border)] bg-white p-3 text-xs text-[var(--color-idea-muted)]">
+              Request this specific asset. Assets are individually tracked, so no quantity is required.
+            </div>
+          )}
+
+          <div className="flex gap-3">
+            <button
+              type="button"
+              disabled={requestBlockedByAssetStatus}
+              onClick={() => openRequestForAsset(asset)}
+              className="flex-1 rounded-xl bg-[var(--color-idea-text)] py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-idea-blue)] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Request Asset
+            </button>
+
+            <button
+              type="button"
+              onClick={() =>
+                onOpenQRGenerator(
+                  asset.id,
+                  catalogItem?.name || asset.asset_code,
+                  `Serial: ${asset.serial_number || 'N/A'}`
+                )
+              }
+              className="rounded-xl border border-[var(--color-idea-border)] px-4 py-2.5 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
+            >
+              Print QR
+            </button>
           </div>
         </div>
       );
     }
 
-    const handleIssueSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!selectedUser) return alert("Please select a student");
-      InventoryStorage.issueAsset(
-        asset.id,
-        selectedUser,
-        remarksInput,
-      );
-      triggerSuccess();
-    };
+    const handleIssueSubmit = (event: React.FormEvent) => {
+      event.preventDefault();
 
-    const handleReturnSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      if (!selectedLoc && !location?.id) {
-        return alert("Please select a storage location");
+      if (!selectedUser) {
+        return alert('Please select a user.');
       }
-      InventoryStorage.returnAsset(
-        asset.id,
-        selectedLoc || location?.id || locations[0]?.id,
-        remarksInput,
-      );
+
+      InventoryStorage.issueAsset(asset.id, selectedUser, remarksInput);
+
       triggerSuccess();
     };
 
-    const handleStatusSubmit = (e: React.FormEvent) => {
-      e.preventDefault();
-      InventoryStorage.updateAssetStatus(
-        asset.id,
-        statusInput,
-        selectedLoc || asset.location_id,
-        remarksInput,
-      );
+    const handleReturnSubmit = (event: React.FormEvent) => {
+      event.preventDefault();
+
+      const returnLocation = selectedLoc || location?.id || locations[0]?.id;
+
+      if (!returnLocation) {
+        return alert('Please select a storage location.');
+      }
+
+      InventoryStorage.returnAsset(asset.id, returnLocation, remarksInput);
+
+      triggerSuccess();
+    };
+
+    const handleStatusSubmit = (event: React.FormEvent) => {
+      event.preventDefault();
+
+      InventoryStorage.updateAssetStatus(asset.id, statusInput, selectedLoc || asset.location_id, remarksInput);
+
       triggerSuccess();
     };
 
     return (
       <div className="space-y-6">
-        {/* Editorial Asset Card */}
-        <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
-          <div className="flex justify-between items-start">
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-5">
+          <div className="absolute left-0 top-0 h-1 w-full bg-[var(--color-idea-blue)]" />
+
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                  INDIVIDUAL TRACKED ASSET
-                </span>
-              </div>
-              <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">
+                ASSET
+              </span>
+
+              <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">
                 {catalogItem?.name || asset.asset_code}
               </h4>
-              <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5">
-                {asset.asset_code}
-              </p>
+
+              <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">{asset.asset_code}</p>
+
               {asset.serial_number && (
-                <p className="text-[11px] text-[#6C6863] font-mono mt-0.5">
-                  SERIAL: {asset.serial_number}
+                <p className="mt-1 text-[11px] font-mono text-[var(--color-idea-muted)]">
+                  Serial: {asset.serial_number}
                 </p>
               )}
             </div>
+
             <div className="text-right">
-              <span
-                className={`text-[10px] px-3 py-1 font-bold uppercase tracking-widest border ${
-                  asset.status === "AVAILABLE"
-                    ? "border-emerald-700 bg-emerald-50 text-emerald-800"
-                    : asset.status === "ISSUED"
-                      ? "border-blue-700 bg-blue-50 text-blue-800"
-                      : asset.status === "UNDER_REPAIR"
-                        ? "border-amber-700 bg-amber-50 text-amber-800"
-                        : "border-red-700 bg-red-50 text-red-800"
-                }`}
-              >
-                {asset.status.replace("_", " ")}
+              <span className="border border-[var(--color-idea-border)] bg-white px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-text)]">
+                {asset.status.replace('_', ' ')}
               </span>
-              <p className="text-xs text-[#6C6863] mt-2 font-medium">
-                {asset.status === "ISSUED"
-                  ? `Assigned to: ${assignedUser?.name || "Student"}`
-                  : `Location: ${location?.name || "Location not set"}`}
+
+              <p className="mt-2 text-xs font-medium text-[var(--color-idea-muted)]">
+                {asset.status === 'ISSUED'
+                  ? `Assigned to: ${assignedUser?.name || 'User'}`
+                  : `Location: ${location?.name || 'Not assigned'}`}
               </p>
             </div>
           </div>
         </div>
 
-        <div className="border border-[#1A1A1A]/10 bg-white p-4 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">
-              Quick Status
-            </p>
-            <span className="text-[9px] text-[#6C6863]">
-              {asset.status.replace("_", " ")}
+        <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-5">
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <div>
+              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Asset Status</h5>
+
+              <p className="mt-0.5 text-[10px] text-[var(--color-idea-muted)]">
+                Update the current condition of this asset.
+              </p>
+            </div>
+
+            <span className="text-[9px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+              {asset.status.replace('_', ' ')}
             </span>
           </div>
+
           <div className="grid grid-cols-2 gap-2">
             {quickStatusOptions.map((status) => {
               const selected = asset.status === status;
-              const label = status.replace("_", " ");
-              const isDanger = status === "DAMAGED" || status === "LOST" || status === "RETIRED";
-              const isRepair = status === "UNDER_REPAIR";
-              const isAvailable = status === "AVAILABLE";
 
               return (
                 <button
@@ -365,994 +286,594 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                   type="button"
                   onClick={() => {
                     setStatusInput(status);
-                    setSubAction("status");
+                    setSubAction('status');
                   }}
-                  className={`py-2 px-2 text-[10px] font-bold uppercase tracking-wider border rounded-lg transition-colors cursor-pointer ${
+                  className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
                     selected
-                      ? isAvailable
-                        ? "bg-emerald-600 text-white border-emerald-600"
-                        : isRepair
-                          ? "bg-amber-500 text-white border-amber-500"
-                          : isDanger
-                            ? "bg-red-600 text-white border-red-600"
-                            : "bg-slate-900 text-white border-slate-900"
-                      : "bg-[#F9F8F6] text-[#1A1A1A] border-[#1A1A1A]/10 hover:border-[#1A1A1A]"
+                      ? 'border-[var(--color-idea-blue)] bg-[var(--color-idea-blue)] text-white'
+                      : 'border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] hover:border-[var(--color-idea-blue)]'
                   }`}
                 >
-                  {label}
+                  {status.replace('_', ' ')}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Sub Action Forms */}
-        {subAction === "issue" && (
+        {canIssue && asset.status === 'AVAILABLE' && (
+          <button
+            type="button"
+            onClick={() => setSubAction('issue')}
+            className="w-full rounded-xl bg-[var(--color-idea-text)] py-3 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-idea-blue)]"
+          >
+            Issue Asset
+          </button>
+        )}
+
+        {canReturnOrRepair && asset.status === 'ISSUED' && (
+          <button
+            type="button"
+            onClick={() => setSubAction('return')}
+            className="w-full rounded-xl border border-[var(--color-idea-border)] py-3 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
+          >
+            Return Asset
+          </button>
+        )}
+
+        {subAction === 'issue' && (
           <form
             onSubmit={handleIssueSubmit}
-            className="space-y-4 bg-white p-5 border border-[#1A1A1A]"
+            className="space-y-4 rounded-2xl border border-[var(--color-idea-border)] bg-white p-5"
           >
-            <h5 className="font-serif text-sm font-bold text-[#1A1A1A] uppercase tracking-wider border-b border-[#1A1A1A]/10 pb-2">
-              Issue Individual Asset to Student
-            </h5>
+            <div>
+              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Issue Asset</h5>
+
+              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">Assign this specific asset to a user.</p>
+            </div>
 
             <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                Select Student / Member
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                User
               </label>
+
               <select
                 value={selectedUser}
-                onChange={(e) => setSelectedUser(e.target.value)}
-                className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A] text-xs font-medium outline-none focus:border-[#D4AF37]"
+                onChange={(event) => setSelectedUser(event.target.value)}
+                className="idea-input w-full p-2.5 text-xs"
                 required
               >
-                <option value="">-- Select Registered Student --</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} ({u.user_code} — {u.role})
+                <option value="">Select user</option>
+
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name} ({user.user_code})
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                Project / Remarks
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Details
               </label>
+
               <input
                 type="text"
                 value={remarksInput}
-                onChange={(e) => setRemarksInput(e.target.value)}
-                placeholder="e.g. Embedded Systems Capstone Node"
-                className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs font-medium outline-none focus:border-[#D4AF37]"
+                onChange={(event) => setRemarksInput(event.target.value)}
+                placeholder="Optional issue details"
+                className="idea-input w-full p-2.5 text-xs"
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setSubAction(null)}
-                className="flex-1 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] text-xs font-bold uppercase tracking-wider"
+                className="flex-1 rounded-xl border border-[var(--color-idea-border)] py-2.5 text-xs font-semibold"
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="flex-1 py-2.5 bg-[#1A1A1A] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#D4AF37] transition-colors"
-              >
+
+              <button type="submit" className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold">
                 Confirm Issue
               </button>
             </div>
           </form>
         )}
 
-        {subAction === "return" && (
+        {subAction === 'return' && (
           <form
             onSubmit={handleReturnSubmit}
-            className="space-y-4 bg-white p-5 border border-[#1A1A1A]"
+            className="space-y-4 rounded-2xl border border-[var(--color-idea-border)] bg-white p-5"
           >
-            <h5 className="font-serif text-sm font-bold text-[#1A1A1A] uppercase tracking-wider border-b border-[#1A1A1A]/10 pb-2">
-              Return Asset to Lab Storage
-            </h5>
+            <div>
+              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Return Asset</h5>
+
+              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
+                Return the asset to a physical storage location.
+              </p>
+            </div>
 
             <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                Storage Location / Cabinet Bin
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Location
               </label>
+
               <select
                 value={selectedLoc}
-                onChange={(e) => setSelectedLoc(e.target.value)}
-                className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A] text-xs font-medium outline-none focus:border-[#D4AF37]"
+                onChange={(event) => setSelectedLoc(event.target.value)}
+                className="idea-input w-full p-2.5 text-xs"
                 required
               >
-                <option value="">-- Select Return Storage --</option>
-                {locations.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name} ({l.code})
+                <option value="">Select location</option>
+
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name} ({location.code})
                   </option>
                 ))}
               </select>
             </div>
 
             <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                Inspection & Condition Remarks
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Condition Details
               </label>
+
               <input
                 type="text"
                 value={remarksInput}
-                onChange={(e) => setRemarksInput(e.target.value)}
-                placeholder="e.g. Header pins straight, tested working"
-                className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs font-medium outline-none focus:border-[#D4AF37]"
+                onChange={(event) => setRemarksInput(event.target.value)}
+                placeholder="Optional condition or inspection notes"
+                className="idea-input w-full p-2.5 text-xs"
               />
             </div>
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setSubAction(null)}
-                className="flex-1 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] text-xs font-bold uppercase tracking-wider"
+                className="flex-1 rounded-xl border border-[var(--color-idea-border)] py-2.5 text-xs font-semibold"
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="flex-1 py-2.5 bg-[#1A1A1A] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#D4AF37] transition-colors"
-              >
+
+              <button type="submit" className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold">
                 Confirm Return
               </button>
             </div>
           </form>
         )}
 
-        {subAction === "status" && (
+        {subAction === 'status' && (
           <form
             onSubmit={handleStatusSubmit}
-            className="space-y-4 bg-white p-5 border border-[#1A1A1A]"
+            className="space-y-4 rounded-2xl border border-[var(--color-idea-border)] bg-white p-5"
           >
-            <h5 className="font-serif text-sm font-bold text-[#1A1A1A] uppercase tracking-wider border-b border-[#1A1A1A]/10 pb-2">
-              Update Asset Condition / Status
-            </h5>
             <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                Condition Status
+              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Update Asset Status</h5>
+
+              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">Change the current state of this asset.</p>
+            </div>
+
+            <div>
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Status
               </label>
+
               <select
                 value={statusInput}
-                onChange={(e) => setStatusInput(e.target.value as AssetStatus)}
-                className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A] text-xs font-medium outline-none"
+                onChange={(event) => setStatusInput(event.target.value as AssetStatus)}
+                className="idea-input w-full p-2.5 text-xs"
               >
-                <option value="AVAILABLE">AVAILABLE (Storage Ready)</option>
-                <option value="UNDER_REPAIR">
-                  UNDER REPAIR (Repair Bench)
-                </option>
-                <option value="DAMAGED">DAMAGED (Faulty)</option>
-                <option value="LOST">LOST (Missing from Lab)</option>
-                <option value="RETIRED">RETIRED (Retired from Service)</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                Location
-              </label>
-              <select
-                value={selectedLoc}
-                onChange={(e) => setSelectedLoc(e.target.value)}
-                className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A] text-xs font-medium outline-none"
-              >
-                <option value="">Keep Existing Location</option>
-                {locations.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
+                {quickStatusOptions.map((status) => (
+                  <option key={status} value={status}>
+                    {status.replace('_', ' ')}
                   </option>
                 ))}
               </select>
             </div>
+
+            {statusInput === 'AVAILABLE' && (
+              <div>
+                <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                  Location
+                </label>
+
+                <select
+                  value={selectedLoc}
+                  onChange={(event) => setSelectedLoc(event.target.value)}
+                  className="idea-input w-full p-2.5 text-xs"
+                >
+                  <option value="">Keep current location</option>
+
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863] tracking-wider block mb-1">
-                Audit Notes / Repair Details
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Details
               </label>
+
               <input
                 type="text"
                 value={remarksInput}
-                onChange={(e) => setRemarksInput(e.target.value)}
-                placeholder="Describe fault or maintenance notes..."
-                className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs font-medium outline-none"
+                onChange={(event) => setRemarksInput(event.target.value)}
+                placeholder="Reason for status change"
+                className="idea-input w-full p-2.5 text-xs"
               />
             </div>
-            <div className="flex gap-3 pt-2">
+
+            <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setSubAction(null)}
-                className="flex-1 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] text-xs font-bold uppercase tracking-wider"
+                className="flex-1 rounded-xl border border-[var(--color-idea-border)] py-2.5 text-xs font-semibold"
               >
                 Cancel
               </button>
-              <button
-                type="submit"
-                className="flex-1 py-2.5 bg-[#1A1A1A] text-white text-xs font-bold uppercase tracking-wider hover:bg-[#D4AF37] transition-colors"
-              >
-                Save Condition
+
+              <button type="submit" className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold">
+                Update Status
               </button>
             </div>
           </form>
-        )}
-
-        {/* Primary Action Button Bar */}
-        {!subAction && (
-          <div className="grid grid-cols-2 gap-3">
-            {asset.status === "AVAILABLE" && (
-              <button
-                onClick={() => {
-                  setSubAction("issue");
-                }}
-                className="p-4 bg-[#1A1A1A] text-white flex items-center gap-3 font-bold text-xs uppercase tracking-wider hover:bg-[#D4AF37] transition-colors cursor-pointer"
-              >
-                <UserCheck className="w-5 h-5 text-[#D4AF37] shrink-0" />
-                <div className="text-left">
-                  <p>Issue to Student</p>
-                  <p className="text-[10px] font-normal opacity-70 capitalize">
-                    Assign loan record
-                  </p>
-                </div>
-              </button>
-            )}
-
-            {asset.status === "ISSUED" && (
-              <button
-                onClick={() => {
-                  setSubAction("return");
-                }}
-                className="p-4 bg-emerald-950 text-white flex items-center gap-3 font-bold text-xs uppercase tracking-wider hover:bg-emerald-900 transition-colors cursor-pointer"
-              >
-                <Check className="w-5 h-5 text-emerald-400 shrink-0" />
-                <div className="text-left">
-                  <p>Return Asset</p>
-                  <p className="text-[10px] font-normal opacity-70 capitalize">
-                    Return to storage bin
-                  </p>
-                </div>
-              </button>
-            )}
-
-            <button
-              onClick={() => setSubAction("status")}
-              className="p-4 bg-[#EBE5DE] text-[#1A1A1A] flex items-center gap-3 font-bold text-xs uppercase tracking-wider hover:bg-[#1A1A1A] hover:text-white transition-colors cursor-pointer"
-            >
-              <AlertTriangle className="w-5 h-5 text-[#D4AF37] shrink-0" />
-              <div className="text-left">
-                <p>Update Condition</p>
-                <p className="text-[10px] font-normal opacity-70 capitalize">
-                  Repair / Damaged / Move
-                </p>
-              </div>
-            </button>
-
-            <button
-              onClick={() =>
-                onOpenQRGenerator(
-                  asset.id,
-                  catalogItem?.name || asset.asset_code,
-                  `SN: ${asset.serial_number || "N/A"}`,
-                )
-              }
-              className="p-4 border border-[#1A1A1A] text-[#1A1A1A] flex items-center gap-3 font-bold text-xs uppercase tracking-wider hover:bg-[#D4AF37] hover:border-[#D4AF37] hover:text-white transition-colors cursor-pointer"
-            >
-              <QrCode className="w-5 h-5 shrink-0" />
-              <div className="text-left">
-                <p>Print Label</p>
-                <p className="text-[10px] font-normal opacity-70 capitalize">
-                  Generate QR sticker
-                </p>
-              </div>
-            </button>
-          </div>
         )}
       </div>
     );
   };
 
-  // 2. CATALOG ITEM ACTIONS
-  const renderCatalogActions = (cat: CatalogItem) => {
-    const catStockLevels = stockLevels.filter(
-      (s) =>
-        s.catalog_item_id === cat.id || s.catalog_item_id === cat.item_code,
-    );
-    const totalQty = catStockLevels.reduce(
-      (acc, curr) => acc + (curr.quantity || 0),
-      0,
+  const renderCatalogActions = (item: CatalogItem) => {
+    const itemStock = stockLevels.filter(
+      (stock) => stock.catalog_item_id === item.id || stock.catalog_item_id === item.item_code
     );
 
-    // Student QR action: request the catalog item, don't mutate stock.
+    const totalQuantity = itemStock.reduce((total, stock) => total + (stock.quantity || 0), 0);
+
     if (studentMode) {
-      const existingRequest = myPendingRequestForCatalogItem(cat.id);
-      const alreadyRequested = !!existingRequest;
-
       return (
         <div className="space-y-6">
-          <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
-            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
-            <div>
-              <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                CATALOG ITEM
-              </span>
-              <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
-                {cat.name}
-              </h4>
-              <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5">
-                {cat.item_code}
-              </p>
-              <p className="text-xs text-[#6C6863] mt-1.5">{cat.description}</p>
+          <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-5">
+            <div className="absolute left-0 top-0 h-1 w-full bg-[var(--color-idea-blue)]" />
+
+            <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">
+              ITEM
+            </span>
+
+            <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{item.name}</h4>
+
+            <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">{item.item_code}</p>
+
+            {item.description && <p className="mt-2 text-xs text-[var(--color-idea-muted)]">{item.description}</p>}
+
+            <div className="mt-5 flex items-end gap-1">
+              <span className="text-3xl font-bold text-[var(--color-idea-text)]">{totalQuantity}</span>
+
+              <span className="mb-1 text-xs font-semibold text-[var(--color-idea-muted)]">{item.unit}</span>
             </div>
-            <div className="text-right">
-              <span className="font-serif text-3xl font-bold text-[#1A1A1A]">
-                {totalQty}
-              </span>
-              <span className="text-xs text-[#6C6863] font-mono font-bold ml-1">
-                {cat.unit}
-              </span>
-              <p className="text-[10px] font-mono uppercase text-[#6C6863] tracking-widest mt-1">
-                Available (by storage bins)
-              </p>
-            </div>
+
+            <p className="mt-1 text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">Available stock</p>
           </div>
 
-          <div className="border border-[#1A1A1A]/10 p-4 bg-white space-y-2">
-            <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">
-              Storage Location Breakdown
-            </p>
-            {catStockLevels.length === 0 ? (
-              <p className="text-xs text-[#6C6863] italic">
-                No active stock assigned to bins.
+          <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
+            <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">Stock by Location</h5>
+
+            {itemStock.length === 0 ? (
+              <p className="text-xs italic text-[var(--color-idea-muted)]">
+                No stock is currently assigned to a location.
               </p>
             ) : (
-              catStockLevels.map((sl) => {
-                const loc = locations.find((l) => l.id === sl.location_id);
-                return (
-                  <div
-                    key={sl.id}
-                    className="flex justify-between items-center text-xs py-1.5 border-b border-[#1A1A1A]/5 last:border-0"
-                  >
-                    <span className="font-medium text-[#1A1A1A]">
-                      {loc?.name || "Storage Bin"}
-                    </span>
-                    <span className="font-mono font-bold text-[#1A1A1A]">
-                      {sl.quantity} {cat.unit}
-                    </span>
-                  </div>
-                );
-              })
+              <div className="space-y-2">
+                {itemStock.map((stock) => {
+                  const location = locations.find((item) => item.id === stock.location_id);
+
+                  return (
+                    <div
+                      key={stock.id}
+                      className="flex items-center justify-between border-b border-[var(--color-idea-border)] py-2 last:border-0"
+                    >
+                      <span className="text-xs font-medium text-[var(--color-idea-text)]">
+                        {location?.name || 'Unknown location'}
+                      </span>
+
+                      <span className="font-mono text-xs font-bold text-[var(--color-idea-text)]">
+                        {stock.quantity} {item.unit}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
 
-          <div className="space-y-3">
-            {alreadyRequested ? (
-              <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
-                Already requested in {existingRequest?.request_number} (
-                {existingRequest?.status})
-              </div>
-            ) : (
-              <div className="p-3 bg-white border border-[#1A1A1A]/10 text-xs rounded-xl">
-                Request this item and track approval in{" "}
-                <span className="font-bold">Requests</span>.
-              </div>
-            )}
+          <div className="rounded-xl border border-[var(--color-idea-border)] bg-white p-3 text-xs text-[var(--color-idea-muted)]">
+            Create a request for this item. The quantity and Consumable/Reusable choice are selected in the request.
+          </div>
 
-            <div className="flex gap-3 pt-1">
-              <button
-                type="button"
-                disabled={alreadyRequested}
-                onClick={() => openRequestForCatalogItem(cat.id, 1)}
-                className="flex-1 py-2.5 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer disabled:opacity-50"
-              >
-                {alreadyRequested ? "Request Submitted" : "Request This Item"}
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  onOpenQRGenerator(
-                    cat.id,
-                    cat.name,
-                    "Inventory Item",
-                  )
-                }
-                className="px-4 py-2.5 border border-[#1A1A1A] text-[#1A1A1A] hover:bg-[#D4AF37] hover:text-[#1A1A1A] text-xs font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Print Label
-              </button>
-            </div>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => openRequestForCatalogItem(item.id, 1)}
+              className="flex-1 rounded-xl bg-[var(--color-idea-text)] py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-idea-blue)]"
+            >
+              Request Item
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onOpenQRGenerator(item.id, item.name, 'Inventory Item')}
+              className="rounded-xl border border-[var(--color-idea-border)] px-4 py-2.5 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
+            >
+              Print QR
+            </button>
           </div>
         </div>
       );
     }
 
-    const handleStockSubmit = (type: "RECEIVE" | "ISSUE") => {
-      if (!selectedLoc) return alert("Select storage bin");
-      const delta = type === "RECEIVE" ? qtyInput : -qtyInput;
+    const handleStockSubmit = (type: 'RECEIVE' | 'ISSUE') => {
+      if (!selectedLoc) {
+        return alert('Select a storage location.');
+      }
+
+      const delta = type === 'RECEIVE' ? qtyInput : -qtyInput;
+
       InventoryStorage.adjustStock(
-        cat.id,
+        item.id,
         selectedLoc,
         delta,
         type,
-        remarksInput || `Manual ${type} via scan`,
+        remarksInput || `Manual ${type.toLowerCase()} via QR scan`
       );
+
       triggerSuccess();
     };
 
     return (
       <div className="space-y-6">
-        <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
-          <div>
-            <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-              CATALOG ITEM
-            </span>
-            <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
-              {cat.name}
-            </h4>
-            <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5">
-              {cat.item_code}
-            </p>
-            <p className="text-xs text-[#6C6863] mt-1.5">{cat.description}</p>
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-5">
+          <div className="absolute left-0 top-0 h-1 w-full bg-[var(--color-idea-blue)]" />
+
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">ITEM</span>
+
+          <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{item.name}</h4>
+
+          <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">{item.item_code}</p>
+
+          <div className="mt-5 flex items-end gap-1">
+            <span className="text-3xl font-bold text-[var(--color-idea-text)]">{totalQuantity}</span>
+
+            <span className="mb-1 text-xs font-semibold text-[var(--color-idea-muted)]">{item.unit}</span>
           </div>
-          <div className="text-right">
-            <span className="font-serif text-3xl font-bold text-[#1A1A1A]">
-              {totalQty}
-            </span>
-            <span className="text-xs text-[#6C6863] font-mono font-bold ml-1">
-              {cat.unit}
-            </span>
-            <p className="text-[10px] font-mono uppercase text-[#6C6863] tracking-widest mt-1">
-              Total Stock
-            </p>
-          </div>
+
+          <p className="mt-1 text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">Total stock</p>
         </div>
 
-        {/* Stock Breakdown */}
-        <div className="border border-[#1A1A1A]/10 p-4 bg-white space-y-2">
-          <p className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863]">
-            Storage Location Breakdown
-          </p>
-          {catStockLevels.length === 0 ? (
-            <p className="text-xs text-[#6C6863] italic">
-              No active stock assigned to bins.
+        <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
+          <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">Stock by Location</h5>
+
+          {itemStock.length === 0 ? (
+            <p className="text-xs italic text-[var(--color-idea-muted)]">
+              No stock is currently assigned to a location.
             </p>
           ) : (
-            catStockLevels.map((sl) => {
-              const loc = locations.find((l) => l.id === sl.location_id);
-              return (
-                <div
-                  key={sl.id}
-                  className="flex justify-between items-center text-xs py-1.5 border-b border-[#1A1A1A]/5 last:border-0"
-                >
-                  <span className="font-medium text-[#1A1A1A]">
-                    {loc?.name || "Storage Bin"}
-                  </span>
-                  <span className="font-mono font-bold text-[#1A1A1A]">
-                    {sl.quantity} {cat.unit}
-                  </span>
-                </div>
-              );
-            })
+            <div className="space-y-2">
+              {itemStock.map((stock) => {
+                const location = locations.find((item) => item.id === stock.location_id);
+
+                return (
+                  <div
+                    key={stock.id}
+                    className="flex items-center justify-between border-b border-[var(--color-idea-border)] py-2 last:border-0"
+                  >
+                    <span className="text-xs font-medium text-[var(--color-idea-text)]">
+                      {location?.name || 'Unknown location'}
+                    </span>
+
+                    <span className="font-mono text-xs font-bold text-[var(--color-idea-text)]">
+                      {stock.quantity} {item.unit}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </div>
 
-        {/* Quick Stock Adjustment */}
-        <div className="border border-[#1A1A1A] p-5 bg-white space-y-3">
-          <h5 className="font-serif text-sm font-bold text-[#1A1A1A] uppercase tracking-wider border-b border-[#1A1A1A]/10 pb-2">
-            Quick Stock Update
-          </h5>
-          <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-5">
+          <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Update Stock</h5>
+
+          <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
+            Add or remove quantity from a specific storage location.
+          </p>
+
+          <div className="mt-4 grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863]">
-                Storage Bin
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Location
               </label>
+
               <select
                 value={selectedLoc}
-                onChange={(e) => setSelectedLoc(e.target.value)}
-                className="w-full mt-1 p-2.5 bg-[#F9F8F6] border border-[#1A1A1A] text-xs font-medium outline-none focus:border-[#D4AF37]"
+                onChange={(event) => setSelectedLoc(event.target.value)}
+                className="idea-input w-full p-2.5 text-xs"
               >
-                <option value="">-- Choose Bin --</option>
-                {locations.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.name}
+                <option value="">Select location</option>
+
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
                   </option>
                 ))}
               </select>
             </div>
+
             <div>
-              <label className="text-[11px] font-mono uppercase text-[#6C6863]">
-                Quantity ({cat.unit})
+              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Quantity ({item.unit})
               </label>
+
               <input
                 type="number"
                 min="1"
                 value={qtyInput}
-                onChange={(e) => setQtyInput(Number(e.target.value))}
-                className="w-full mt-1 p-2.5 bg-[#F9F8F6] border border-[#1A1A1A] font-mono text-xs font-bold outline-none"
+                onChange={(event) => setQtyInput(Math.max(1, Number(event.target.value)))}
+                className="idea-input w-full p-2.5 text-xs font-mono"
               />
             </div>
           </div>
-          <div className="flex gap-3 pt-2">
-            <button
-              onClick={() => handleStockSubmit("RECEIVE")}
-              className="flex-1 py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
-            >
-              + Receive / Add
-            </button>
-            <button
-              onClick={() => handleStockSubmit("ISSUE")}
-              className="flex-1 py-3 border border-[#1A1A1A] hover:bg-[#1A1A1A] hover:text-white text-[#1A1A1A] font-bold text-xs uppercase tracking-wider transition-colors cursor-pointer"
-            >
-              - Consume / Issue
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  };
 
-  // 3. LOCATION ACTIONS
-  const renderLocationActions = (loc: Location) => {
-    const assetsInLoc = assets.filter((a) => a.location_id === loc.id);
-    const stockInLoc = stockLevels.filter((s) => s.location_id === loc.id);
+          <input
+            type="text"
+            value={remarksInput}
+            onChange={(event) => setRemarksInput(event.target.value)}
+            placeholder="Optional details"
+            className="idea-input mt-3 w-full p-2.5 text-xs"
+          />
 
-    // Student QR action: show item stock + request buttons. Students cannot mutate inventory.
-    if (studentMode) {
-      const itemsInLoc = stockInLoc
-        .map((s) => {
-          const cat = catalogItems.find(
-            (c) =>
-              c.id === s.catalog_item_id || c.item_code === s.catalog_item_id,
-          );
-          return { stock: s, catalogItem: cat };
-        })
-        .filter((x) => x.catalogItem) as { stock: StockLevel; catalogItem: CatalogItem }[];
-
-      return (
-        <div className="space-y-5">
-          <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
-            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
-            <div>
-              <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                STORAGE LOCATION
-              </span>
-              <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
-                {loc.name}
-              </h4>
-              <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5">
-                {loc.code || loc.id}
-              </p>
-            </div>
+          <div className="mt-4 flex gap-3">
             <button
-              onClick={() =>
-                onOpenQRGenerator(
-                  loc.id,
-                  loc.name,
-                  "Storage Location",
-                )
-              }
-              className="p-2.5 bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-[#D4AF37] transition-colors cursor-pointer"
               type="button"
+              onClick={() => handleStockSubmit('RECEIVE')}
+              className="flex-1 rounded-xl bg-[var(--color-idea-text)] py-2.5 text-xs font-semibold text-white transition-colors hover:bg-[var(--color-idea-blue)]"
             >
-              <QrCode className="w-4 h-4 text-[#D4AF37]" /> Print QR
+              Add Stock
             </button>
-          </div>
 
-          <div>
-            <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-              Items in Location ({itemsInLoc.length})
-            </h5>
-            <div className="max-h-52 overflow-y-auto space-y-2">
-              {itemsInLoc.length === 0 ? (
-                <p className="text-xs text-[#6C6863] italic">
-                  No bulk stock in this location.
-                </p>
-              ) : (
-                itemsInLoc.map(({ stock, catalogItem }) => {
-                  const existing = myPendingRequestForCatalogItem(
-                    catalogItem.id,
-                  );
-                  const alreadyRequested = !!existing;
-                  return (
-                    <div
-                      key={stock.id}
-                      className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs gap-3"
-                    >
-                      <div className="min-w-0">
-                        <p className="font-bold text-[#1A1A1A] truncate">
-                          {catalogItem.name}
-                        </p>
-                        <p className="text-[10px] font-mono text-[#6C6863]">
-                          {stock.quantity} {catalogItem.unit}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        disabled={alreadyRequested}
-                        onClick={() =>
-                          openRequestForCatalogItem(catalogItem.id, 1)
-                        }
-                        className="shrink-0 px-3 py-2 bg-[#1A1A1A] text-white text-[10px] font-mono font-bold uppercase tracking-wider hover:bg-[#D4AF37] transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        {alreadyRequested ? "Requested" : "Request"}
-                      </button>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-5">
-        <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
-          <div>
-            <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-              STORAGE LOCATION
-            </span>
-            <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
-              {loc.name}
-            </h4>
-            <p className="text-xs font-mono text-[#D4AF37] font-semibold mt-0.5">
-              {loc.code || loc.id}
-            </p>
-          </div>
-          <button
-            onClick={() =>
-              onOpenQRGenerator(
-                loc.id,
-                loc.name,
-                "Storage Location",
-              )
-            }
-            className="p-2.5 bg-[#1A1A1A] text-white text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-2 hover:bg-[#D4AF37] transition-colors"
-            type="button"
-          >
-            <QrCode className="w-4 h-4 text-[#D4AF37]" /> Print QR
-          </button>
-        </div>
-
-        <div>
-          <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-            Tracked Assets in Location ({assetsInLoc.length})
-          </h5>
-          <div className="max-h-40 overflow-y-auto space-y-2">
-            {assetsInLoc.length === 0 ? (
-              <p className="text-xs text-[#6C6863] italic">
-                No assets stored in this location.
-              </p>
-            ) : (
-              assetsInLoc.map((a) => {
-                const cat = catalogItems.find(
-                  (c) =>
-                    c.id === a.catalog_item_id ||
-                    c.item_code === a.catalog_item_id,
-                );
-                return (
-                  <div
-                    key={a.id}
-                    className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs"
-                  >
-                    <div>
-                      <span className="font-bold text-[#1A1A1A]">
-                        {cat?.name}
-                      </span>
-                      <span className="text-[#6C6863] font-mono ml-2">
-                        ({a.asset_code})
-                      </span>
-                    </div>
-                    <span className="text-[10px] px-2 py-0.5 border border-emerald-700 bg-emerald-50 text-emerald-800 font-mono uppercase font-bold">
-                      {a.status}
-                    </span>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
-
-        <div>
-          <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-            Items in Stock
-          </h5>
-          <div className="max-h-40 overflow-y-auto space-y-2">
-            {stockInLoc.length === 0 ? (
-              <p className="text-xs text-[#6C6863] italic">
-                No bulk stock in this location.
-              </p>
-            ) : (
-              stockInLoc.map((s) => {
-                const cat = catalogItems.find(
-                  (c) =>
-                    c.id === s.catalog_item_id ||
-                    c.item_code === s.catalog_item_id,
-                );
-                return (
-                  <div
-                    key={s.id}
-                    className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs"
-                  >
-                    <span className="font-bold text-[#1A1A1A]">
-                      {cat?.name}
-                    </span>
-                    <span className="font-mono font-bold text-[#D4AF37]">
-                      {s.quantity} {cat?.unit}
-                    </span>
-                  </div>
-                );
-              })
-            )}
+            <button
+              type="button"
+              onClick={() => handleStockSubmit('ISSUE')}
+              className="flex-1 rounded-xl border border-[var(--color-idea-border)] py-2.5 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
+            >
+              Remove Stock
+            </button>
           </div>
         </div>
       </div>
     );
   };
 
-  // 4. REQUEST ACTIONS
-  const renderRequestActions = (req: Request) => {
-    const student = users.find((u) => u.id === req.user_id);
+  const renderLocationActions = (location: Location) => {
+    const assetsInLocation = assets.filter((asset) => asset.location_id === location.id);
 
-    const handleReview = async (status: "APPROVED" | "REJECTED") => {
-      const finalRemark =
-        remarksInput.trim() ||
-        (status === "APPROVED"
-          ? "Approved. Inventory will change at handover."
-          : "Request rejected.");
-      await reviewLabRequest(req, status, activeUser, finalRemark);
-      triggerSuccess();
-    };
+    const stockInLocation = stockLevels.filter((stock) => stock.location_id === location.id);
 
-    const handleHandover = async () => {
-      await handoverLabRequest(
-        req,
-        activeUser,
-        remarksInput.trim() || `Handed over via scan for ${req.request_number}`,
+    const itemsInLocation = stockInLocation
+      .map((stock) => {
+        const catalogItem = findCatalogItem(stock.catalog_item_id);
+
+        return {
+          stock,
+          catalogItem,
+        };
+      })
+      .filter(
+        (
+          entry
+        ): entry is {
+          stock: StockLevel;
+          catalogItem: CatalogItem;
+        } => Boolean(entry.catalogItem)
       );
-      triggerSuccess();
-    };
-
-    const handleComplete = async () => {
-      await completeLabRequest(
-        req,
-        activeUser,
-        remarksInput.trim() || `Completed ${req.request_number}`,
-        locations[0]?.id,
-      );
-      triggerSuccess();
-    };
 
     return (
       <div className="space-y-5">
-        <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
-          <div>
-            <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-              MATERIAL REQUISITION
-            </span>
-            <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
-              {req.request_number}
-            </h4>
-            <p className="text-xs text-[#1A1A1A] font-bold mt-1">
-              Requested by: {student?.name || "Student"}
-            </p>
-            <p className="text-xs text-[#6C6863] italic mt-0.5 font-serif">
-              "{req.purpose}"
-            </p>
-          </div>
-          <span
-            className={`text-[10px] px-3 py-1 font-mono uppercase tracking-widest border ${
-              req.status === "PENDING"
-                ? "border-amber-700 bg-amber-50 text-amber-800 animate-pulse"
-                : req.status === "APPROVED"
-                  ? "border-blue-700 bg-blue-50 text-blue-800"
-                  : req.status === "HANDED_OVER" || req.status === "COMPLETED"
-                    ? "border-emerald-700 bg-emerald-50 text-emerald-800"
-                    : "border-red-700 bg-red-50 text-red-800"
-            }`}
-          >
-            {req.status}
-          </span>
-        </div>
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-5">
+          <div className="absolute left-0 top-0 h-1 w-full bg-[var(--color-idea-blue)]" />
 
-        <div>
-          <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-            Requested Component Items
-          </h5>
-          <div className="space-y-2">
-            {req.items?.map((item) => {
-              const cat = catalogItems.find(
-                (c) =>
-                  c.id === item.catalog_item_id ||
-                  c.item_code === item.catalog_item_id,
-              );
-              return (
-                <div
-                  key={item.id}
-                  className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between text-xs font-semibold"
-                >
-                  <span>{cat?.name || "Item"}</span>
-                  <span className="font-mono text-[#D4AF37] font-bold">
-                    {item.requested_qty} {cat?.unit}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {req.status === "PENDING" && canApprove && (
-          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
-            <input
-              type="text"
-              value={remarksInput}
-              onChange={(e) => setRemarksInput(e.target.value)}
-              placeholder="Approval notes..."
-              className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs outline-none focus:border-[#D4AF37]"
-            />
-            <div className="flex gap-3">
-              <button
-                onClick={() => void handleReview("REJECTED")}
-                className="flex-1 py-3 border border-red-800 text-red-800 hover:bg-red-800 hover:text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Reject
-              </button>
-              <button
-                onClick={() => void handleReview("APPROVED")}
-                className="flex-1 py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-              >
-                Approve
-              </button>
-            </div>
-          </div>
-        )}
-
-        {req.status === "APPROVED" && canApprove && (
-          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
-            <input
-              type="text"
-              value={remarksInput}
-              onChange={(e) => setRemarksInput(e.target.value)}
-              placeholder="Handover notes..."
-              className="w-full p-2.5 bg-[#F9F8F6] border border-[#1A1A1A]/30 text-xs outline-none focus:border-[#D4AF37]"
-            />
-            <button
-              onClick={() => void handleHandover()}
-              className="w-full py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-            >
-              Hand Over
-            </button>
-          </div>
-        )}
-
-        {req.status === "HANDED_OVER" && canApprove && (
-          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
-            <button
-              onClick={() => void handleComplete()}
-              className="w-full py-3 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-xs font-bold uppercase tracking-wider transition-colors cursor-pointer"
-            >
-              Complete
-            </button>
-          </div>
-        )}
-
-        {req.status === "PENDING" && !canApprove && (
-          <div className="space-y-3 pt-3 border-t border-[#1A1A1A]/10">
-            <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
-              Waiting for staff to approve this request. Inventory will not change until handover.
-            </div>
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // 5. USER ACTIONS
-  const renderUserActions = (user: User) => {
-    const userAssignments = InventoryStorage.getAssignments().filter(
-      (a) => a.assigned_to_user_id === user.id && !a.returned_at,
-    );
-
-    if (studentMode) {
-      return (
-        <div className="space-y-5">
-          <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
-            <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
+          <div className="flex items-start justify-between gap-4">
             <div>
-              <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-                LAB MEMBER PROFILE
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">
+                LOCATION
               </span>
-              <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
-                {user.name}
-              </h4>
-              <p className="text-xs font-mono text-[#6C6863] mt-0.5">
-                {user.user_code} • {user.email}
+
+              <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{location.name}</h4>
+
+              <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
+                {location.code || location.id}
               </p>
             </div>
-            <span className="text-[10px] px-3 py-1 font-mono uppercase tracking-widest border border-[#1A1A1A] bg-[#1A1A1A] text-white">
-              {user.role}
-            </span>
-          </div>
 
-          <div className="p-3 bg-amber-50 border border-amber-200 text-amber-800 text-xs rounded-xl font-mono">
-            Students cannot issue/return assets from a member QR code.
+            <button
+              type="button"
+              onClick={() => onOpenQRGenerator(location.id, location.name, 'Storage Location')}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-idea-border)] px-3 py-2 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-white"
+            >
+              <QrCode className="h-4 w-4" />
+              Print QR
+            </button>
           </div>
-        </div>
-      );
-    }
-
-    return (
-      <div className="space-y-5">
-        <div className="border border-[#1A1A1A]/20 bg-[#F9F8F6] p-5 flex justify-between items-start relative">
-          <div className="absolute top-0 left-0 w-full h-1 bg-[#D4AF37]" />
-          <div>
-            <span className="text-[10px] font-mono tracking-[0.2em] uppercase text-[#6C6863]">
-              LAB MEMBER PROFILE
-            </span>
-            <h4 className="font-serif text-xl font-bold text-[#1A1A1A] mt-1">
-              {user.name}
-            </h4>
-            <p className="text-xs font-mono text-[#6C6863] mt-0.5">
-              {user.user_code} • {user.email}
-            </p>
-          </div>
-          <span className="text-[10px] px-3 py-1 font-mono uppercase tracking-widest border border-[#1A1A1A] bg-[#1A1A1A] text-white">
-            {user.role}
-          </span>
         </div>
 
         <div>
-          <h5 className="text-[10px] font-mono uppercase tracking-[0.2em] text-[#6C6863] mb-2">
-            Active Loans Held ({userAssignments.length})
-          </h5>
-          <div className="space-y-2">
-            {userAssignments.length === 0 ? (
-              <p className="text-xs text-[#6C6863] italic">
-                No active assets currently loaned to this member.
-              </p>
+          <h5 className="mb-2 text-sm font-semibold text-[var(--color-idea-text)]">Items in this Location</h5>
+
+          <div className="max-h-52 space-y-2 overflow-y-auto">
+            {itemsInLocation.length === 0 ? (
+              <p className="text-xs italic text-[var(--color-idea-muted)]">No item stock is currently stored here.</p>
             ) : (
-              userAssignments.map((asg) => {
-                const asset = InventoryStorage.getAssets().find(
-                  (a) => a.id === asg.asset_id,
-                );
-                const cat = catalogItems.find(
-                  (c) =>
-                    c.id === asset?.catalog_item_id ||
-                    c.item_code === asset?.catalog_item_id,
-                );
+              itemsInLocation.map(({ stock, catalogItem }) => (
+                <div
+                  key={stock.id}
+                  className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-idea-border)] bg-white p-3"
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-semibold text-[var(--color-idea-text)]">{catalogItem.name}</p>
+
+                    <p className="mt-0.5 text-[10px] font-mono text-[var(--color-idea-muted)]">
+                      {stock.quantity} {catalogItem.unit}
+                    </p>
+                  </div>
+
+                  {studentMode && (
+                    <button
+                      type="button"
+                      onClick={() => openRequestForCatalogItem(catalogItem.id, 1)}
+                      className="shrink-0 rounded-lg border border-[var(--color-idea-border)] px-3 py-2 text-[10px] font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
+                    >
+                      Request
+                    </button>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+
+        <div>
+          <h5 className="mb-2 text-sm font-semibold text-[var(--color-idea-text)]">Assets in this Location</h5>
+
+          <div className="max-h-52 space-y-2 overflow-y-auto">
+            {assetsInLocation.length === 0 ? (
+              <p className="text-xs italic text-[var(--color-idea-muted)]">No assets are currently stored here.</p>
+            ) : (
+              assetsInLocation.map((asset) => {
+                const catalogItem = findCatalogItem(asset.catalog_item_id);
+
                 return (
                   <div
-                    key={asg.id}
-                    className="p-3 bg-white border border-[#1A1A1A]/10 flex items-center justify-between"
+                    key={asset.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-idea-border)] bg-white p-3"
                   >
-                    <div>
-                      <p className="text-xs font-bold text-[#1A1A1A]">
-                        {cat?.name}
+                    <div className="min-w-0">
+                      <p className="truncate text-xs font-semibold text-[var(--color-idea-text)]">
+                        {catalogItem?.name || asset.asset_code}
                       </p>
-                      <p className="text-[10px] font-mono text-[#D4AF37] font-semibold">
-                        {asset?.asset_code}
-                      </p>
+
+                      <p className="mt-0.5 text-[10px] font-mono text-[var(--color-idea-blue)]">{asset.asset_code}</p>
                     </div>
-                    <button
-                      onClick={() => {
-                        const defaultLoc = locations[0]?.id;
-                        if (asset && defaultLoc) {
-                          InventoryStorage.returnAsset(
-                            asset.id,
-                            defaultLoc,
-                            "Returned via student profile",
-                          );
-                          triggerSuccess();
-                        }
-                      }}
-                      className="px-3 py-1 bg-[#1A1A1A] hover:bg-[#D4AF37] text-white text-[11px] font-mono font-bold uppercase tracking-wider transition-colors cursor-pointer"
-                    >
-                      Return
-                    </button>
+
+                    <span className="shrink-0 rounded-lg border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--color-idea-muted)]">
+                      {asset.status.replace('_', ' ')}
+                    </span>
                   </div>
                 );
               })
@@ -1364,55 +885,59 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-[#1A1A1A]/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-[#F9F8F6] border border-[#1A1A1A] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col relative">
-        {/* Editorial Top Border Accent */}
-        <div className="h-1 bg-[#D4AF37] w-full" />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+      role="dialog"
+      aria-modal="true"
+      aria-label="QR action panel"
+    >
+      <div className="idea-card relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden">
+        <div className="h-1 w-full bg-[var(--color-idea-blue)]" />
 
-        {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-[#1A1A1A]/10 flex items-center justify-between bg-white">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-[#1A1A1A] text-white">
-              <QrCode className="w-4 h-4 text-[#D4AF37]" />
+        <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-white px-6 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="rounded-xl bg-[var(--color-idea-light-grey)] p-2.5">
+              <QrCode className="h-4 w-4 text-[var(--color-idea-blue)]" />
             </div>
-            <div>
-              <h3 className="font-serif font-bold text-[#1A1A1A] text-lg">
-                QR Intelligence Inspect
-              </h3>
-              <p className="text-[10px] font-mono text-[#6C6863] tracking-widest uppercase">
-                CODE: {qrData.rawCode}
+
+            <div className="min-w-0">
+              <h3 className="truncate text-lg font-bold text-[var(--color-idea-text)]">QR Action</h3>
+
+              <p className="truncate text-[10px] font-mono uppercase tracking-widest text-[var(--color-idea-muted)]">
+                {qrData.rawCode}
               </p>
             </div>
           </div>
+
           <button
+            type="button"
             onClick={onClose}
-            className="p-2 text-[#1A1A1A]/50 hover:text-[#1A1A1A] transition-colors cursor-pointer"
+            aria-label="Close QR action panel"
+            className="shrink-0 rounded-lg p-2 text-[var(--color-idea-muted)] transition-colors hover:bg-[var(--color-idea-light-grey)] hover:text-[var(--color-idea-text)]"
           >
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Modal Body */}
-        <div className="p-6">
-          {qrData.type === "asset" && renderAssetActions(qrData.entity)}
-          {qrData.type === "catalog" && renderCatalogActions(qrData.entity)}
-          {qrData.type === "location" && renderLocationActions(qrData.entity)}
-          {qrData.type === "request" && renderRequestActions(qrData.entity)}
-          {qrData.type === "user" && renderUserActions(qrData.entity)}
-          {qrData.type === "unknown" && (
-            <div className="text-center py-10 space-y-4">
-              <AlertTriangle className="w-12 h-12 text-[#D4AF37] mx-auto" />
-              <h4 className="font-serif font-bold text-xl text-[#1A1A1A]">
-                Unrecognized QR Identifier
-              </h4>
-              <p className="text-xs text-[#6C6863] max-w-xs mx-auto">
-                No matching asset, catalog item, location, request, or user
-                record found for QR payload{" "}
-                <span className="font-mono text-[#1A1A1A] font-bold">
+        <div className="overflow-y-auto p-6">
+          {qrData.type === 'asset' && renderAssetActions(qrData.entity)}
+
+          {qrData.type === 'catalog' && renderCatalogActions(qrData.entity)}
+
+          {qrData.type === 'location' && renderLocationActions(qrData.entity)}
+
+          {qrData.type === 'unknown' && (
+            <div className="space-y-4 py-10 text-center">
+              <AlertTriangle className="mx-auto h-12 w-12 text-[var(--color-idea-blue)]" />
+              <div>
+                <h4 className="text-xl font-bold text-[var(--color-idea-text)]">QR Not Recognized</h4>
+                <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-[var(--color-idea-muted)]">
+                  No matching Item, Asset or Location was found for this QR identifier.
+                </p>
+                <p className="mt-3 break-all rounded-lg bg-[var(--color-idea-light-grey)] px-3 py-2 font-mono text-xs font-semibold text-[var(--color-idea-text)]">
                   {qrData.rawCode}
-                </span>
-                .
-              </p>
+                </p>
+              </div>
             </div>
           )}
         </div>

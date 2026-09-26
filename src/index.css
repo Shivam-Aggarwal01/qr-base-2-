@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   /* AICTE IDEA Lab Brand Colours */
@@ -29,7 +29,7 @@
     margin: 0;
     background-color: var(--color-idea-background);
     color: var(--color-idea-text);
-    font-family: "Inter", sans-serif;
+    font-family: 'Inter', sans-serif;
   }
   button,
   input,
@@ -46,17 +46,8 @@
 /* IDEA LAB BACKGROUNDS */
 .idea-bg {
   background:
-    radial-gradient(
-      circle at 10% 10%,
-      rgba(10, 174, 240, 0.08),
-      transparent 30%
-    ),
-    radial-gradient(
-      circle at 90% 90%,
-      rgba(133, 180, 64, 0.08),
-      transparent 30%
-    ),
-    var(--color-idea-background);
+    radial-gradient(circle at 10% 10%, rgba(10, 174, 240, 0.08), transparent 30%),
+    radial-gradient(circle at 90% 90%, rgba(133, 180, 64, 0.08), transparent 30%), var(--color-idea-background);
 }
 
 /* Subtle technology / network background */
@@ -69,10 +60,7 @@
 
 /* Small dot network pattern */
 .dot-grid {
-  background-image: radial-gradient(
-    rgba(11, 76, 163, 0.16) 1px,
-    transparent 1px
-  );
+  background-image: radial-gradient(rgba(11, 76, 163, 0.16) 1px, transparent 1px);
 
   background-size: 20px 20px;
 }
@@ -82,11 +70,7 @@
   background: linear-gradient(135deg, #0aaef0 0%, #0b4ca3 100%);
 }
 .idea-gradient-soft {
-  background: linear-gradient(
-    135deg,
-    rgba(10, 174, 240, 0.12),
-    rgba(11, 76, 163, 0.06)
-  );
+  background: linear-gradient(135deg, rgba(10, 174, 240, 0.12), rgba(11, 76, 163, 0.06));
 }
 .idea-gradient-multi {
   background: linear-gradient(135deg, #0aaef0 0%, #0b4ca3 45%, #85b440 100%);
@@ -195,11 +179,7 @@
   width: 64px;
   height: 64px;
   border-radius: 16px;
-  background: linear-gradient(
-    135deg,
-    rgba(10, 174, 240, 0.12),
-    rgba(11, 76, 163, 0.08)
-  );
+  background: linear-gradient(135deg, rgba(10, 174, 240, 0.12), rgba(11, 76, 163, 0.08));
 }
 
 /* COLOUR ACCENT BAR */
@@ -242,12 +222,7 @@
 
 /* NETWORK / AI VISUAL ELEMENT */
 .network-glow {
-  background: radial-gradient(
-    circle,
-    rgba(10, 174, 240, 0.2) 0%,
-    rgba(10, 174, 240, 0.05) 35%,
-    transparent 70%
-  );
+  background: radial-gradient(circle, rgba(10, 174, 240, 0.2) 0%, rgba(10, 174, 240, 0.05) 35%, transparent 70%);
 }
 .blue-glow {
   box-shadow: 0 0 40px rgba(10, 174, 240, 0.15);
@@ -263,12 +238,7 @@
 }
 .idea-divider-gradient {
   height: 1px;
-  background: linear-gradient(
-    90deg,
-    transparent,
-    rgba(10, 174, 240, 0.35),
-    transparent
-  );
+  background: linear-gradient(90deg, transparent, rgba(10, 174, 240, 0.35), transparent);
 }
 
 /* SCROLLBAR */

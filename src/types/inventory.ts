@@ -1,26 +1,19 @@
-export type UserRole =
-  "ADMIN" | "STUDENT_AMBASSADOR" | "STUDENT_LEAD" | "STUDENT";
+// ============================================================
+// INVENTORY SYSTEM TYPES
+// All codes (item_code, asset_code, user_code, location code)
+// are generated server-side from Firestore doc IDs.
+// Users never enter or see internal codes.
+// ============================================================
 
-export type RequestUsage = "CONSUMABLE" | "REUSABLE";
+export type UserRole = 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT_LEAD' | 'STUDENT';
 
-export type AssetStatus =
-  | "AVAILABLE"
-  | "ISSUED"
-  | "UNDER_REPAIR"
-  | "DAMAGED"
-  | "LOST"
-  | "RETIRED";
+export type RequestUsage = 'CONSUMABLE' | 'REUSABLE';
 
-export type RequestStatus =
-  | "PENDING"
-  | "APPROVED"
-  | "REJECTED"
-  | "HANDED_OVER"
-  | "COMPLETED"
-  | "PARTIAL"
-  | "CANCELLED";
+export type AssetStatus = 'AVAILABLE' | 'ISSUED' | 'UNDER_REPAIR' | 'DAMAGED' | 'LOST' | 'RETIRED';
 
-export type RequestLineKind = "CATALOG" | "ASSET";
+export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'HANDED_OVER' | 'COMPLETED' | 'PARTIAL' | 'CANCELLED';
+
+export type RequestLineKind = 'CATALOG' | 'ASSET';
 
 export interface RequestLineDraft {
   kind: RequestLineKind;
@@ -30,7 +23,7 @@ export interface RequestLineDraft {
   usage?: RequestUsage;
 }
 
-export type AccountRequestStatus = "PENDING" | "APPROVED" | "REJECTED";
+export type AccountRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface AccountRequest {
   id: string;
@@ -43,18 +36,16 @@ export interface AccountRequest {
   updated_at: string;
 }
 
-export type TransactionType =
-  | "RECEIVE"
-  | "ISSUE"
-  | "RETURN"
-  | "MOVE"
-  | "ADJUSTMENT"
-  | "DAMAGE"
-  | "DISPOSAL";
+export type TransactionType = 'RECEIVE' | 'ISSUE' | 'RETURN' | 'MOVE' | 'ADJUSTMENT' | 'DAMAGE' | 'DISPOSAL';
 
+// ---------------------------------------------------------------------------
+// User
+// user_code is auto-generated as USR-<docId prefix>
+// ---------------------------------------------------------------------------
 export interface User {
   id: string;
-  user_code: string; // Roll Number or Employee ID
+  /** Auto-generated from Firestore doc ID — never entered manually. */
+  user_code: string;
   name: string;
   email: string;
   role: UserRole;
@@ -62,10 +53,15 @@ export interface User {
   updated_at: string;
 }
 
-export type AssetTrackingMode = "BOX" | "INDIVIDUAL";
+export type AssetTrackingMode = 'BOX' | 'INDIVIDUAL';
 
+// ---------------------------------------------------------------------------
+// CatalogItem
+// item_code is auto-generated as ITEM-<docId prefix> after creation
+// ---------------------------------------------------------------------------
 export interface CatalogItem {
   id: string;
+  /** Auto-generated from Firestore doc ID — never entered manually. */
   item_code: string;
   name: string;
   description: string;
@@ -77,15 +73,31 @@ export interface CatalogItem {
   updated_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// Location
+// code is auto-generated as LOC-<docId prefix> after creation
+// ---------------------------------------------------------------------------
+// Location
+// code is auto-generated as LOC-<docId prefix> after creation
+// ---------------------------------------------------------------------------
+
 export interface Location {
   id: string;
   name: string;
+  /** Auto-generated from Firestore doc ID — never entered manually. */
   code?: string;
+  /**
+   * Describes physical placement in the lab, dynamically.
+   * e.g. "Main Lab > Almirah 1 > Rack 2"
+   */
   storage_path?: string | null;
   created_at: string;
   updated_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// StockLevel
+// ---------------------------------------------------------------------------
 export interface StockLevel {
   id: string;
   catalog_item_id: string;
@@ -94,37 +106,53 @@ export interface StockLevel {
   updated_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// Asset
+// asset_code is auto-generated as ASSET-<docId prefix> after creation
+// ---------------------------------------------------------------------------
 export interface Asset {
   id: string;
+  /** Auto-generated from Firestore doc ID — never entered manually. */
   asset_code: string;
-  qr_code?: string;
+  /**
+   * Human-readable asset name, e.g. "Soldering Station 01".
+   * Required — every asset must have a unique, descriptive name.
+   */
+  name: string;
   catalog_item_id: string;
-  serial_number?: string;
+  serial_number?: string | null;
   status: AssetStatus;
   location_id?: string | null;
-  /** Human-readable path such as "Room 2 / Cupboard B / Row 3 / Bin 4". */
+  /** Detailed sub-location within the location, e.g. "Row 2, Shelf B". */
   storage_location?: string | null;
   assigned_to_user_id?: string | null;
-  tracking_mode?: AssetTrackingMode; // 'BOX' or 'INDIVIDUAL'
+  tracking_mode?: AssetTrackingMode;
   is_box?: boolean;
-  box_capacity?: number; // Total capacity of the box (e.g. 15)
-  available_in_box?: number; // Currently inside box available for checkout (e.g. 12)
+  box_capacity?: number;
+  available_in_box?: number;
   notes?: string;
   created_at: string;
   updated_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// AssetAssignment
+// ---------------------------------------------------------------------------
 export interface AssetAssignment {
   id: string;
   asset_id: string;
   assigned_to_user_id: string;
   assigned_by_user_id: string;
-  quantity?: number; // For box assets, how many units taken (default 1 for individual)
+  /** For box assets, how many units taken (default 1 for individual assets). */
+  quantity?: number;
   assigned_at: string;
   returned_at?: string | null;
   remarks?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Request + RequestItem
+// ---------------------------------------------------------------------------
 export interface RequestItem {
   id: string;
   request_id: string;
@@ -153,6 +181,9 @@ export interface Request {
   items?: RequestItem[];
 }
 
+// ---------------------------------------------------------------------------
+// InventoryTransaction
+// ---------------------------------------------------------------------------
 export interface InventoryTransaction {
   id: string;
   catalog_item_id?: string | null;
@@ -168,6 +199,9 @@ export interface InventoryTransaction {
   created_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// AuditLog
+// ---------------------------------------------------------------------------
 export interface AuditLog {
   id: string;
   user_id?: string | null;
@@ -177,12 +211,8 @@ export interface AuditLog {
   created_at: string;
 }
 
+// ---------------------------------------------------------------------------
+// View routing
+// ---------------------------------------------------------------------------
 export type ViewMode =
-  | "dashboard"
-  | "inventory"
-  | "assets"
-  | "requests"
-  | "locations"
-  | "activity"
-  | "qr-sheet"
-  | "users";
+  'dashboard' | 'inventory' | 'assets' | 'requests' | 'locations' | 'activity' | 'qr-sheet' | 'users';

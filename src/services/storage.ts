@@ -11,36 +11,24 @@ import {
   AssetStatus,
   TransactionType,
   RequestStatus,
-} from "../types/inventory";
+} from '../types/inventory';
 
 const STORAGE_KEYS = {
-  USERS: "lablogic_users_v1",
-  LOCATIONS: "lablogic_locations_v1",
-  CATALOG: "lablogic_catalog_v1",
-  STOCK: "lablogic_stock_v1",
-  ASSETS: "lablogic_assets_v1",
-  ASSIGNMENTS: "lablogic_assignments_v1",
-  REQUESTS: "lablogic_requests_v1",
-  TRANSACTIONS: "lablogic_transactions_v1",
-  AUDIT: "lablogic_audit_v1",
-  ACTIVE_USER: "lablogic_active_user_v1",
+  USERS: 'lablogic_users_v1',
+  LOCATIONS: 'lablogic_locations_v1',
+  CATALOG: 'lablogic_catalog_v1',
+  STOCK: 'lablogic_stock_v1',
+  ASSETS: 'lablogic_assets_v1',
+  ASSIGNMENTS: 'lablogic_assignments_v1',
+  REQUESTS: 'lablogic_requests_v1',
+  TRANSACTIONS: 'lablogic_transactions_v1',
+  AUDIT: 'lablogic_audit_v1',
+  ACTIVE_USER: 'lablogic_active_user_v1',
 };
 
-const VALID_ASSET_STATUSES: AssetStatus[] = [
-  "AVAILABLE",
-  "ISSUED",
-  "UNDER_REPAIR",
-  "DAMAGED",
-  "LOST",
-  "RETIRED",
-];
+const VALID_ASSET_STATUSES: AssetStatus[] = ['AVAILABLE', 'ISSUED', 'UNDER_REPAIR', 'DAMAGED', 'LOST', 'RETIRED'];
 
-const BLOCKED_ISSUE_STATUSES = new Set<AssetStatus>([
-  "DAMAGED",
-  "UNDER_REPAIR",
-  "LOST",
-  "RETIRED",
-]);
+const BLOCKED_ISSUE_STATUSES = new Set<AssetStatus>(['DAMAGED', 'UNDER_REPAIR', 'LOST', 'RETIRED']);
 
 function normalizeAssetQr(asset: Asset): string {
   return asset.qr_code || asset.asset_code || `AST-${asset.id}`;
@@ -54,27 +42,27 @@ function applyAssetRules(asset: Asset): void {
     throw new Error(`Unsupported asset status: ${asset.status}`);
   }
 
-  if (asset.status === "AVAILABLE" && !asset.location_id) {
-    throw new Error("An available asset must have a location.");
+  if (asset.status === 'AVAILABLE' && !asset.location_id) {
+    throw new Error('An available asset must have a location.');
   }
 
-  if (asset.status === "ISSUED") {
+  if (asset.status === 'ISSUED') {
     if (!asset.assigned_to_user_id) {
-      throw new Error("An issued asset must have an assigned user.");
+      throw new Error('An issued asset must have an assigned user.');
     }
     asset.location_id = null;
   }
 
-  if (asset.status === "AVAILABLE" && asset.assigned_to_user_id) {
+  if (asset.status === 'AVAILABLE' && asset.assigned_to_user_id) {
     asset.assigned_to_user_id = null;
   }
 
-  if (asset.status === "LOST" || asset.status === "RETIRED") {
+  if (asset.status === 'LOST' || asset.status === 'RETIRED') {
     asset.assigned_to_user_id = null;
     asset.location_id = null;
   }
 
-  if (["DAMAGED", "UNDER_REPAIR"].includes(asset.status)) {
+  if (['DAMAGED', 'UNDER_REPAIR'].includes(asset.status)) {
     asset.assigned_to_user_id = null;
   }
 }
@@ -113,11 +101,11 @@ export class InventoryStorage {
 
     return (
       users[0] || {
-        id: "guest-user",
-        user_code: "GUEST",
-        name: "Guest User",
-        email: "guest@local.dev",
-        role: "STUDENT",
+        id: 'guest-user',
+        user_code: 'GUEST',
+        name: 'Guest User',
+        email: 'guest@local.dev',
+        role: 'STUDENT',
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }
@@ -146,9 +134,7 @@ export class InventoryStorage {
   static deleteStockForItem(catalogItemId: string, itemCode?: string): void {
     const stocks = this.getStockLevels();
     const remaining = stocks.filter(
-      (stock) =>
-        stock.catalog_item_id !== catalogItemId &&
-        (!itemCode || stock.catalog_item_id !== itemCode),
+      (stock) => stock.catalog_item_id !== catalogItemId && (!itemCode || stock.catalog_item_id !== itemCode)
     );
     this.save(STORAGE_KEYS.STOCK, remaining);
   }
@@ -187,12 +173,7 @@ export class InventoryStorage {
   }
 
   // Audit logger
-  private static logAudit(
-    action: string,
-    entityType: string,
-    entityId: string,
-    userId?: string,
-  ) {
+  private static logAudit(action: string, entityType: string, entityId: string, userId?: string) {
     const logs = this.getAuditLogs();
     const newLog: AuditLog = {
       id: `aud-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -212,7 +193,7 @@ export class InventoryStorage {
     item: Partial<CatalogItem> & {
       name: string;
       item_code: string;
-    },
+    }
   ): CatalogItem {
     const items = this.getCatalog();
     const now = new Date().toISOString();
@@ -230,8 +211,8 @@ export class InventoryStorage {
         id: `cat-${Date.now()}`,
         item_code: item.item_code,
         name: item.name,
-        description: item.description || "",
-        unit: item.unit || "pcs",
+        description: item.description || '',
+        unit: item.unit || 'pcs',
         min_stock_alert: item.min_stock_alert || 10,
         created_at: now,
         updated_at: now,
@@ -244,11 +225,7 @@ export class InventoryStorage {
     }
 
     this.save(STORAGE_KEYS.CATALOG, items);
-    this.logAudit(
-      item.id ? "UPDATE_CATALOG_ITEM" : "CREATE_CATALOG_ITEM",
-      "CATALOG_ITEM",
-      savedItem.id,
-    );
+    this.logAudit(item.id ? 'UPDATE_CATALOG_ITEM' : 'CREATE_CATALOG_ITEM', 'CATALOG_ITEM', savedItem.id);
     return savedItem;
   }
 
@@ -258,16 +235,13 @@ export class InventoryStorage {
     locationId: string,
     quantityDelta: number,
     transactionType: TransactionType,
-    remarks?: string,
+    remarks?: string
   ): void {
     const stocks = this.getStockLevels();
     const activeUser = this.getActiveUser();
     const now = new Date().toISOString();
 
-    let stockItem = stocks.find(
-      (s) =>
-        s.catalog_item_id === catalogItemId && s.location_id === locationId,
-    );
+    let stockItem = stocks.find((s) => s.catalog_item_id === catalogItemId && s.location_id === locationId);
     if (!stockItem) {
       stockItem = {
         id: `stk-${Date.now()}`,
@@ -294,29 +268,23 @@ export class InventoryStorage {
       to_location_id: quantityDelta > 0 ? locationId : undefined,
       from_location_id: quantityDelta < 0 ? locationId : undefined,
       processed_by_user_id: activeUser.id,
-      remarks:
-        remarks ||
-        `Stock adjusted by ${quantityDelta > 0 ? "+" : ""}${quantityDelta}`,
+      remarks: remarks || `Stock adjusted by ${quantityDelta > 0 ? '+' : ''}${quantityDelta}`,
       created_at: now,
     };
     this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...txs]);
-    this.logAudit("ADJUST_STOCK", "STOCK_LEVEL", stockItem.id);
+    this.logAudit('ADJUST_STOCK', 'STOCK_LEVEL', stockItem.id);
 
     // Optionally sync to Firestore (non-blocking)
     try {
-      import("../services/firebaseCollections").then(async (module) => {
-        await module.updateDocument("stock_levels", stockItem!.id, {
+      import('../services/firebaseCollections').then(async (module) => {
+        await module.updateDocument('stock_levels', stockItem!.id, {
           quantity: stockItem!.quantity,
           updated_at: now,
         });
-        console.log(
-          `✅ Stock updated in Firestore: ${catalogItemId} -> ${stockItem!.quantity}`,
-        );
+        console.log(`✅ Stock updated in Firestore: ${catalogItemId} -> ${stockItem!.quantity}`);
       });
     } catch (error) {
-      console.log(
-        "ℹ️ Stock update to Firestore skipped (local storage updated)",
-      );
+      console.log('ℹ️ Stock update to Firestore skipped (local storage updated)');
     }
   }
 
@@ -326,29 +294,29 @@ export class InventoryStorage {
     toUserId: string,
     remarks?: string,
     requestId?: string,
-    quantityToTake: number = 1,
+    quantityToTake: number = 1
   ): Asset {
     const assets = this.getAssets();
     const activeUser = this.getActiveUser();
     const now = new Date().toISOString();
 
     const asset = assets.find((a) => a.id === assetId);
-    if (!asset) throw new Error("Asset not found");
+    if (!asset) throw new Error('Asset not found');
     if (!toUserId || !toUserId.trim()) {
-      throw new Error("An asset issue requires a valid assigned user.");
+      throw new Error('An asset issue requires a valid assigned user.');
     }
-    if (asset.status !== "AVAILABLE") {
-      throw new Error("This asset cannot be issued because it is not available.");
+    if (asset.status !== 'AVAILABLE') {
+      throw new Error('This asset cannot be issued because it is not available.');
     }
     if (BLOCKED_ISSUE_STATUSES.has(asset.status)) {
-      throw new Error("This asset cannot be issued because it is not available for issue.");
+      throw new Error('This asset cannot be issued because it is not available for issue.');
     }
     if (asset.assigned_to_user_id && asset.assigned_to_user_id !== toUserId) {
-      throw new Error("This asset is already assigned to another user.");
+      throw new Error('This asset is already assigned to another user.');
     }
 
     const previousLocationId = asset.location_id;
-    asset.status = "ISSUED";
+    asset.status = 'ISSUED';
     asset.assigned_to_user_id = toUserId;
     asset.location_id = null;
 
@@ -364,7 +332,7 @@ export class InventoryStorage {
       assigned_by_user_id: activeUser.id,
       quantity: 1,
       assigned_at: now,
-      remarks: remarks || "Issued to student",
+      remarks: remarks || 'Issued to student',
     };
     this.save(STORAGE_KEYS.ASSIGNMENTS, [newAssignment, ...assignments]);
 
@@ -373,7 +341,7 @@ export class InventoryStorage {
       id: `trx-${Date.now()}`,
       asset_id: assetId,
       catalog_item_id: asset.catalog_item_id,
-      transaction_type: "ISSUE",
+      transaction_type: 'ISSUE',
       quantity: 1,
       from_location_id: previousLocationId || undefined,
       issued_to_user_id: toUserId,
@@ -383,33 +351,28 @@ export class InventoryStorage {
       created_at: now,
     };
     this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...txs]);
-    this.logAudit("ISSUE_ASSET", "ASSET", assetId);
+    this.logAudit('ISSUE_ASSET', 'ASSET', assetId);
 
     return asset;
   }
 
   // Return Reusable Asset (or return units to a Box asset)
-  static returnAsset(
-    assetId: string,
-    toLocationId: string,
-    remarks?: string,
-    quantityToReturn: number = 1,
-  ): Asset {
+  static returnAsset(assetId: string, toLocationId: string, remarks?: string, quantityToReturn: number = 1): Asset {
     const assets = this.getAssets();
     const activeUser = this.getActiveUser();
     const now = new Date().toISOString();
 
     const asset = assets.find((a) => a.id === assetId);
-    if (!asset) throw new Error("Asset not found");
+    if (!asset) throw new Error('Asset not found');
     if (!toLocationId || !toLocationId.trim()) {
-      throw new Error("A returned asset must be assigned to a physical return location.");
+      throw new Error('A returned asset must be assigned to a physical return location.');
     }
-    if (asset.status === "RETIRED" || asset.status === "LOST") {
-      throw new Error("This asset cannot be returned because it is retired or lost.");
+    if (asset.status === 'RETIRED' || asset.status === 'LOST') {
+      throw new Error('This asset cannot be returned because it is retired or lost.');
     }
 
     const previousUser = asset.assigned_to_user_id;
-    asset.status = "AVAILABLE";
+    asset.status = 'AVAILABLE';
     asset.assigned_to_user_id = null;
     asset.location_id = toLocationId;
 
@@ -418,14 +381,11 @@ export class InventoryStorage {
     this.save(STORAGE_KEYS.ASSETS, assets);
 
     const assignments = this.getAssignments();
-    const activeAssignment = assignments.find(
-      (a) => a.asset_id === assetId && !a.returned_at,
-    );
+    const activeAssignment = assignments.find((a) => a.asset_id === assetId && !a.returned_at);
     if (activeAssignment) {
       activeAssignment.returned_at = now;
       if (remarks) {
-        activeAssignment.remarks =
-          (activeAssignment.remarks || "") + ` | Returned: ${remarks}`;
+        activeAssignment.remarks = (activeAssignment.remarks || '') + ` | Returned: ${remarks}`;
       }
       this.save(STORAGE_KEYS.ASSIGNMENTS, assignments);
     }
@@ -435,7 +395,7 @@ export class InventoryStorage {
       id: `trx-${Date.now()}`,
       asset_id: assetId,
       catalog_item_id: asset.catalog_item_id,
-      transaction_type: "RETURN",
+      transaction_type: 'RETURN',
       quantity: 1,
       to_location_id: toLocationId,
       issued_to_user_id: previousUser || undefined,
@@ -444,7 +404,7 @@ export class InventoryStorage {
       created_at: now,
     };
     this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...txs]);
-    this.logAudit("RETURN_ASSET", "ASSET", assetId);
+    this.logAudit('RETURN_ASSET', 'ASSET', assetId);
 
     return asset;
   }
@@ -454,14 +414,14 @@ export class InventoryStorage {
     assetId: string,
     newStatus: AssetStatus,
     newLocationId?: string | null,
-    remarks?: string,
+    remarks?: string
   ): Asset {
     const assets = this.getAssets();
     const activeUser = this.getActiveUser();
     const now = new Date().toISOString();
 
     const asset = assets.find((a) => a.id === assetId);
-    if (!asset) throw new Error("Asset not found");
+    if (!asset) throw new Error('Asset not found');
     if (!VALID_ASSET_STATUSES.includes(newStatus)) {
       throw new Error(`Unsupported asset status: ${newStatus}`);
     }
@@ -469,25 +429,25 @@ export class InventoryStorage {
     const prevLocation = asset.location_id;
     const currentStatus = asset.status;
 
-    if (currentStatus === "ISSUED" && newStatus !== "AVAILABLE" && newStatus !== "LOST" && newStatus !== "RETIRED") {
-      throw new Error("A currently issued asset must be returned before changing its status.");
+    if (currentStatus === 'ISSUED' && newStatus !== 'AVAILABLE' && newStatus !== 'LOST' && newStatus !== 'RETIRED') {
+      throw new Error('A currently issued asset must be returned before changing its status.');
     }
 
-    if (newStatus === "AVAILABLE") {
+    if (newStatus === 'AVAILABLE') {
       if (!newLocationId && !asset.location_id) {
-        throw new Error("Available asset must have a location.");
+        throw new Error('Available asset must have a location.');
       }
       asset.assigned_to_user_id = null;
       asset.location_id = newLocationId || asset.location_id || prevLocation || null;
-    } else if (newStatus === "LOST" || newStatus === "RETIRED") {
+    } else if (newStatus === 'LOST' || newStatus === 'RETIRED') {
       asset.assigned_to_user_id = null;
       asset.location_id = null;
-    } else if (newStatus === "DAMAGED" || newStatus === "UNDER_REPAIR") {
+    } else if (newStatus === 'DAMAGED' || newStatus === 'UNDER_REPAIR') {
       asset.assigned_to_user_id = null;
       if (newLocationId) asset.location_id = newLocationId;
-    } else if (newStatus === "ISSUED") {
+    } else if (newStatus === 'ISSUED') {
       if (!asset.assigned_to_user_id) {
-        throw new Error("Issued assets must already have a user assignment.");
+        throw new Error('Issued assets must already have a user assignment.');
       }
       asset.location_id = null;
     }
@@ -499,10 +459,10 @@ export class InventoryStorage {
     asset.updated_at = now;
     this.save(STORAGE_KEYS.ASSETS, assets);
 
-    let txType: TransactionType = "ADJUSTMENT";
-    if (newStatus === "DAMAGED") txType = "DAMAGE";
-    else if (newStatus === "RETIRED") txType = "DISPOSAL";
-    else if (newStatus === "AVAILABLE" && prevLocation !== asset.location_id) txType = "MOVE";
+    let txType: TransactionType = 'ADJUSTMENT';
+    if (newStatus === 'DAMAGED') txType = 'DAMAGE';
+    else if (newStatus === 'RETIRED') txType = 'DISPOSAL';
+    else if (newStatus === 'AVAILABLE' && prevLocation !== asset.location_id) txType = 'MOVE';
 
     const txs = this.getTransactions();
     const newTx: InventoryTransaction = {
@@ -518,7 +478,7 @@ export class InventoryStorage {
       created_at: now,
     };
     this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...txs]);
-    this.logAudit(`UPDATE_ASSET_STATUS_${newStatus}`, "ASSET", assetId);
+    this.logAudit(`UPDATE_ASSET_STATUS_${newStatus}`, 'ASSET', assetId);
 
     return asset;
   }
@@ -527,19 +487,19 @@ export class InventoryStorage {
     assetId: string,
     newLocationId: string,
     storageLocation: string,
-    remarks = "Asset storage location updated",
+    remarks = 'Asset storage location updated'
   ): Asset {
     const assets = this.getAssets();
     const activeUser = this.getActiveUser();
     const now = new Date().toISOString();
     const asset = assets.find((entry) => entry.id === assetId);
 
-    if (!asset) throw new Error("Asset not found");
-    if (asset.status === "ISSUED" || asset.status === "LOST" || asset.status === "RETIRED") {
-      throw new Error("Issued, lost, or retired assets cannot have a storage location.");
+    if (!asset) throw new Error('Asset not found');
+    if (asset.status === 'ISSUED' || asset.status === 'LOST' || asset.status === 'RETIRED') {
+      throw new Error('Issued, lost, or retired assets cannot have a storage location.');
     }
     if (!newLocationId.trim()) {
-      throw new Error("A room or storage location is required.");
+      throw new Error('A room or storage location is required.');
     }
 
     const previousLocation = asset.location_id;
@@ -553,7 +513,7 @@ export class InventoryStorage {
       id: `trx-${Date.now()}`,
       asset_id: assetId,
       catalog_item_id: asset.catalog_item_id,
-      transaction_type: previousLocation === newLocationId ? "ADJUSTMENT" : "MOVE",
+      transaction_type: previousLocation === newLocationId ? 'ADJUSTMENT' : 'MOVE',
       quantity: 1,
       from_location_id: previousLocation || undefined,
       to_location_id: newLocationId,
@@ -561,11 +521,8 @@ export class InventoryStorage {
       remarks,
       created_at: now,
     };
-    this.save(STORAGE_KEYS.TRANSACTIONS, [
-      newTx,
-      ...this.getTransactions(),
-    ]);
-    this.logAudit("UPDATE_ASSET_LOCATION", "ASSET", assetId);
+    this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...this.getTransactions()]);
+    this.logAudit('UPDATE_ASSET_LOCATION', 'ASSET', assetId);
     return asset;
   }
 
@@ -574,19 +531,19 @@ export class InventoryStorage {
     userId: string,
     purpose: string,
     items: { catalog_item_id: string; requested_qty: number }[],
-    remarks?: string,
+    remarks?: string
   ): Request {
     const requests = this.getRequests();
     const now = new Date().toISOString();
-    const reqNum = `REQ-${now.substring(0, 10).replace(/-/g, "")}-${Math.floor(100 + Math.random() * 900)}`;
+    const reqNum = `REQ-${now.substring(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
 
     const newReq: Request = {
       id: `req-${Date.now()}`,
       request_number: reqNum,
       user_id: userId,
       purpose,
-      status: "PENDING",
-      remarks: remarks || "",
+      status: 'PENDING',
+      remarks: remarks || '',
       created_at: now,
       updated_at: now,
       items: items.map((i, idx) => ({
@@ -598,36 +555,30 @@ export class InventoryStorage {
     };
 
     this.save(STORAGE_KEYS.REQUESTS, [newReq, ...requests]);
-    this.logAudit("CREATE_REQUEST", "REQUEST", newReq.id, userId);
+    this.logAudit('CREATE_REQUEST', 'REQUEST', newReq.id, userId);
     return newReq;
   }
 
   // Fulfill Request
-  static fulfillRequest(
-    requestId: string,
-    status: RequestStatus,
-    remarks?: string,
-  ): Request {
+  static fulfillRequest(requestId: string, status: RequestStatus, remarks?: string): Request {
     const requests = this.getRequests();
     const activeUser = this.getActiveUser();
     const now = new Date().toISOString();
 
     const req = requests.find((r) => r.id === requestId);
-    if (!req) throw new Error("Request not found");
+    if (!req) throw new Error('Request not found');
 
     req.status = status;
     req.approved_by_user_id = activeUser.id;
     if (remarks) req.remarks = remarks;
     req.updated_at = now;
 
-    if (status === "COMPLETED" || status === "PARTIAL") {
+    if (status === 'COMPLETED' || status === 'PARTIAL') {
       const catalogItems = this.getCatalog();
-      const defaultStore = this.getLocations()[0]?.id || "default-storage";
+      const defaultStore = this.getLocations()[0]?.id || 'default-storage';
 
       req.items?.forEach((item) => {
-        const catalogItem = catalogItems.find(
-          (catalog) => catalog.id === item.catalog_item_id,
-        );
+        const catalogItem = catalogItems.find((catalog) => catalog.id === item.catalog_item_id);
         const storagePlace = catalogItem?.storage_place || defaultStore;
 
         if (item.catalog_item_id && item.requested_qty > 0 && !item.asset_id) {
@@ -635,19 +586,19 @@ export class InventoryStorage {
             item.catalog_item_id,
             storagePlace,
             -item.requested_qty,
-            "ISSUE",
-            `Issued via request ${req.request_number}`,
+            'ISSUE',
+            `Issued via request ${req.request_number}`
           );
         }
       });
     }
 
-    if (status === "CANCELLED") {
-      req.remarks = remarks || "Request rejected and no stock was deducted.";
+    if (status === 'CANCELLED') {
+      req.remarks = remarks || 'Request rejected and no stock was deducted.';
     }
 
     this.save(STORAGE_KEYS.REQUESTS, requests);
-    this.logAudit(`FULFILL_REQUEST_${status}`, "REQUEST", requestId);
+    this.logAudit(`FULFILL_REQUEST_${status}`, 'REQUEST', requestId);
     return req;
   }
 
@@ -661,14 +612,14 @@ export class InventoryStorage {
       code:
         code ||
         `LOC-${name
-          .replace(/[^a-zA-Z0-9]/g, "")
+          .replace(/[^a-zA-Z0-9]/g, '')
           .substring(0, 6)
           .toUpperCase()}`,
       created_at: now,
       updated_at: now,
     };
     this.save(STORAGE_KEYS.LOCATIONS, [...locations, newLoc]);
-    this.logAudit("CREATE_LOCATION", "LOCATION", newLoc.id);
+    this.logAudit('CREATE_LOCATION', 'LOCATION', newLoc.id);
     return newLoc;
   }
 
@@ -679,7 +630,7 @@ export class InventoryStorage {
     locationId: string,
     serialNumber?: string,
     notes?: string,
-    storageLocation?: string,
+    storageLocation?: string
   ): Asset {
     const assets = this.getAssets();
     const now = new Date().toISOString();
@@ -690,23 +641,23 @@ export class InventoryStorage {
       qr_code: normalizedCode,
       catalog_item_id: catalogItemId,
       serial_number: serialNumber,
-      status: "AVAILABLE",
+      status: 'AVAILABLE',
       location_id: locationId,
       storage_location: storageLocation?.trim() || null,
       assigned_to_user_id: null,
-      notes: notes || "",
+      notes: notes || '',
       created_at: now,
       updated_at: now,
     };
     applyAssetRules(newAsset);
     this.save(STORAGE_KEYS.ASSETS, [newAsset, ...assets]);
-    this.logAudit("CREATE_ASSET", "ASSET", newAsset.id);
+    this.logAudit('CREATE_ASSET', 'ASSET', newAsset.id);
     return newAsset;
   }
 
   // QR Code lookup service (matches code string to user, asset, catalog item, location, or request)
   static parseQRCode(qrData: string): {
-    type: "asset" | "catalog" | "location" | "request" | "user" | "unknown";
+    type: 'asset' | 'catalog' | 'location' | 'request' | 'user' | 'unknown';
     entity: any;
     rawCode: string;
   } {
@@ -722,58 +673,41 @@ export class InventoryStorage {
       (a) =>
         a.id.toLowerCase() === cleanData.toLowerCase() ||
         a.asset_code.toLowerCase() === cleanData.toLowerCase() ||
-        a.serial_number?.toLowerCase() === cleanData.toLowerCase(),
+        a.serial_number?.toLowerCase() === cleanData.toLowerCase()
     );
-    if (foundAsset)
-      return { type: "asset", entity: foundAsset, rawCode: cleanData };
+    if (foundAsset) return { type: 'asset', entity: foundAsset, rawCode: cleanData };
 
     // 2. Check Catalog Item Code
     const foundCatalog = catalog.find(
-      (c) =>
-        c.id.toLowerCase() === cleanData.toLowerCase() ||
-        c.item_code.toLowerCase() === cleanData.toLowerCase(),
+      (c) => c.id.toLowerCase() === cleanData.toLowerCase() || c.item_code.toLowerCase() === cleanData.toLowerCase()
     );
-    if (foundCatalog)
-      return { type: "catalog", entity: foundCatalog, rawCode: cleanData };
+    if (foundCatalog) return { type: 'catalog', entity: foundCatalog, rawCode: cleanData };
 
     // 3. Check Location Code or Name
     const foundLoc = locations.find(
       (l) =>
         l.id.toLowerCase() === cleanData.toLowerCase() ||
         l.code?.toLowerCase() === cleanData.toLowerCase() ||
-        l.name.toLowerCase() === cleanData.toLowerCase(),
+        l.name.toLowerCase() === cleanData.toLowerCase()
     );
-    if (foundLoc)
-      return { type: "location", entity: foundLoc, rawCode: cleanData };
+    if (foundLoc) return { type: 'location', entity: foundLoc, rawCode: cleanData };
 
     // 4. Check Request Number
-    const foundReq = requests.find(
-      (r) => r.request_number.toLowerCase() === cleanData.toLowerCase(),
-    );
-    if (foundReq)
-      return { type: "request", entity: foundReq, rawCode: cleanData };
+    const foundReq = requests.find((r) => r.request_number.toLowerCase() === cleanData.toLowerCase());
+    if (foundReq) return { type: 'request', entity: foundReq, rawCode: cleanData };
 
     // 5. Check User Code
-    const foundUser = users.find(
-      (u) => u.user_code.toLowerCase() === cleanData.toLowerCase(),
-    );
-    if (foundUser)
-      return { type: "user", entity: foundUser, rawCode: cleanData };
+    const foundUser = users.find((u) => u.user_code.toLowerCase() === cleanData.toLowerCase());
+    if (foundUser) return { type: 'user', entity: foundUser, rawCode: cleanData };
 
     // Search loose match
-    const fuzzyAsset = assets.find((a) =>
-      cleanData.toLowerCase().includes(a.asset_code.toLowerCase()),
-    );
-    if (fuzzyAsset)
-      return { type: "asset", entity: fuzzyAsset, rawCode: cleanData };
+    const fuzzyAsset = assets.find((a) => cleanData.toLowerCase().includes(a.asset_code.toLowerCase()));
+    if (fuzzyAsset) return { type: 'asset', entity: fuzzyAsset, rawCode: cleanData };
 
-    const fuzzyCatalog = catalog.find((c) =>
-      cleanData.toLowerCase().includes(c.item_code.toLowerCase()),
-    );
-    if (fuzzyCatalog)
-      return { type: "catalog", entity: fuzzyCatalog, rawCode: cleanData };
+    const fuzzyCatalog = catalog.find((c) => cleanData.toLowerCase().includes(c.item_code.toLowerCase()));
+    if (fuzzyCatalog) return { type: 'catalog', entity: fuzzyCatalog, rawCode: cleanData };
 
-    return { type: "unknown", entity: null, rawCode: cleanData };
+    return { type: 'unknown', entity: null, rawCode: cleanData };
   }
 }
 
@@ -787,10 +721,7 @@ export type QRParseEntities = {
 
 // Overload-like helper: keeps existing call sites working, but allows
 // QR parsing to use the in-memory Firestore state.
-export function parseQRCodeFromEntities(
-  qrData: string,
-  entities: QRParseEntities,
-) {
+export function parseQRCodeFromEntities(qrData: string, entities: QRParseEntities) {
   const cleanData = qrData.trim();
   const assets = entities.assets ?? InventoryStorage.getAssets();
   const catalog = entities.catalog ?? InventoryStorage.getCatalog();
@@ -803,20 +734,17 @@ export function parseQRCodeFromEntities(
     (a) =>
       a.id.toLowerCase() === cleanData.toLowerCase() ||
       a.asset_code.toLowerCase() === cleanData.toLowerCase() ||
-      a.serial_number?.toLowerCase() === cleanData.toLowerCase(),
+      a.serial_number?.toLowerCase() === cleanData.toLowerCase()
   );
-  if (foundAsset)
-    return { type: "asset" as const, entity: foundAsset, rawCode: cleanData };
+  if (foundAsset) return { type: 'asset' as const, entity: foundAsset, rawCode: cleanData };
 
   // 2. Check Catalog Item Code
   const foundCatalog = catalog.find(
-    (c) =>
-      c.id.toLowerCase() === cleanData.toLowerCase() ||
-      c.item_code.toLowerCase() === cleanData.toLowerCase(),
+    (c) => c.id.toLowerCase() === cleanData.toLowerCase() || c.item_code.toLowerCase() === cleanData.toLowerCase()
   );
   if (foundCatalog)
     return {
-      type: "catalog" as const,
+      type: 'catalog' as const,
       entity: foundCatalog,
       rawCode: cleanData,
     };
@@ -826,41 +754,29 @@ export function parseQRCodeFromEntities(
     (l) =>
       l.id.toLowerCase() === cleanData.toLowerCase() ||
       l.code?.toLowerCase() === cleanData.toLowerCase() ||
-      l.name.toLowerCase() === cleanData.toLowerCase(),
+      l.name.toLowerCase() === cleanData.toLowerCase()
   );
-  if (foundLoc)
-    return { type: "location" as const, entity: foundLoc, rawCode: cleanData };
+  if (foundLoc) return { type: 'location' as const, entity: foundLoc, rawCode: cleanData };
 
   // 4. Check Request Number
-  const foundReq = requests.find(
-    (r) => r.request_number.toLowerCase() === cleanData.toLowerCase(),
-  );
-  if (foundReq)
-    return { type: "request" as const, entity: foundReq, rawCode: cleanData };
+  const foundReq = requests.find((r) => r.request_number.toLowerCase() === cleanData.toLowerCase());
+  if (foundReq) return { type: 'request' as const, entity: foundReq, rawCode: cleanData };
 
   // 5. Check User Code
-  const foundUser = users.find(
-    (u) => u.user_code.toLowerCase() === cleanData.toLowerCase(),
-  );
-  if (foundUser)
-    return { type: "user" as const, entity: foundUser, rawCode: cleanData };
+  const foundUser = users.find((u) => u.user_code.toLowerCase() === cleanData.toLowerCase());
+  if (foundUser) return { type: 'user' as const, entity: foundUser, rawCode: cleanData };
 
   // Search loose match
-  const fuzzyAsset = assets.find((a) =>
-    cleanData.toLowerCase().includes(a.asset_code.toLowerCase()),
-  );
-  if (fuzzyAsset)
-    return { type: "asset" as const, entity: fuzzyAsset, rawCode: cleanData };
+  const fuzzyAsset = assets.find((a) => cleanData.toLowerCase().includes(a.asset_code.toLowerCase()));
+  if (fuzzyAsset) return { type: 'asset' as const, entity: fuzzyAsset, rawCode: cleanData };
 
-  const fuzzyCatalog = catalog.find((c) =>
-    cleanData.toLowerCase().includes(c.item_code.toLowerCase()),
-  );
+  const fuzzyCatalog = catalog.find((c) => cleanData.toLowerCase().includes(c.item_code.toLowerCase()));
   if (fuzzyCatalog)
     return {
-      type: "catalog" as const,
+      type: 'catalog' as const,
       entity: fuzzyCatalog,
       rawCode: cleanData,
     };
 
-  return { type: "unknown" as const, entity: null, rawCode: cleanData };
+  return { type: 'unknown' as const, entity: null, rawCode: cleanData };
 }

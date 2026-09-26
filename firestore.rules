@@ -1,60 +1,51 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
     function signedIn() {
       return request.auth != null;
     }
-
     function userDocPath() {
       return /databases/$(database)/documents/users/$(request.auth.uid);
     }
-
     function role() {
       return signedIn() && exists(userDocPath())
         ? get(userDocPath()).data.role
         : null;
     }
-
-    function isAdminEmail() {
-      return signedIn() && request.auth.token.email != null && (
-        request.auth.token.email.matches('(?i)^shivamafterall111@gmail\\.com$') ||
-        request.auth.token.email.matches('(?i)^mohitdavar2004@gmail\\.com$')
-      );
-    }
-
-    // Admin level: hardcoded emails must win even if the users/{uid} doc is missing.
     function isAdmin() {
-      return isAdminEmail() || role() == 'ADMIN';
+      return signedIn() &&
+        request.auth.token.role == 'ADMIN';
     }
-
-    // Staff level (STUDENT_AMBASSADOR, STUDENT_LEAD): Can issue inventory, manage catalog, approve requests
     function isStaff() {
-      return isAdmin() || (signedIn() && role() in ['STUDENT_LEAD', 'STUDENT_AMBASSADOR']);
+      return signedIn() &&
+        request.auth.token.role in [
+          'ADMIN',
+          'STUDENT_LEAD',
+          'STUDENT_AMBASSADOR'
+        ];
     }
-
     function isStudent() {
-      return signedIn() && (
-        role() in ['ADMIN', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR', 'STUDENT'] ||
-        request.auth.uid != null
-      );
+      return signedIn() &&
+        request.auth.token.role == 'STUDENT';
     }
 
     match /users/{userId} {
-      allow read: if signedIn();
+      allow read: if signedIn() &&
+        (request.auth.uid == userId || isStaff());
       allow create: if signedIn() && (
         isAdmin() ||
         (
-          request.auth.uid == userId && (
-            isAdminEmail() ||
-            (
-              exists(/databases/$(database)/documents/account_requests/$(userId)) &&
-              get(/databases/$(database)/documents/account_requests/$(userId)).data.status == 'APPROVED'
-            )
-          )
+          request.auth.uid == userId &&
+          exists(/databases/$(database)/documents/account_requests/$(userId)) &&
+          get(/databases/$(database)/documents/account_requests/$(userId)).data.status == 'APPROVED'
         )
       );
-      allow update: if signedIn() && (request.auth.uid == userId || isAdmin());
+      allow update: if isAdmin() ||
+        (
+          signedIn() &&
+          request.auth.uid == userId &&
+          request.resource.data.role == resource.data.role
+        );
       allow delete: if isAdmin();
     }
 
@@ -62,7 +53,8 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.auth.uid == requestId
         && request.resource.data.status == 'PENDING';
-      allow read: if signedIn() && (request.auth.uid == requestId || isAdmin());
+      allow read: if signedIn() &&
+        (request.auth.uid == requestId || isAdmin());
       allow update, delete: if isAdmin();
     }
 
@@ -92,11 +84,10 @@ service cloud.firestore {
     }
 
     match /requests/{requestId} {
-      // Users can see their own requests; staff can see all
-      allow read: if signedIn() && (request.auth.uid == resource.data.user_id || isStaff());
-      // Students can submit their own requests, even before a profile doc exists.
-      allow create: if signedIn() && request.auth.uid == request.resource.data.user_id;
-      // Only staff can update status (approve, partial, complete)
+      allow read: if signedIn() &&
+        (request.auth.uid == resource.data.user_id || isStaff());
+      allow create: if signedIn() &&
+        request.auth.uid == request.resource.data.user_id;
       allow update: if isStaff();
       allow delete: if isAdmin();
     }
@@ -104,22 +95,23 @@ service cloud.firestore {
     match /requests/{requestId}/request_items/{requestItemId} {
       allow read: if signedIn();
       allow create: if signedIn() && (
-        request.auth.uid == get(/databases/$(database)/documents/requests/$(requestId)).data.user_id ||
+        request.auth.uid ==
+          get(/databases/$(database)/documents/requests/$(requestId)).data.user_id ||
         isStaff()
       );
       allow update, delete: if isStaff();
     }
 
     match /inventory_transactions/{txId} {
-      allow read: if signedIn();
+      allow read: if isStaff();
       allow create: if isStaff();
-      allow update, delete: if isAdmin();
+      allow update, delete: if false;
     }
 
     match /audit_logs/{logId} {
-      allow read: if signedIn();
+      allow read: if isStaff();
       allow create: if isStaff();
-      allow update, delete: if isAdmin();
+      allow update, delete: if false;
     }
   }
 }
