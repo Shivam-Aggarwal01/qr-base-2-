@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { loginWithGoogle, STUDENT_SIGNUP_NAME_KEY } from '../services/firebaseInventory';
 import { StudentLoginRequest } from './StudentLoginRequest';
 import type { AccountRequestStatus } from '../types/inventory';
+import { Link } from 'react-router-dom';
 
 interface FirebaseAuthPanelProps {
   accessNotice?: {
@@ -128,6 +129,12 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ accessNoti
           </div>
         </div>
         <p className="mt-6 text-center text-[11px] text-[#8b9aa3] tracking-wide">AICTE IDEA Lab</p>
+        <p className="mt-3 text-center text-[11px] leading-5 text-[#8b9aa3]">
+          By continuing, you agree to our{' '}
+          <Link to="/terms" className="font-semibold text-idea-deep-blue hover:text-idea-blue">Terms of Service</Link>{' '}
+          and acknowledge our{' '}
+          <Link to="/privacy" className="font-semibold text-idea-deep-blue hover:text-idea-blue">Privacy Policy</Link>.
+        </p>
       </div>
     </div>
   );

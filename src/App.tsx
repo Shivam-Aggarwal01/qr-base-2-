@@ -34,6 +34,7 @@ import { QRGeneratorModal } from './components/QRGeneratorModal';
 import { QuickActionModal } from './components/QuickActionModal';
 import { NewRequestModal } from './components/NewRequestModal';
 import { StudentInventoryView } from './components/StudentInventoryView';
+import { LegalPage } from './components/LegalPage';
 import {
   User,
   CatalogItem,
@@ -81,6 +82,8 @@ const pathViews = Object.fromEntries(
   Object.entries(viewPaths).map(([view, path]) => [path, view as ViewMode])
 ) as Record<string, ViewMode>;
 
+const legalPaths = ['/privacy', '/terms'];
+
 const viewMetadata: Record<ViewMode, { title: string; description: string }> = {
   dashboard: {
     title: 'Dashboard',
@@ -122,7 +125,7 @@ export default function App() {
   const currentView = pathViews[location.pathname] ?? 'dashboard';
   const setCurrentView = (view: ViewMode) => navigate(viewPaths[view]);
   const pageMetadata = viewMetadata[currentView];
-  const pageTitle = `${pageMetadata.title} | AICTE Inventory Management`;
+  const pageTitle = `${pageMetadata.title} | IDEA LAB Inventory Management`;
   const pageDescription = pageMetadata.description;
   const pageUrl = `${window.location.origin}${location.pathname}`;
   const socialImage = `${window.location.origin}/social-preview.png`;
@@ -343,6 +346,9 @@ export default function App() {
   // Navigation
   // ---------------------------------------------------------------------------
   useEffect(() => {
+    if (legalPaths.includes(location.pathname)) {
+      return;
+    }
     if (location.pathname === '/') {
       navigate(viewPaths.dashboard, { replace: true });
       return;
@@ -494,6 +500,9 @@ export default function App() {
   // ---------------------------------------------------------------------------
   // Authentication screens
   // ---------------------------------------------------------------------------
+  if (location.pathname === '/privacy' || location.pathname === '/terms') {
+    return <LegalPage kind={location.pathname === '/privacy' ? 'privacy' : 'terms'} />;
+  }
   if (!authReady) {
     return (
       <>
