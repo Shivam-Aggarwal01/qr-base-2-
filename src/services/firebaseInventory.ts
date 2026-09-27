@@ -317,8 +317,9 @@ export async function completeGoogleRedirect(): Promise<FirebaseUser | null> {
   return result?.user ?? null;
 }
 
-export async function loginWithGoogle(): Promise<FirebaseUser | null> {
+export async function loginWithGoogle(allowRedirect = true): Promise<FirebaseUser | null> {
   const provider = new GoogleAuthProvider();
+
   provider.setCustomParameters({
     prompt: 'select_account',
   });
@@ -334,7 +335,13 @@ export async function loginWithGoogle(): Promise<FirebaseUser | null> {
       error?.code === 'auth/internal-error' ||
       /Cross-Origin-Opener-Policy|window\.closed|window\.close/i.test(String(error?.message || ''));
 
-    if (shouldUseRedirect) {
+    /*
+     * Login can fall back to redirect.
+     *
+     * Signup cannot use redirect because it needs the Firebase
+     * user immediately to create the account request.
+     */
+    if (shouldUseRedirect && allowRedirect) {
       await signInWithRedirect(auth, provider);
       return null;
     }

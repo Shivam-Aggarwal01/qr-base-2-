@@ -2,17 +2,19 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // -----------------------------
+
+    // ============================================================
     // Authentication and roles
-    // -----------------------------
+    // ============================================================
+
     function signedIn() {
       return request.auth != null;
     }
+
     function userDocPath() {
       return /databases/$(database)/documents/users/$(request.auth.uid);
     }
-    // Firestore user document is the primary role source.
-    // Auth custom claim is used as a fallback.
+
     function role() {
       return signedIn()
         ? (
@@ -22,9 +24,11 @@ service cloud.firestore {
           )
         : null;
     }
+
     function isAdmin() {
       return role() == 'ADMIN';
     }
+
     function isStaff() {
       return role() in [
         'ADMIN',
@@ -32,15 +36,18 @@ service cloud.firestore {
         'STUDENT_AMBASSADOR'
       ];
     }
+
     function isStudent() {
       return role() == 'STUDENT';
     }
 
 
-    // -----------------------------
+    // ============================================================
     // Users
-    // -----------------------------
+    // ============================================================
+
     match /users/{userId} {
+
       // Users can read themselves.
       // Staff can read all users.
       allow read: if signedIn() &&
@@ -48,132 +55,163 @@ service cloud.firestore {
           request.auth.uid == userId ||
           isStaff()
         );
-      // User can create their own profile only when
-      // an approved account request exists.
+
+      // Admin can create any user.
       //
-      // Students cannot choose another role during signup.
+      // A student can create only their own profile after
+      // their account request has been approved.
       allow create: if signedIn() && (
         isAdmin() ||
         (
           request.auth.uid == userId &&
+
           exists(
             /databases/$(database)/documents/account_requests/$(userId)
           ) &&
+
           get(
             /databases/$(database)/documents/account_requests/$(userId)
           ).data.status == 'APPROVED' &&
+
           request.resource.data.role == 'STUDENT'
         )
       );
+
       // Admin can update any user.
       //
-      // Non-admin users can only update their own profile,
-      // and only non-sensitive profile fields.
+      // Non-admin users can update only their own profile.
+      // They cannot change role, email, or status.
       allow update: if isAdmin() ||
         (
           signedIn() &&
           request.auth.uid == userId &&
 
-          // Role cannot be changed.
           request.resource.data.role == resource.data.role &&
-
-          // Sensitive account fields cannot be changed.
           request.resource.data.email == resource.data.email &&
           request.resource.data.status == resource.data.status
         );
+
+      // Only admins can delete users.
       allow delete: if isAdmin();
     }
 
 
-    // -----------------------------
+    // ============================================================
     // Account Requests
-    // -----------------------------
+    // ============================================================
+
     match /account_requests/{requestId} {
-      // User can submit their own account request.
+
+      // A signed-in user can create their own request.
+      //
+      // The request must start as PENDING.
       allow create: if signedIn() &&
         request.auth.uid == requestId &&
         request.resource.data.status == 'PENDING';
-      // User can read their own request.
-      // Admin can read all requests.
+
+      // A student can read only their own request.
+      // Admins can read all requests.
       allow read: if signedIn() &&
         (
           request.auth.uid == requestId ||
           isAdmin()
         );
-      // Only admin can approve/reject/delete.
-      allow update, delete: if isAdmin();
+
+      // Only admins can approve, reject, or otherwise modify
+      // an account request.
+      allow update: if isAdmin();
+
+      // Only admins can delete requests.
+      allow delete: if isAdmin();
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Catalog Items
-    // -----------------------------
+    // ============================================================
+
     match /catalog_items/{itemId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Locations
-    // -----------------------------
+    // ============================================================
+
     match /locations/{locationId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Stock Levels
-    // -----------------------------
+    // ============================================================
+
     match /stock_levels/{stockId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Assets
-    // -----------------------------
+    // ============================================================
+
     match /assets/{assetId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Asset Assignments
-    // -----------------------------
+    // ============================================================
+
     match /asset_assignments/{assignmentId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Requests
-    // -----------------------------
+    // ============================================================
+
     match /requests/{requestId} {
+
       // Staff can read all requests.
       //
-      // A student can read only their own request.
-      // Using isStaff() as a separate condition ensures
-      // collection/list queries work correctly.
+      // Students can read only requests belonging to them.
       allow read: if isStaff() ||
         (
           signedIn() &&
           resource.data.user_id == request.auth.uid
         );
+
       // A signed-in user can create only their own request.
       allow create: if signedIn() &&
         request.auth.uid == request.resource.data.user_id;
-      // Staff manage requests.
+
+      // Staff can update requests.
       allow update: if isStaff();
+
+      // Only admins can delete requests.
       allow delete: if isAdmin();
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Request Items
-    // -----------------------------
+    // ============================================================
+
     match /requests/{requestId}/request_items/{requestItemId} {
+
       // Staff can read all request items.
       //
-      // Students can only read request items belonging
-      // to their own request.
+      // Students can read items only from their own request.
       allow read: if isStaff() ||
         (
           signedIn() &&
@@ -181,6 +219,7 @@ service cloud.firestore {
             /databases/$(database)/documents/requests/$(requestId)
           ).data.user_id == request.auth.uid
         );
+
       // Request owner or staff can add request items.
       allow create: if signedIn() && (
         isStaff() ||
@@ -188,28 +227,36 @@ service cloud.firestore {
           /databases/$(database)/documents/requests/$(requestId)
         ).data.user_id == request.auth.uid
       );
+
       // Staff manage request items.
       allow update, delete: if isStaff();
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Inventory Transactions
-    // -----------------------------
+    // ============================================================
+
     match /inventory_transactions/{txId} {
-      // Historical inventory transactions should not be
-      // modified or created directly by clients.
+
+      // Historical inventory transactions are readable by staff.
       allow read: if isStaff();
+
+      // Transactions must be written by trusted backend code.
       allow create, update, delete: if false;
     }
 
-    // -----------------------------
+
+    // ============================================================
     // Audit Logs
-    // -----------------------------
+    // ============================================================
+
     match /audit_logs/{logId} {
-      // Audit logs are visible to staff.
+
+      // Staff can read audit logs.
       allow read: if isStaff();
-      // Audit logs should be written by trusted
-      // server-side code only.
+
+      // Audit logs must be written by trusted backend code.
       allow create, update, delete: if false;
     }
   }

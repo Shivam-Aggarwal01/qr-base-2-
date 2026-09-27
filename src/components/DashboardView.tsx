@@ -10,17 +10,7 @@ import {
   ScrollText,
   Users,
 } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-} from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip } from 'recharts';
 
 import {
   Asset,
@@ -69,10 +59,10 @@ const getTimeAgo = (dateString: string) => {
   const diff = (Date.now() - new Date(dateString).getTime()) / 1000;
 
   if (diff < 60) return 'Just now';
-  if (diff < 3600) return `${ Math.floor(diff / 60) }m ago`;
-  if (diff < 86400) return `${ Math.floor(diff / 3600) }h ago`;
+  if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
 
-  return `${ Math.floor(diff / 86400) }d ago`;
+  return `${Math.floor(diff / 86400)}d ago`;
 };
 
 const CHART_COLORS = {
@@ -108,17 +98,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     const approvedRequests = myRequests.filter((r) => r.status === 'APPROVED');
 
-    const completedRequests = myRequests.filter(
-      (r) => r.status === 'HANDED_OVER' || r.status === 'COMPLETED'
-    );
+    const completedRequests = myRequests.filter((r) => r.status === 'HANDED_OVER' || r.status === 'COMPLETED');
 
     const visibleRequests = myRequests.filter((r) =>
       ['PENDING', 'APPROVED', 'HANDED_OVER', 'COMPLETED'].includes(r.status)
     );
 
-    const issuedAssets = assets.filter(
-      (a) => a.assigned_to_user_id === currentUser.id && a.status === 'ISSUED'
-    );
+    const issuedAssets = assets.filter((a) => a.assigned_to_user_id === currentUser.id && a.status === 'ISSUED');
 
     const reusableItems = myRequests
       .filter((r) => r.status === 'HANDED_OVER')
@@ -126,16 +112,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         (r.items ?? [])
           .filter((i) => !i.asset_id && i.usage === 'REUSABLE')
           .map((i) => ({
-            id: `${ r.id } -${ i.id } `,
+            id: `${r.id} -${i.id} `,
             catalogItemId: i.catalog_item_id || '',
             quantity: Number(i.requested_qty) || 0,
           }))
       )
       .filter((i) => i.catalogItemId && i.quantity > 0);
 
-    const currentlyHeldCount =
-      issuedAssets.length +
-      reusableItems.reduce((total, item) => total + item.quantity, 0);
+    const currentlyHeldCount = issuedAssets.length + reusableItems.reduce((total, item) => total + item.quantity, 0);
 
     return (
       <div className="flex-1 overflow-y-auto idea-bg">
@@ -193,25 +177,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 bar: 'bg-[var(--color-idea-deep-blue)]',
               },
             ].map((metric) => (
-              <div
-                key={metric.label}
-                className="idea-card p-5 relative overflow-hidden"
-              >
-                <div
-                  className={`absolute top - 0 left - 0 w - full h - 1 ${ metric.bar } `}
-                />
+              <div key={metric.label} className="idea-card p-5 relative overflow-hidden">
+                <div className={`absolute top - 0 left - 0 w - full h - 1 ${metric.bar} `} />
 
                 <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
                   {metric.label}
                 </p>
 
-                <p className="text-4xl font-bold text-idea-text mt-2">
-                  {metric.value}
-                </p>
+                <p className="text-4xl font-bold text-idea-text mt-2">{metric.value}</p>
 
-                <p className="text-[10px] text-idea-muted mt-2">
-                  {metric.sub}
-                </p>
+                <p className="text-[10px] text-idea-muted mt-2">{metric.sub}</p>
               </div>
             ))}
           </div>
@@ -224,9 +199,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Requests
                   </p>
 
-                  <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">
-                    Recent Requests
-                  </h2>
+                  <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">Recent Requests</h2>
                 </div>
 
                 <button
@@ -243,9 +216,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="p-8 text-center">
                   <ClipboardList className="w-7 h-7 mx-auto text-[var(--color-idea-blue)]" />
 
-                  <p className="text-sm font-semibold text-[var(--color-idea-text)] mt-3">
-                    No requests yet
-                  </p>
+                  <p className="text-sm font-semibold text-[var(--color-idea-text)] mt-3">No requests yet</p>
 
                   <p className="text-xs text-[var(--color-idea-muted)] mt-1">
                     Create a request when you need an item or specific asset.
@@ -265,11 +236,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </span>
 
                           <span
-                            className={`text - [8px] px - 2 py - 0.5 rounded - full font - bold uppercase tracking - wider ${
-  getStatusBadge(
-    request.status
-  )
-} `}
+                            className={`text - [8px] px - 2 py - 0.5 rounded - full font - bold uppercase tracking - wider ${getStatusBadge(
+                              request.status
+                            )} `}
                           >
                             {formatStatus(request.status)}
                           </span>
@@ -283,31 +252,23 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           {(request.items ?? [])
                             .map((item) => {
                               if (item.asset_id) {
-                                const asset = assets.find(
-                                  (a) => a.id === item.asset_id
-                                );
+                                const asset = assets.find((a) => a.id === item.asset_id);
 
                                 return asset?.asset_code || 'Asset';
                               }
 
                               const catalogItem = catalogItems.find(
-                                (c) =>
-                                  c.id === item.catalog_item_id ||
-                                  c.item_code === item.catalog_item_id
+                                (c) => c.id === item.catalog_item_id || c.item_code === item.catalog_item_id
                               );
 
-                              return `${ item.requested_qty } × ${
-  catalogItem?.name || 'Item'
-} `;
+                              return `${item.requested_qty} × ${catalogItem?.name || 'Item'} `;
                             })
                             .join(' · ') || 'No line items'}
                         </p>
                       </div>
 
                       <span className="text-[9px] font-mono text-[var(--color-idea-muted)] shrink-0">
-                        {new Date(request.created_at).toLocaleDateString(
-                          'en-IN'
-                        )}
+                        {new Date(request.created_at).toLocaleDateString('en-IN')}
                       </span>
                     </div>
                   ))}
@@ -322,9 +283,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     Current State
                   </p>
 
-                  <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">
-                    Items With Me
-                  </h2>
+                  <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">Items With Me</h2>
                 </div>
 
                 <Package className="w-4 h-4 text-[var(--color-idea-blue)]" />
@@ -334,9 +293,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="p-6 text-center">
                   <CheckCircle2 className="w-6 h-6 mx-auto text-[var(--color-idea-green)]" />
 
-                  <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-2">
-                    Nothing currently issued
-                  </p>
+                  <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-2">Nothing currently issued</p>
 
                   <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
                     Your issued items and assets will appear here.
@@ -346,9 +303,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="p-4 space-y-2.5 max-h-96 overflow-y-auto">
                   {issuedAssets.map((asset) => {
                     const catalogItem = catalogItems.find(
-                      (item) =>
-                        item.id === asset.catalog_item_id ||
-                        item.item_code === asset.catalog_item_id
+                      (item) => item.id === asset.catalog_item_id || item.item_code === asset.catalog_item_id
                     );
 
                     return (
@@ -360,9 +315,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           {catalogItem?.name || 'Asset'}
                         </p>
 
-                        <p className="text-[9px] font-mono text-[var(--color-idea-blue)] mt-1">
-                          {asset.asset_code}
-                        </p>
+                        <p className="text-[9px] font-mono text-[var(--color-idea-blue)] mt-1">{asset.asset_code}</p>
 
                         <span className="inline-flex mt-2 text-[8px] px-2 py-0.5 rounded-full idea-info font-bold uppercase tracking-wide">
                           Issued
@@ -373,9 +326,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   {reusableItems.map((item) => {
                     const catalogItem = catalogItems.find(
-                      (c) =>
-                        c.id === item.catalogItemId ||
-                        c.item_code === item.catalogItemId
+                      (c) => c.id === item.catalogItemId || c.item_code === item.catalogItemId
                     );
 
                     return (
@@ -409,34 +360,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   /*
    * STAFF / ADMIN DASHBOARD
    */
-  const totalStock = stockLevels.reduce(
-    (total, stock) => total + Number(stock.quantity || 0),
-    0
-  );
+  const totalStock = stockLevels.reduce((total, stock) => total + Number(stock.quantity || 0), 0);
 
   const issuedAssets = assets.filter((asset) => asset.status === 'ISSUED');
-  const availableAssets = assets.filter(
-    (asset) => asset.status === 'AVAILABLE'
-  );
-  const damagedAssets = assets.filter(
-    (asset) => asset.status === 'DAMAGED'
-  );
-  const repairAssets = assets.filter(
-    (asset) => asset.status === 'UNDER_REPAIR'
-  );
+  const availableAssets = assets.filter((asset) => asset.status === 'AVAILABLE');
+  const damagedAssets = assets.filter((asset) => asset.status === 'DAMAGED');
+  const repairAssets = assets.filter((asset) => asset.status === 'UNDER_REPAIR');
 
-  const pendingRequests = requests.filter(
-    (request) => request.status === 'PENDING'
-  );
+  const pendingRequests = requests.filter((request) => request.status === 'PENDING');
 
   const lowStockItems = catalogItems
     .map((item) => {
       const quantity = stockLevels
-        .filter(
-          (stock) =>
-            stock.catalog_item_id === item.id ||
-            stock.catalog_item_id === item.item_code
-        )
+        .filter((stock) => stock.catalog_item_id === item.id || stock.catalog_item_id === item.item_code)
         .reduce((total, stock) => total + Number(stock.quantity || 0), 0);
 
       return {
@@ -445,12 +381,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         threshold: item.min_stock_alert,
       };
     })
-    .filter(
-      ({ threshold, quantity }) =>
-        threshold !== undefined &&
-        threshold !== null &&
-        quantity <= threshold
-    );
+    .filter(({ threshold, quantity }) => threshold !== undefined && threshold !== null && quantity <= threshold);
 
   const getTransactionLabel = (type: string) => {
     switch (type) {
@@ -576,29 +507,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => onSelectView(metric.view)}
                 className="idea-card p-5 text-left relative overflow-hidden hover:border-[var(--color-idea-blue)]/40 transition-colors cursor-pointer"
               >
-                <div
-                  className="absolute top-0 left-0 w-full h-1"
-                  style={{ background: metric.color }}
-                />
+                <div className="absolute top-0 left-0 w-full h-1" style={{ background: metric.color }} />
 
                 <div className="flex items-center justify-between">
                   <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-idea-muted)]">
                     {metric.label}
                   </p>
 
-                  <Icon
-                    className="w-4 h-4"
-                    style={{ color: metric.color }}
-                  />
+                  <Icon className="w-4 h-4" style={{ color: metric.color }} />
                 </div>
 
-                <p className="text-4xl font-bold text-[var(--color-idea-text)] mt-3">
-                  {metric.value}
-                </p>
+                <p className="text-4xl font-bold text-[var(--color-idea-text)] mt-3">{metric.value}</p>
 
-                <p className="text-[10px] text-[var(--color-idea-muted)] mt-2">
-                  {metric.sub}
-                </p>
+                <p className="text-[10px] text-[var(--color-idea-muted)] mt-2">{metric.sub}</p>
               </button>
             );
           })}
@@ -612,9 +533,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Asset Status
               </p>
 
-              <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">
-                Current Equipment State
-              </h2>
+              <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">Current Equipment State</h2>
             </div>
 
             <div className="p-5 min-h-[250px] flex flex-col">
@@ -622,9 +541,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="flex-1 flex flex-col items-center justify-center text-center py-8">
                   <Wrench className="w-7 h-7 text-[var(--color-idea-muted)]" />
 
-                  <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">
-                    No assets tracked yet
-                  </p>
+                  <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">No assets tracked yet</p>
 
                   <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
                     Individually tracked equipment will appear here.
@@ -644,10 +561,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           paddingAngle={2}
                         >
                           {assetStatusData.map((entry) => (
-                            <Cell
-                              key={entry.name}
-                              fill={entry.color}
-                            />
+                            <Cell key={entry.name} fill={entry.color} />
                           ))}
                         </Pie>
 
@@ -663,21 +577,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                   <div className="flex-1 space-y-2.5">
                     {assetStatusData.map((entry) => (
-                      <div
-                        key={entry.name}
-                        className="flex items-center justify-between text-xs"
-                      >
+                      <div key={entry.name} className="flex items-center justify-between text-xs">
                         <span className="flex items-center gap-2 text-[var(--color-idea-muted)]">
-                          <span
-                            className="w-2.5 h-2.5 rounded-full shrink-0"
-                            style={{ background: entry.color }}
-                          />
+                          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: entry.color }} />
                           {entry.name}
                         </span>
 
-                        <span className="font-bold text-[var(--color-idea-text)]">
-                          {entry.value}
-                        </span>
+                        <span className="font-bold text-[var(--color-idea-text)]">{entry.value}</span>
                       </div>
                     ))}
                   </div>
@@ -701,9 +607,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   Distribution
                 </p>
 
-                <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">
-                  Stock by Location
-                </h2>
+                <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">Stock by Location</h2>
               </div>
 
               <button
@@ -721,9 +625,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <div className="w-full text-center">
                   <Boxes className="w-7 h-7 mx-auto text-[var(--color-idea-muted)]" />
 
-                  <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">
-                    No stock recorded yet
-                  </p>
+                  <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">No stock recorded yet</p>
 
                   <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
                     Stock distribution will appear here once inventory is added.
@@ -732,16 +634,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ) : (
                 <div className="w-full h-52">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart
-                      data={stockByLocation}
-                      layout="vertical"
-                      margin={{ left: 8, right: 16 }}
-                    >
-                      <XAxis
-                        type="number"
-                        tick={{ fontSize: 10 }}
-                        stroke="var(--color-idea-muted)"
-                      />
+                    <BarChart data={stockByLocation} layout="vertical" margin={{ left: 8, right: 16 }}>
+                      <XAxis type="number" tick={{ fontSize: 10 }} stroke="var(--color-idea-muted)" />
 
                       <YAxis
                         type="category"
@@ -758,11 +652,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         }}
                       />
 
-                      <Bar
-                        dataKey="qty"
-                        fill="var(--color-idea-blue)"
-                        radius={[0, 4, 4, 0]}
-                      />
+                      <Bar dataKey="qty" fill="var(--color-idea-blue)" radius={[0, 4, 4, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
@@ -782,7 +672,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">
                   Pending Requests
-
                   {pendingRequests.length > 0 && (
                     <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full idea-warning align-middle">
                       {pendingRequests.length}
@@ -805,9 +694,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="min-h-[190px] flex flex-col items-center justify-center text-center px-6 py-8">
                 <CheckCircle2 className="w-7 h-7 text-[var(--color-idea-green)]" />
 
-                <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">
-                  No pending requests
-                </p>
+                <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">No pending requests</p>
 
                 <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
                   All current requests have been reviewed.
@@ -816,9 +703,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ) : (
               <div className="divide-y divide-[var(--color-idea-border)] max-h-80 overflow-y-auto">
                 {pendingRequests.map((request) => {
-                  const requester = users.find(
-                    (user) => user.id === request.user_id
-                  );
+                  const requester = users.find((user) => user.id === request.user_id);
 
                   return (
                     <div
@@ -832,11 +717,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           </span>
 
                           <span
-                            className={`text - [8px] px - 2 py - 0.5 rounded - full font - bold uppercase tracking - wider ${
-  getStatusBadge(
-    request.status
-  )
-} `}
+                            className={`text - [8px] px - 2 py - 0.5 rounded - full font - bold uppercase tracking - wider ${getStatusBadge(
+                              request.status
+                            )} `}
                           >
                             Pending
                           </span>
@@ -846,21 +729,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                           {requester?.name || 'Unknown user'}
                         </p>
 
-                        <p className="text-[10px] text-[var(--color-idea-muted)] mt-1 truncate">
-                          {request.purpose}
-                        </p>
+                        <p className="text-[10px] text-[var(--color-idea-muted)] mt-1 truncate">{request.purpose}</p>
                       </div>
 
                       <div className="text-right shrink-0">
                         <p className="text-[9px] font-mono text-[var(--color-idea-muted)]">
-                          {new Date(request.created_at).toLocaleDateString(
-                            'en-IN'
-                          )}
+                          {new Date(request.created_at).toLocaleDateString('en-IN')}
                         </p>
 
-                        <span className="text-[9px] text-[var(--color-idea-blue)] font-semibold">
-                          Review
-                        </span>
+                        <span className="text-[9px] text-[var(--color-idea-blue)] font-semibold">Review</span>
                       </div>
                     </div>
                   );
@@ -878,7 +755,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                 <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">
                   Low Stock Items
-
                   {lowStockItems.length > 0 && (
                     <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full idea-error align-middle">
                       {lowStockItems.length}
@@ -900,9 +776,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="min-h-[190px] flex flex-col items-center justify-center text-center px-6 py-8">
                 <CheckCircle2 className="w-7 h-7 text-[var(--color-idea-green)]" />
 
-                <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">
-                  Stock levels are healthy
-                </p>
+                <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">Stock levels are healthy</p>
 
                 <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
                   No items are currently below their alert threshold.
@@ -911,18 +785,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             ) : (
               <div className="divide-y divide-[var(--color-idea-border)] max-h-80 overflow-y-auto">
                 {lowStockItems.map(({ item, quantity, threshold }) => (
-                  <div
-                    key={item.id}
-                    className="px-5 py-3.5 flex items-center justify-between gap-4"
-                  >
+                  <div key={item.id} className="px-5 py-3.5 flex items-center justify-between gap-4">
                     <div className="min-w-0">
-                      <p className="text-xs font-semibold text-[var(--color-idea-text)] truncate">
-                        {item.name}
-                      </p>
+                      <p className="text-xs font-semibold text-[var(--color-idea-text)] truncate">{item.name}</p>
 
-                      <p className="text-[9px] font-mono text-[var(--color-idea-muted)] mt-0.5">
-                        {item.item_code}
-                      </p>
+                      <p className="text-[9px] font-mono text-[var(--color-idea-muted)] mt-0.5">{item.item_code}</p>
                     </div>
 
                     <div className="text-right shrink-0">
@@ -930,9 +797,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         {quantity} {item.unit}
                       </p>
 
-                      <p className="text-[9px] text-[var(--color-idea-muted)]">
-                        Alert at {threshold}
-                      </p>
+                      <p className="text-[9px] text-[var(--color-idea-muted)]">Alert at {threshold}</p>
                     </div>
                   </div>
                 ))}
@@ -949,9 +814,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 Historical Activity
               </p>
 
-              <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">
-                Recent Ledger Entries
-              </h2>
+              <h2 className="text-base font-bold text-[var(--color-idea-text)] mt-0.5">Recent Ledger Entries</h2>
             </div>
 
             <button
@@ -968,9 +831,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="min-h-[170px] flex flex-col items-center justify-center text-center px-6 py-8">
               <ScrollText className="w-7 h-7 text-[var(--color-idea-muted)]" />
 
-              <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">
-                No ledger entries yet
-              </p>
+              <p className="text-xs font-semibold text-[var(--color-idea-text)] mt-3">No ledger entries yet</p>
 
               <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
                 Meaningful inventory events will appear here.
@@ -980,25 +841,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <div className="divide-y divide-[var(--color-idea-border)] max-h-80 overflow-y-auto">
               {transactions.map((transaction) => {
                 const asset = assets.find(
-                  (item) =>
-                    item.id === transaction.asset_id ||
-                    item.asset_code === transaction.asset_id
+                  (item) => item.id === transaction.asset_id || item.asset_code === transaction.asset_id
                 );
 
                 const catalogItem = catalogItems.find(
                   (item) =>
-                    item.id ===
-                      (transaction.catalog_item_id ||
-                        asset?.catalog_item_id) ||
-                    item.item_code ===
-                      (transaction.catalog_item_id ||
-                        asset?.catalog_item_id)
+                    item.id === (transaction.catalog_item_id || asset?.catalog_item_id) ||
+                    item.item_code === (transaction.catalog_item_id || asset?.catalog_item_id)
                 );
 
-                const performer = users.find(
-                  (user) =>
-                    user.id === transaction.processed_by_user_id
-                );
+                const performer = users.find((user) => user.id === transaction.processed_by_user_id);
 
                 return (
                   <div
@@ -1008,23 +860,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-semibold text-[var(--color-idea-text)] truncate">
-                          {catalogItem?.name ||
-                            asset?.asset_code ||
-                            'Unknown entity'}
+                          {catalogItem?.name || asset?.asset_code || 'Unknown entity'}
                         </span>
 
                         <span className="text-[8px] px-2 py-0.5 rounded-full idea-info font-bold uppercase tracking-wide shrink-0">
-                          {getTransactionLabel(
-                            transaction.transaction_type
-                          )}
+                          {getTransactionLabel(transaction.transaction_type)}
                         </span>
                       </div>
 
                       <p className="text-[9px] text-[var(--color-idea-muted)] mt-1 truncate">
                         {performer?.name || 'System'}
-                        {transaction.remarks
-                          ? ` · ${ transaction.remarks } `
-                          : ''}
+                        {transaction.remarks ? ` · ${transaction.remarks} ` : ''}
                       </p>
                     </div>
 
@@ -1041,4 +887,3 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     </div>
   );
 };
-

@@ -14,7 +14,6 @@ import {
   reviewAccountRequest,
   submitAccountRequest,
   STUDENT_SIGNUP_NAME_KEY,
-  updateFirestoreDocument,
 } from './services/firebaseInventory';
 import { readFirestoreState } from './services/firebaseCollections';
 import { isStudent } from './services/authRoles';
@@ -74,7 +73,6 @@ const viewPaths: Record<ViewMode, string> = {
   requests: '/requests',
   locations: '/locations',
   activity: '/activity',
-  'qr-sheet': '/labels',
   users: '/users',
 };
 
@@ -106,15 +104,11 @@ const viewMetadata: Record<ViewMode, { title: string; description: string }> = {
     description: 'Manage storage locations and inventory stored at each location.',
   },
   activity: {
-    title: 'Activity Ledger',
+    title: 'Ledger',
     description: 'Review historical inventory transactions and activity.',
   },
-  'qr-sheet': {
-    title: 'QR Labels',
-    description: 'Generate printable QR labels for inventory records.',
-  },
   users: {
-    title: 'User Directory',
+    title: 'Users',
     description: 'Manage lab users, access roles, and account approval requests.',
   },
 };
@@ -207,9 +201,9 @@ export default function App() {
   const pendingAccountCount = accountRequests.filter((request) => request.status === 'PENDING').length;
   const pendingRequestsCount = isStudentUser
     ? requests.filter(
-      (request) =>
-        (request.status === 'PENDING' || request.status === 'APPROVED') && request.user_id === currentUser?.id
-    ).length
+        (request) =>
+          (request.status === 'PENDING' || request.status === 'APPROVED') && request.user_id === currentUser?.id
+      ).length
     : requests.filter((request) => request.status === 'PENDING' || request.status === 'APPROVED').length;
 
   // ---------------------------------------------------------------------------
@@ -630,9 +624,6 @@ export default function App() {
               users={users}
               onOpenQRGenerator={handleOpenQRGenerator}
             />
-          )}
-          {currentView === 'qr-sheet' && (
-            <BatchQRLabelsModal assets={assets} catalogItems={catalogItems} locations={locations} />
           )}
           {currentView === 'users' && (
             <UsersView

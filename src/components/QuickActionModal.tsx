@@ -1,6 +1,15 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle, QrCode } from 'lucide-react';
-import { Asset, CatalogItem, Location, User, AssetStatus, StockLevel, Request, RequestLineDraft } from '../types/inventory';
+import {
+  Asset,
+  CatalogItem,
+  Location,
+  User,
+  AssetStatus,
+  StockLevel,
+  Request,
+  RequestLineDraft,
+} from '../types/inventory';
 import { InventoryStorage } from '../services/storage';
 import { canApproveRequests, canIssueInventory, canReturnOrRepairItems, isStudent } from '../services/authRoles';
 import confetti from 'canvas-confetti';
@@ -288,10 +297,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                     setStatusInput(status);
                     setSubAction('status');
                   }}
-                  className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${selected
+                  className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                    selected
                       ? 'border-[var(--color-idea-blue)] bg-[var(--color-idea-blue)] text-white'
                       : 'border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] hover:border-[var(--color-idea-blue)]'
-                    }`}
+                  }`}
                 >
                   {status.replace('_', ' ')}
                 </button>

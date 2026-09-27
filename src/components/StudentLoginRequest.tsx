@@ -12,12 +12,11 @@ export const StudentLoginRequest: React.FC<StudentLoginRequestProps> = ({ status
 
   return (
     <div
-      className={`mt-6 rounded-xl border-l-4 bg-idea-background p-4 text-left ${isRejected ? 'border-l-idea-red' : 'border-l-idea-yellow'
-        }`}
+      className={`mt-6 rounded-xl border-l-4 bg-idea-background p-4 text-left ${
+        isRejected ? 'border-l-idea-red' : 'border-l-idea-yellow'
+      }`}
     >
-      <p className="text-sm font-semibold text-idea-text">
-        {isRejected ? 'Request declined' : 'Approval pending'}
-      </p>
+      <p className="text-sm font-semibold text-idea-text">{isRejected ? 'Request declined' : 'Approval pending'}</p>
       <p className="mt-1 text-sm text-idea-muted">
         {isRejected
           ? 'An admin declined this student account request.'
