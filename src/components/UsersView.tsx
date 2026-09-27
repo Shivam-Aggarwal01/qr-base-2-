@@ -281,7 +281,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
 
       {/* Pending account requests */}
       {isAdmin && pendingAccountRequests.length > 0 && (
-        <div className="idea-card p-5 space-y-4">
+        <div className="idea-card p-5 mt-5 space-y-4">
           <div>
             <p className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
               Approval Requests
@@ -327,11 +327,6 @@ export const UsersView: React.FC<UsersViewProps> = ({
         </div>
       )}
 
-      {/* User count */}
-      <div className="text-xs text-[var(--color-idea-muted)]">
-        Showing <span className="font-bold text-[var(--color-idea-text)]">{filteredUsers.length}</span> members
-      </div>
-
       {/* User grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
         {filteredUsers.map((user) => {
@@ -354,7 +349,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
                     <select
                       value={editingRole}
                       onChange={(event) => setEditingRole(event.target.value as User['role'])}
-                      className={`shrink-0 text-[10px] px-2.5 py-1.5 rounded-full font-bold uppercase tracking-wider outline-none cursor-pointer ${getRoleBadge(
+                      className={`shrink-0 text-[10px] py-1.5 rounded-full font-bold uppercase tracking-wider outline-none cursor-pointer ${getRoleBadge(
                         editingRole
                       )}`}
                     >

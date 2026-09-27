@@ -172,9 +172,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             </div>
             <div>
               <h3 className="font-bold text-[var(--color-idea-text)] text-lg leading-tight">New Request</h3>
-              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">
-                Requisition inventory items or specific tracked assets
-              </p>
+              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">Ask for items or assets</p>
             </div>
           </div>
           <button
@@ -189,7 +187,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
           {/* Requested By */}
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
-              Requested By
+              Requester
             </label>
             <div className="p-3 bg-[var(--color-idea-light-grey)]/60 border border-[var(--color-idea-border)] rounded-xl text-xs font-semibold text-[var(--color-idea-text)] flex justify-between items-center">
               <span>{activeUser.name}</span>
@@ -217,7 +215,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
           {/* Deadline */}
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
-              Return Deadline <span className="text-[var(--color-idea-red)]">*</span>
+              Return By <span className="text-[var(--color-idea-red)]">*</span>
             </label>
             <input
               type="datetime-local"
@@ -227,16 +225,13 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
               onChange={(e) => setDeadlineAt(e.target.value)}
               className="idea-input w-full px-3 py-2.5 text-xs"
             />
-            <p className="text-[9px] text-[var(--color-idea-muted)] mt-1.5 ml-1">
-              When will reusable items and assets be returned to the lab?
-            </p>
           </div>
 
           {/* Items */}
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
-                Requested Items &amp; Assets
+                Items
               </label>
               <button
                 type="button"
@@ -253,42 +248,51 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                   key={idx}
                   className="p-3 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/30 space-y-2.5 hover:border-[var(--color-idea-blue)]/30 transition-colors"
                 >
-                  <div className="flex gap-2">
-                    <select
-                      value={item.kind}
-                      onChange={(event) => handleKindChange(idx, event.target.value as RequestLineDraft['kind'])}
-                      className="idea-input w-28 px-2 py-2 text-[11px] font-bold"
-                    >
-                      <option value="CATALOG">Item</option>
-                      <option value="ASSET">Asset</option>
-                    </select>
+                  <div className="flex gap-2 w-full">
+                    <div className="w-1/3 shrink-0">
+                      <select
+                        value={item.kind}
+                        onChange={(event) => handleKindChange(idx, event.target.value as RequestLineDraft['kind'])}
+                        className="idea-input w-full px-2 py-2 text-xs font-medium"
+                      >
+                        <option value="CATALOG">Item</option>
+                        <option value="ASSET">Asset</option>
+                      </select>
+                    </div>
 
-                    {item.kind === 'ASSET' ? (
-                      <select
-                        value={item.asset_id || ''}
-                        onChange={(event) => handleItemChange(idx, 'asset_id', event.target.value)}
-                        className="flex-1 px-2 py-2 text-[11px]"
-                      >
-                        <option value="">Select available asset</option>
-                        {availableAssets.map((asset) => (
-                          <option key={asset.id} value={asset.id}>
-                            {assetLabel(asset)}
+                    <div className="flex-1 min-w-0">
+                      {item.kind === 'ASSET' ? (
+                        <select
+                          value={availableAssets.some((a) => a.id === item.asset_id) ? item.asset_id : ''}
+                          onChange={(event) => handleItemChange(idx, 'asset_id', event.target.value)}
+                          className="idea-input w-full px-3 py-2 text-xs truncate"
+                        >
+                          <option value="" disabled>
+                            Select asset…
                           </option>
-                        ))}
-                      </select>
-                    ) : (
-                      <select
-                        value={item.catalog_item_id || ''}
-                        onChange={(event) => handleItemChange(idx, 'catalog_item_id', event.target.value)}
-                        className="idea-input flex-1 px-2 py-2 text-[11px]"
-                      >
-                        {catalogItems.map((cat) => (
-                          <option key={cat.id} value={cat.id}>
-                            {cat.name}
+                          {availableAssets.map((asset) => (
+                            <option key={asset.id} value={asset.id}>
+                              {assetLabel(asset)}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          value={catalogItems.some((c) => c.id === item.catalog_item_id) ? item.catalog_item_id : ''}
+                          onChange={(event) => handleItemChange(idx, 'catalog_item_id', event.target.value)}
+                          className="idea-input w-full px-3 py-2 text-xs truncate"
+                        >
+                          <option value="" disabled>
+                            Select item…
                           </option>
-                        ))}
-                      </select>
-                    )}
+                          {catalogItems.map((cat) => (
+                            <option key={cat.id} value={cat.id}>
+                              {cat.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
 
                     {requestItems.length > 1 && (
                       <button
@@ -301,14 +305,10 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                     )}
                   </div>
 
-                  {item.kind === 'ASSET' ? (
-                    <p className="text-[9px] text-[var(--color-idea-muted)] px-1">
-                      Individually tracked asset. Quantity is fixed at 1.
-                    </p>
-                  ) : (
-                    <div className="flex gap-2">
-                      <div className="relative w-28">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[9px] font-bold text-[var(--color-idea-muted)]">
+                  {item.kind !== 'ASSET' && (
+                    <div className="flex gap-2 w-full">
+                      <div className="relative w-1/3 shrink-0">
+                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[var(--color-idea-muted)]">
                           Qty
                         </span>
                         <input
@@ -316,17 +316,19 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                           min="1"
                           value={item.requested_qty}
                           onChange={(event) => handleItemChange(idx, 'requested_qty', Number(event.target.value))}
-                          className="idea-input w-full pl-9 pr-2 py-2 text-[11px] font-bold text-center"
+                          className="idea-input w-full pl-9 pr-2 py-2 text-xs font-medium text-center"
                         />
                       </div>
-                      <select
-                        value={item.usage || 'CONSUMABLE'}
-                        onChange={(event) => handleItemChange(idx, 'usage', event.target.value)}
-                        className="idea-input flex-1 px-3 py-2 text-[11px] font-bold"
-                      >
-                        <option value="CONSUMABLE">Consumable (Consumed in project)</option>
-                        <option value="REUSABLE">Reusable (Will be returned)</option>
-                      </select>
+                      <div className="flex-1 min-w-0">
+                        <select
+                          value={item.usage || 'CONSUMABLE'}
+                          onChange={(event) => handleItemChange(idx, 'usage', event.target.value)}
+                          className="idea-input w-full px-3 py-2 text-xs font-medium truncate"
+                        >
+                          <option value="CONSUMABLE">Consumable</option>
+                          <option value="REUSABLE">Reusable</option>
+                        </select>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -337,7 +339,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
           {/* Remarks */}
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
-              Remarks <span className="font-normal normal-case">(Optional)</span>
+              Notes
             </label>
             <input
               type="text"

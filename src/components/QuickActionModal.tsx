@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, AlertTriangle, QrCode } from 'lucide-react';
-import { Asset, CatalogItem, Location, User, AssetStatus, StockLevel, RequestLineDraft } from '../types/inventory';
+import { Asset, CatalogItem, Location, User, AssetStatus, StockLevel, Request, RequestLineDraft } from '../types/inventory';
 import { InventoryStorage } from '../services/storage';
 import { canApproveRequests, canIssueInventory, canReturnOrRepairItems, isStudent } from '../services/authRoles';
 import confetti from 'canvas-confetti';
@@ -9,7 +9,7 @@ interface QuickActionModalProps {
   isOpen: boolean;
   onClose: () => void;
   qrData: {
-    type: 'asset' | 'catalog' | 'location' | 'user' | 'unknown';
+    type: 'asset' | 'catalog' | 'location' | 'request' | 'user' | 'unknown';
     entity: any;
     rawCode: string;
   } | null;
@@ -288,11 +288,10 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                     setStatusInput(status);
                     setSubAction('status');
                   }}
-                  className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
-                    selected
+                  className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${selected
                       ? 'border-[var(--color-idea-blue)] bg-[var(--color-idea-blue)] text-white'
                       : 'border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] hover:border-[var(--color-idea-blue)]'
-                  }`}
+                    }`}
                 >
                   {status.replace('_', ' ')}
                 </button>
@@ -884,6 +883,94 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     );
   };
 
+  const renderRequestActions = (request: Request) => {
+    const requester = users.find((user) => user.id === request.user_id);
+
+    return (
+      <div className="space-y-5">
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-5">
+          <div className="absolute left-0 top-0 h-1 w-full bg-[var(--color-idea-blue)]" />
+
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">
+                REQUEST
+              </span>
+
+              <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{request.request_number}</h4>
+
+              <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
+                {requester?.name || 'Unknown requester'}
+              </p>
+            </div>
+
+            <span className="rounded-lg border border-[var(--color-idea-border)] bg-white px-2.5 py-1 text-[9px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-text)]">
+              {request.status}
+            </span>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
+          <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Request summary</h5>
+
+          <div className="mt-3 space-y-2 text-xs text-[var(--color-idea-muted)]">
+            <div className="flex items-center justify-between gap-3">
+              <span>Purpose</span>
+              <span className="max-w-[60%] text-right font-medium text-[var(--color-idea-text)]">
+                {request.purpose || 'Not specified'}
+              </span>
+            </div>
+
+            <div className="flex items-center justify-between gap-3">
+              <span>Items</span>
+              <span className="font-mono font-semibold text-[var(--color-idea-text)]">
+                {request.items?.length ?? 0}
+              </span>
+            </div>
+
+            {request.deadline_at && (
+              <div className="flex items-center justify-between gap-3">
+                <span>Deadline</span>
+                <span className="font-mono font-semibold text-[var(--color-idea-text)]">
+                  {new Date(request.deadline_at).toLocaleDateString()}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {request.items && request.items.length > 0 && (
+          <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
+            <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">Requested items</h5>
+
+            <div className="space-y-2">
+              {request.items.map((item) => {
+                const itemName = item.catalog_item_id
+                  ? findCatalogItem(item.catalog_item_id)?.name || 'Catalog item'
+                  : item.asset_id
+                    ? assets.find((asset) => asset.id === item.asset_id)?.asset_code || 'Asset'
+                    : 'Inventory item';
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-3 py-2"
+                  >
+                    <span className="text-xs font-medium text-[var(--color-idea-text)]">{itemName}</span>
+
+                    <span className="font-mono text-[10px] font-semibold text-[var(--color-idea-muted)]">
+                      Qty {item.requested_qty}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
@@ -925,6 +1012,8 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           {qrData.type === 'catalog' && renderCatalogActions(qrData.entity)}
 
           {qrData.type === 'location' && renderLocationActions(qrData.entity)}
+
+          {qrData.type === 'request' && renderRequestActions(qrData.entity)}
 
           {qrData.type === 'unknown' && (
             <div className="space-y-4 py-10 text-center">

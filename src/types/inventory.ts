@@ -114,6 +114,7 @@ export interface Asset {
   id: string;
   /** Auto-generated from Firestore doc ID — never entered manually. */
   asset_code: string;
+  qr_code?: string;
   /**
    * Human-readable asset name, e.g. "Soldering Station 01".
    * Required — every asset must have a unique, descriptive name.

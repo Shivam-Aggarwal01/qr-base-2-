@@ -639,6 +639,7 @@ export class InventoryStorage {
       id: `ast-${Date.now()}`,
       asset_code: normalizedCode,
       qr_code: normalizedCode,
+      name: normalizedCode,
       catalog_item_id: catalogItemId,
       serial_number: serialNumber,
       status: 'AVAILABLE',

@@ -133,11 +133,11 @@ export const ActivityView: React.FC<ActivityViewProps> = ({ transactions, catalo
       case 'RECEIVE':
         return toLocation ? (
           <span className="truncate">
-            <span className="text-[var(--color-idea-muted)]">Into</span>{' '}
-            <span className="font-medium text-[var(--color-idea-text)]">{toLocation.name}</span>
+            <span className="text-idea-muted">Into</span>{' '}
+            <span className="font-medium text-idea-text">{toLocation.name}</span>
           </span>
         ) : (
-          <span className="text-[var(--color-idea-muted)]">—</span>
+          <span className="text-idea-muted">—</span>
         );
 
       case 'ISSUE':

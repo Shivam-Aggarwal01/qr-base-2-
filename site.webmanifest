@@ -1,0 +1,21 @@
+{
+    "name": "AICTE Inventory Management System",
+    "short_name": "AICTE Inventory",
+    "description": "Inventory management system for AICTE IDEA Lab.",
+    "start_url": "/dashboard",
+    "display": "standalone",
+    "background_color": "#f8fafc",
+    "theme_color": "#102d43",
+    "icons": [
+        {
+            "src": "/android-chrome-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png"
+        },
+        {
+            "src": "/android-chrome-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png"
+        }
+    ]
+}

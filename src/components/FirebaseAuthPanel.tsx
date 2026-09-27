@@ -39,14 +39,14 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ accessNoti
   };
 
   return (
-    <div className="min-h-screen w-full bg-idea-background flex items-center justify-center px-4 py-8 sm:py-12 relative overflow-hidden">
-      <div className="relative w-full max-w-[400px]">
+    <div className="min-h-screen w-full bg-idea-background flex items-center justify-center px-4 py-8 sm:py-12">
+      <div className="w-full max-w-[400px]">
         <div className="bg-white border border-idea-border rounded-2xl shadow-[0_20px_70px_rgba(11,76,163,0.09)] overflow-hidden">
           <div className="h-1 bg-gradient-to-r from-idea-blue via-idea-deep-blue to-idea-green" />
           <div className="p-7 sm:p-9">
             <div className="text-center">
               <img src="/logo.png" alt="AICTE IDEA Lab" className="h-24 sm:h-28 w-auto mx-auto object-contain" />
-              <div className="mt-6 sm:mt-8">
+              <div className="mt-6">
                 <h1 className="text-2xl sm:text-[27px] font-bold tracking-tight text-idea-text">Welcome</h1>
                 <p className="mt-2 text-sm text-idea-muted">
                   {authMode === 'signup'
@@ -57,8 +57,12 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ accessNoti
             </div>
 
             {error && (
-              <div className="mt-6 flex items-start gap-2.5 rounded-xl border border-idea-red/20 bg-idea-red/5 px-3.5 py-3 text-sm text-[#c9151d]">
-                <span>{error}</span>
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="mt-6 rounded-xl border border-idea-red/20 bg-idea-red/5 px-3.5 py-3 text-sm text-[#c9151d]"
+              >
+                {error}
               </div>
             )}
 
@@ -68,10 +72,9 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ accessNoti
 
             <div className="mt-8">
               {authMode === 'signup' && (
-                <>
-                  <label htmlFor="student-full-name" className="block text-left text-xs font-bold text-idea-text mb-2">
-                    Full name
-                    <span className="ml-1 text-idea-red">*</span>
+                <div className="mb-4">
+                  <label htmlFor="student-full-name" className="block text-left text-xs font-semibold text-idea-text mb-1.5">
+                    Full name <span className="text-idea-red">*</span>
                   </label>
                   <input
                     id="student-full-name"
@@ -80,44 +83,31 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ accessNoti
                     onChange={(event) => setFullName(event.target.value)}
                     placeholder="Enter your name"
                     autoComplete="name"
-                    className="idea-input px-3.5 py-3 text-sm mb-3"
+                    className="idea-input px-3.5 py-3 text-sm focus:outline-none focus:ring-4 focus:ring-idea-blue/10 focus:border-idea-blue"
                     required
                   />
-                </>
+                </div>
               )}
               <button
                 type="button"
                 onClick={handleGoogleLogin}
                 disabled={loading}
-                className="w-full h-12 rounded-xl border border-idea-border bg-white text-idea-text text-sm sm:text-base font-semibold transition-all hover:bg-idea-background hover:border-[#b9c9d1] focus:outline-none focus:ring-4 focus:ring-idea-blue/10 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 cursor-pointer"
+                className="w-full h-12 rounded-xl border border-idea-border bg-white text-idea-text text-sm sm:text-base font-semibold transition-colors hover:bg-idea-background hover:border-[#b9c9d1] focus:outline-none focus:ring-4 focus:ring-idea-blue/10 disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 cursor-pointer"
               >
-                {loading ? (
-                  <span className="text-sm text-idea-muted">
-                    {authMode === 'signup' ? 'Creating request…' : 'Signing in…'}
-                  </span>
-                ) : (
-                  <>
-                    <svg className="w-5 h-5 sm:w-6 sm:h-6" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M21.35 12.23c0-.79-.07-1.55-.23-2.23H12v4.22h5.25a4.49 4.49 0 01-1.95 2.95v2.45h3.15c1.84-1.7 2.9-4.2 2.9-7.39z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 21.5c2.63 0 4.84-.87 6.45-2.35l-3.15-2.45c-.87.58-1.98.93-3.3.93-2.54 0-4.69-1.72-5.46-4.03H3.28v2.53A9.74 9.74 0 0012 21.5z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M6.54 13.6A5.86 5.86 0 016.23 12c0-.56.11-1.1.31-1.6V7.87H3.28A9.74 9.74 0 002.5 12c0 1.57.38 3.06 1.05 4.13l2.99-2.53z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 6.37c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.46 14.63 2.5 12 2.5a9.74 9.74 0 00-8.72 5.37l3.26 2.53C7.31 8.09 9.46 6.37 12 6.37z"
-                      />
-                    </svg>
-                    {authMode === 'signup' ? 'Sign up with Google' : 'Log in with Google'}
-                  </>
-                )}
+                <svg
+                  className={`w-5 h-5 sm:w-6 sm:h-6 shrink-0 ${loading ? 'animate-pulse' : ''}`}
+                  viewBox="0 0 24 24"
+                >
+                  <path fill="#4285F4" d="M21.35 12.23c0-.79-.07-1.55-.23-2.23H12v4.22h5.25a4.49 4.49 0 01-1.95 2.95v2.45h3.15c1.84-1.7 2.9-4.2 2.9-7.39z" />
+                  <path fill="#34A853" d="M12 21.5c2.63 0 4.84-.87 6.45-2.35l-3.15-2.45c-.87.58-1.98.93-3.3.93-2.54 0-4.69-1.72-5.46-4.03H3.28v2.53A9.74 9.74 0 0012 21.5z" />
+                  <path fill="#FBBC05" d="M6.54 13.6A5.86 5.86 0 016.23 12c0-.56.11-1.1.31-1.6V7.87H3.28A9.74 9.74 0 002.5 12c0 1.57.38 3.06 1.05 4.13l2.99-2.53z" />
+                  <path fill="#EA4335" d="M12 6.37c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.46 14.63 2.5 12 2.5a9.74 9.74 0 00-8.72 5.37l3.26 2.53C7.31 8.09 9.46 6.37 12 6.37z" />
+                </svg>
+                <span>
+                  {loading
+                    ? authMode === 'signup' ? 'Creating request…' : 'Signing in…'
+                    : authMode === 'signup' ? 'Sign up with Google' : 'Log in with Google'}
+                </span>
               </button>
               <p className="mt-3 text-center text-[11px] text-idea-muted">
                 {authMode === 'signup'
@@ -137,15 +127,7 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({ accessNoti
             </div>
           </div>
         </div>
-        <div className="mt-8 text-center">
-          <div className="flex items-center justify-center gap-2.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-idea-blue" />
-            <span className="w-1.5 h-1.5 rounded-full bg-idea-green" />
-            <span className="w-1.5 h-1.5 rounded-full bg-idea-yellow" />
-            <span className="w-1.5 h-1.5 rounded-full bg-idea-red" />
-          </div>
-          <p className="mt-3 text-[11px] sm:text-xs text-[#8b9aa3] tracking-wide">AICTE IDEA Lab</p>
-        </div>
+        <p className="mt-6 text-center text-[11px] text-[#8b9aa3] tracking-wide">AICTE IDEA Lab</p>
       </div>
     </div>
   );

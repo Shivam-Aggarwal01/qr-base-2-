@@ -11,13 +11,12 @@ import {
 } from 'firebase/auth';
 
 const firebaseConfig = {
-  apiKey: 'AIzaSyBGtsHb0kh8JFZ5O0JGaNtlNn0djRYuWYE',
-  authDomain: 'inventory-management-sys-aab7d.firebaseapp.com',
-  projectId: 'inventory-management-sys-aab7d',
-  storageBucket: 'inventory-management-sys-aab7d.firebasestorage.app',
-  messagingSenderId: '231677064197',
-  appId: '1:231677064197:web:83084680699546cfe7d86c',
-  measurementId: 'G-GG57BH5933',
+  apiKey: 'AIzaSyDvZc4N7LpYXsTtZZu9xQNzp8mJcXHWS6s',
+  authDomain: 'inventory-management-sys-564f5.firebaseapp.com',
+  projectId: 'inventory-management-sys-564f5',
+  storageBucket: 'inventory-management-sys-564f5.firebasestorage.app',
+  messagingSenderId: '86746785859',
+  appId: '1:86746785859:web:bf0d01b3d6cb196f898cf6',
 };
 
 const app = initializeApp(firebaseConfig);

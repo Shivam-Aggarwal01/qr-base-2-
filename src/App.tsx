@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
+import { Helmet } from 'react-helmet-async';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { auth, functions } from './firebase';
 import { httpsCallable } from 'firebase/functions';
 import { InventoryStorage, parseQRCodeFromEntities } from './services/storage';
@@ -64,7 +66,96 @@ type QuickActionData = {
   qrResult: QRResult | null;
 };
 
+const viewPaths: Record<ViewMode, string> = {
+  dashboard: '/dashboard',
+  inventory: '/inventory',
+  assets: '/assets',
+  requests: '/requests',
+  locations: '/locations',
+  activity: '/activity',
+  'qr-sheet': '/labels',
+  users: '/users',
+};
+
+const pathViews = Object.fromEntries(
+  Object.entries(viewPaths).map(([view, path]) => [path, view as ViewMode])
+) as Record<string, ViewMode>;
+
+const viewMetadata: Record<ViewMode, { title: string; description: string }> = {
+  dashboard: {
+    title: 'Dashboard',
+    description: 'Overview of inventory, equipment, requests, storage locations, and recent activity.',
+  },
+  inventory: {
+    title: 'Inventory',
+    description: 'Manage catalog items, stock quantities, and inventory records.',
+  },
+  assets: {
+    title: 'Assets',
+    description: 'Track individual equipment, asset status, locations, and assignments.',
+  },
+  requests: {
+    title: 'Requests',
+    description: 'Create, review, approve, and track inventory requests.',
+  },
+  locations: {
+    title: 'Locations',
+    description: 'Manage storage locations and inventory stored at each location.',
+  },
+  activity: {
+    title: 'Activity Ledger',
+    description: 'Review historical inventory transactions and activity.',
+  },
+  'qr-sheet': {
+    title: 'QR Labels',
+    description: 'Generate printable QR labels for inventory records.',
+  },
+  users: {
+    title: 'User Directory',
+    description: 'Manage lab users, access roles, and account approval requests.',
+  },
+};
+
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const currentView = pathViews[location.pathname] ?? 'dashboard';
+  const setCurrentView = (view: ViewMode) => navigate(viewPaths[view]);
+  const pageMetadata = viewMetadata[currentView];
+  const pageTitle = `${pageMetadata.title} | AICTE Inventory Management`;
+  const pageDescription = pageMetadata.description;
+  const pageUrl = `${window.location.origin}${location.pathname}`;
+  const socialImage = `${window.location.origin}/social-preview.png`;
+
+  const pageHead = (
+    <Helmet>
+      <html lang="en" />
+
+      <title>{pageTitle}</title>
+
+      <meta name="description" content={pageDescription} />
+      <meta name="robots" content="noindex, nofollow, noarchive" />
+      <meta name="googlebot" content="noindex, nofollow, noarchive" />
+
+      <link rel="canonical" href={pageUrl} />
+
+      <meta name="theme-color" content="#102d43" />
+
+      <meta property="og:type" content="website" />
+      <meta property="og:site_name" content="AICTE Inventory Management" />
+      <meta property="og:title" content={pageTitle} />
+      <meta property="og:description" content={pageDescription} />
+      <meta property="og:url" content={pageUrl} />
+      <meta property="og:image" content={socialImage} />
+      <meta property="og:image:alt" content="AICTE Inventory Management System" />
+
+      <meta name="twitter:card" content="summary_large_image" />
+      <meta name="twitter:title" content={pageTitle} />
+      <meta name="twitter:description" content={pageDescription} />
+      <meta name="twitter:image" content={socialImage} />
+      <meta name="twitter:image:alt" content="AICTE Inventory Management System" />
+    </Helmet>
+  );
   // ---------------------------------------------------------------------------
   // Application data
   // ---------------------------------------------------------------------------
@@ -90,7 +181,6 @@ export default function App() {
   // ---------------------------------------------------------------------------
   // Navigation and modals
   // ---------------------------------------------------------------------------
-  const [currentView, setCurrentView] = useState<ViewMode>('dashboard');
   const [isScannerOpen, setIsScannerOpen] = useState(false);
   const [isNewRequestOpen, setIsNewRequestOpen] = useState(false);
   const [newRequestPrefillItems, setNewRequestPrefillItems] = useState<RequestLineDraft[]>([]);
@@ -114,9 +204,9 @@ export default function App() {
   const pendingAccountCount = accountRequests.filter((request) => request.status === 'PENDING').length;
   const pendingRequestsCount = isStudentUser
     ? requests.filter(
-        (request) =>
-          (request.status === 'PENDING' || request.status === 'APPROVED') && request.user_id === currentUser?.id
-      ).length
+      (request) =>
+        (request.status === 'PENDING' || request.status === 'APPROVED') && request.user_id === currentUser?.id
+    ).length
     : requests.filter((request) => request.status === 'PENDING' || request.status === 'APPROVED').length;
 
   // ---------------------------------------------------------------------------
@@ -253,10 +343,18 @@ export default function App() {
   // Navigation
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (isStudentUser && currentView !== 'dashboard' && currentView !== 'requests' && currentView !== 'inventory') {
-      setCurrentView('requests');
+    if (location.pathname === '/') {
+      navigate(viewPaths.dashboard, { replace: true });
+      return;
     }
-  }, [isStudentUser, currentView]);
+    if (!pathViews[location.pathname]) {
+      navigate(viewPaths.dashboard, { replace: true });
+      return;
+    }
+    if (isStudentUser && currentView !== 'dashboard' && currentView !== 'requests' && currentView !== 'inventory') {
+      navigate(viewPaths.requests, { replace: true });
+    }
+  }, [isStudentUser, currentView, location.pathname, navigate]);
 
   // ---------------------------------------------------------------------------
   // User actions
@@ -398,13 +496,21 @@ export default function App() {
   // ---------------------------------------------------------------------------
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
-        <p className="text-sm font-medium text-slate-500">Restoring session…</p>
-      </div>
+      <>
+        {pageHead}
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-6">
+          <p className="text-sm font-medium text-slate-500">Restoring session…</p>
+        </div>
+      </>
     );
   }
   if (!currentUser) {
-    return <FirebaseAuthPanel accessNotice={accessNotice} />;
+    return (
+      <>
+        {pageHead}
+        <FirebaseAuthPanel accessNotice={accessNotice} />
+      </>
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -412,6 +518,7 @@ export default function App() {
   // ---------------------------------------------------------------------------
   return (
     <div className="flex flex-col h-screen w-screen bg-[#f8fafc] text-slate-900 font-sans overflow-hidden antialiased select-none">
+      {pageHead}
       <Navbar
         activeUser={currentUser}
         users={users}
@@ -477,6 +584,7 @@ export default function App() {
               catalogItems={catalogItems}
               locations={locations}
               users={users}
+              userRole={effectiveRole ?? currentUser.role}
               onRefreshData={refreshAllData}
               onOpenQRGenerator={handleOpenQRGenerator}
             />
@@ -499,6 +607,7 @@ export default function App() {
               catalogItems={catalogItems}
               assets={assets}
               stockLevels={stockLevels}
+              userRole={effectiveRole ?? currentUser.role}
               onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
             />
@@ -561,7 +670,6 @@ export default function App() {
         catalogItems={catalogItems}
         stockLevels={stockLevels}
         assets={assets}
-        requests={requests}
         activeUser={currentUser}
         onOpenNewRequest={openNewRequest}
         onRefreshData={refreshAllData}

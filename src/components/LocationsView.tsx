@@ -1,13 +1,22 @@
 import React, { useMemo, useState } from 'react';
-import { Plus, MapPin, QrCode, Box, Layers, Search, X, ChevronRight, Compass } from 'lucide-react';
-import { Location, CatalogItem, Asset, StockLevel } from '../types/inventory';
-import { createLocationInFirestore } from '../services/firebaseInventory';
+import { Plus, MapPin, QrCode, Box, Layers, Search, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { Location, CatalogItem, Asset, StockLevel, UserRole } from '../types/inventory';
+import {
+  createLocationInFirestore,
+  deleteFirestoreDocument,
+  updateFirestoreDocument,
+  COLLECTIONS,
+} from '../services/firebaseInventory';
+
+// Mirrors Firestore rule: isStaff = ADMIN | STUDENT_LEAD | STUDENT_AMBASSADOR
+const isStaff = (role?: UserRole) => role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
 
 interface LocationsViewProps {
   locations: Location[];
   catalogItems: CatalogItem[];
   assets: Asset[];
   stockLevels: StockLevel[];
+  userRole?: UserRole;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
   onRefreshData: () => Promise<void>;
 }
@@ -64,6 +73,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
   catalogItems,
   assets,
   stockLevels,
+  userRole,
   onOpenQRGenerator,
   onRefreshData,
 }) => {
@@ -73,6 +83,14 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
   const [storagePath, setStoragePath] = useState('');
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Edit Location Modal
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingLoc, setEditingLoc] = useState<Location | null>(null);
+  const [editLocName, setEditLocName] = useState('');
+  const [editStoragePath, setEditStoragePath] = useState('');
+  const [editFormError, setEditFormError] = useState<string | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
 
   const catalogById = useMemo(() => {
     const map = new Map<string, CatalogItem>();
@@ -183,6 +201,68 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
     }
   };
 
+  const openEditModal = (loc: Location) => {
+    setEditingLoc(loc);
+    setEditLocName(loc.name);
+    setEditStoragePath(loc.storage_path || '');
+    setEditFormError(null);
+    setShowEditModal(true);
+  };
+
+  const handleEditLocation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingLoc) return;
+    setEditFormError(null);
+    let name = editLocName.trim();
+    if (!name) {
+      setEditFormError('Location name is required.');
+      return;
+    }
+    name = name
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+      .join(' ');
+    const duplicate = locations.some(
+      (l) => l.id !== editingLoc.id && l.name.trim().toLowerCase() === name.toLowerCase()
+    );
+    if (duplicate) {
+      setEditFormError('A location with this name already exists.');
+      return;
+    }
+    setEditSaving(true);
+    try {
+      await updateFirestoreDocument(COLLECTIONS.LOCATIONS, editingLoc.id, {
+        name,
+        storage_path: editStoragePath.trim() || null,
+        updated_at: new Date().toISOString(),
+      });
+      await onRefreshData();
+      setShowEditModal(false);
+      setEditingLoc(null);
+    } catch (error) {
+      console.error('Failed to update location:', error);
+      setEditFormError('Failed to update location. Check permissions and try again.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const handleDeleteLocation = async (loc: Location) => {
+    if (
+      !window.confirm(
+        `Delete location "${loc.name}"? This will NOT remove inventory assigned here, but the location record will be gone.`
+      )
+    )
+      return;
+    try {
+      await deleteFirestoreDocument(COLLECTIONS.LOCATIONS, loc.id);
+      await onRefreshData();
+    } catch (error: any) {
+      console.error('Failed to delete location:', error);
+      alert(error?.message || 'Failed to delete location.');
+    }
+  };
+
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
       <div className="max-w-7xl mx-auto w-full p-8 space-y-8">
@@ -197,39 +277,22 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
               <span className="text-[var(--color-idea-blue)]"> List</span>
             </h2>
           </div>
-          <button
-            type="button"
-            onClick={() => {
-              resetLocationForm();
-              setShowAddModal(true);
-            }}
-            className="idea-button flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-semibold cursor-pointer shadow-sm"
-          >
-            <Plus className="w-4 h-4" />
-            Add Location
-          </button>
+          {isStaff(userRole) && (
+            <button
+              type="button"
+              onClick={() => {
+                resetLocationForm();
+                setShowAddModal(true);
+              }}
+              className="idea-button flex items-center justify-center gap-2 px-5 py-2.5 text-xs font-semibold cursor-pointer shadow-sm"
+            >
+              <Plus className="w-4 h-4" />
+              Add Location
+            </button>
+          )}
         </div>
 
-        {/* Summary and search */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <div className="idea-card p-4">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">Locations</p>
-            <p className="text-xl font-bold text-[var(--color-idea-text)] mt-1">{locations.length}</p>
-          </div>
-          <div className="idea-card p-4">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">Stored Assets</p>
-            <p className="text-xl font-bold text-[var(--color-idea-text)] mt-1">{storedAssetCount}</p>
-          </div>
-          <div className="idea-card p-4">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">Stock Records</p>
-            <p className="text-xl font-bold text-[var(--color-idea-text)] mt-1">{stockLevels.length}</p>
-          </div>
-          <div className="idea-card p-4">
-            <p className="text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">Total Stock</p>
-            <p className="text-xl font-bold text-[var(--color-idea-text)] mt-1">{totalStockQuantity}</p>
-          </div>
-        </div>
-
+        {/* Search */}
         <div className="idea-card p-3">
           <div className="relative w-full">
             <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-1/2 -translate-y-1/2" />
@@ -279,15 +342,37 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                           </div>
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => onOpenQRGenerator(locationCode, loc.name, 'Storage Location')}
-                        className="p-2 idea-button rounded-lg hover:opacity-90 transition-opacity cursor-pointer shrink-0"
-                        title="Generate QR tag"
-                        aria-label={`Generate QR tag for ${loc.name}`}
-                      >
-                        <QrCode className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => onOpenQRGenerator(locationCode, loc.name, 'Storage Location')}
+                          className="p-2 idea-button rounded-lg hover:opacity-90 transition-opacity cursor-pointer"
+                          title="Generate QR tag"
+                          aria-label={`Generate QR tag for ${loc.name}`}
+                        >
+                          <QrCode className="w-4 h-4" />
+                        </button>
+                        {isStaff(userRole) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openEditModal(loc)}
+                              className="p-2 rounded-lg border border-[var(--color-idea-border)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
+                              title="Edit location"
+                            >
+                              <Pencil className="w-4 h-4 text-[var(--color-idea-text)]" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteLocation(loc)}
+                              className="p-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+                              title="Delete location"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </div>
 
                     {/* Inventory summary metrics */}
@@ -296,7 +381,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                         <div className="flex items-center justify-between">
                           <span className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-[var(--color-idea-muted)]">
                             <Layers className="w-3.5 h-3.5 text-[var(--color-idea-blue)]" />
-                            Tracked assets
+                            Assets
                           </span>
                           <span className="font-mono text-xs font-bold text-[var(--color-idea-text)]">
                             {assetsInLocation.length}
@@ -305,7 +390,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                         <div className="border-t border-[var(--color-idea-border)]/60 pt-2 flex items-center justify-between">
                           <span className="flex items-center gap-2 text-[10px] font-medium uppercase tracking-wider text-[var(--color-idea-muted)]">
                             <Box className="w-3.5 h-3.5 text-[var(--color-idea-green)]" />
-                            Stock Items
+                            Items
                           </span>
                           <span className="font-mono text-xs font-bold text-[var(--color-idea-text)]">
                             {consumableQuantity} pcs
@@ -369,6 +454,85 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Edit Location Modal */}
+      {showEditModal && editingLoc && (
+        <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden">
+            <div className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-medium tracking-[0.2em] uppercase text-[var(--color-idea-muted)]">
+                  Lab Setup
+                </p>
+                <h3 className="font-bold text-[var(--color-idea-text)] text-lg mt-1">Edit Location</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEditModal(false);
+                  setEditingLoc(null);
+                }}
+                disabled={editSaving}
+                className="p-2 text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] disabled:opacity-50 cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditLocation} className="p-6 space-y-4">
+              {editFormError && <div className="idea-error rounded-xl px-3 py-2.5 text-xs">{editFormError}</div>}
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Location Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={editLocName}
+                  onChange={(e) => setEditLocName(e.target.value)}
+                  className="idea-input mt-1.5 p-2.5 text-xs"
+                />
+              </div>
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Lab Hierarchy / Placement Route
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Main Lab &gt; Wall Almirah &gt; Shelf 2 &gt; Bin B"
+                  value={editStoragePath}
+                  onChange={(e) => setEditStoragePath(e.target.value)}
+                  className="idea-input mt-1.5 p-2.5 text-xs font-mono w-full"
+                />
+                <div className="mt-2 p-2.5 rounded-lg bg-[var(--color-idea-light-grey)]/60 border border-[var(--color-idea-border)] w-full">
+                  <span className="text-[10px] text-[var(--color-idea-muted)] block mb-1">Live Route Preview:</span>
+                  <LocationPathBreadcrumb path={editStoragePath} />
+                </div>
+              </div>
+              <div className="pt-2 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingLoc(null);
+                  }}
+                  disabled={editSaving}
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
+                >
+                  {editSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add Location Modal */}
       {showAddModal && (

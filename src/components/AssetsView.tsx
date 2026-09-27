@@ -1,50 +1,61 @@
 import React, { useEffect, useState } from 'react';
-import { Plus, Search, ChevronDown, QrCode } from 'lucide-react';
-import { Asset, CatalogItem, Location, User, AssetStatus } from '../types/inventory';
-import { COLLECTIONS, createAssetInFirestore, updateFirestoreDocument } from '../services/firebaseInventory';
+import { Plus, Search, QrCode, Pencil, Trash2 } from 'lucide-react';
+import { Asset, CatalogItem, Location, User, AssetStatus, UserRole } from '../types/inventory';
+import {
+  COLLECTIONS,
+  createAssetInFirestore,
+  updateFirestoreDocument,
+  deleteFirestoreDocument,
+} from '../services/firebaseInventory';
 import { InventoryStorage } from '../services/storage';
+
+// Mirrors Firestore rule: isStaff = ADMIN | STUDENT_LEAD | STUDENT_AMBASSADOR
+const isStaff = (role?: UserRole) => role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
 
 interface AssetsViewProps {
   assets: Asset[];
   catalogItems: CatalogItem[];
   locations: Location[];
   users: User[];
+  userRole?: UserRole;
   onRefreshData: () => void;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
 }
+
+const EDITABLE_STATUSES: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST'];
 
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
   catalogItems,
   locations,
   users,
+  userRole,
   onRefreshData,
   onOpenQRGenerator,
 }) => {
   const [statusFilter, setStatusFilter] = useState<AssetStatus | 'ALL'>('ALL');
-
   const [searchFilter, setSearchFilter] = useState('');
 
   // Add Asset Modal
   const [showAddModal, setShowAddModal] = useState(false);
-
   const [newAssetName, setNewAssetName] = useState('');
-
   const [newLocationId, setNewLocationId] = useState(locations[0]?.id || '');
-
   const [newNotes, setNewNotes] = useState('');
-  const [newStorageLocation, setNewStorageLocation] = useState('');
-  const [editingLocationId, setEditingLocationId] = useState<string | null>(null);
-  const [locationDraft, setLocationDraft] = useState('');
-  const [storageLocationDraft, setStorageLocationDraft] = useState('');
+
+  // Edit Asset Modal — now the single source of truth for name, status, location, notes
+  const [showEditAssetModal, setShowEditAssetModal] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [editAssetName, setEditAssetName] = useState('');
+  const [editAssetNotes, setEditAssetNotes] = useState('');
+  const [editAssetStatus, setEditAssetStatus] = useState<AssetStatus>('AVAILABLE');
+  const [editAssetLocationId, setEditAssetLocationId] = useState('');
+  const [editAssetSaving, setEditAssetSaving] = useState(false);
 
   useEffect(() => {
     if (!newLocationId && locations.length > 0) {
       setNewLocationId(locations[0].id);
     }
   }, [locations, newLocationId]);
-
-  const availableCatalogItems = catalogItems;
 
   const filteredAssets = assets.filter((asset) => {
     if (statusFilter !== 'ALL' && asset.status !== statusFilter) {
@@ -53,7 +64,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
-
       const cat = catalogItems.find((c) => c.id === asset.catalog_item_id || c.item_code === asset.catalog_item_id);
 
       if (
@@ -121,70 +131,96 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     return status === 'LOST' ? 'MISSING' : status.replace('_', ' ');
   };
 
-  const handleAssetStatusChange = async (asset: Asset, nextStatus: AssetStatus) => {
-    if (nextStatus === asset.status) return;
+  const openEditAssetModal = (asset: Asset) => {
+    setEditingAsset(asset);
+    setEditAssetName(asset.name || '');
+    setEditAssetNotes(asset.notes || '');
+    setEditAssetStatus(asset.status);
+    setEditAssetLocationId(asset.location_id || locations[0]?.id || '');
+    setShowEditAssetModal(true);
+  };
 
-    if (asset.status === 'ISSUED') {
+  const closeEditAssetModal = () => {
+    setShowEditAssetModal(false);
+    setEditingAsset(null);
+  };
+
+  const handleEditAssetSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAsset || !editAssetName.trim()) return;
+
+    if (!isStaff(userRole) && editAssetStatus !== editingAsset.status) {
+      alert('Only staff can update asset status.');
+      return;
+    }
+
+    if (editingAsset.status === 'ISSUED' && editAssetStatus !== editingAsset.status) {
       alert('This asset is currently issued to a student. Use the return flow to mark it available again.');
       return;
     }
 
+    setEditAssetSaving(true);
     try {
-      const fallbackLocation = asset.location_id || locations[0]?.id || null;
-      await updateFirestoreDocument(COLLECTIONS.ASSETS, asset.id, {
-        status: nextStatus,
-        location_id:
-          nextStatus === 'AVAILABLE'
-            ? fallbackLocation
-            : nextStatus === 'LOST' || nextStatus === 'RETIRED'
-              ? null
-              : (asset.location_id ?? null),
-        assigned_to_user_id:
-          nextStatus === 'AVAILABLE' || nextStatus === 'DAMAGED' || nextStatus === 'UNDER_REPAIR'
+      const statusChanged = editAssetStatus !== editingAsset.status;
+      const fallbackLocation = editAssetLocationId || editingAsset.location_id || locations[0]?.id || null;
+
+      const nextLocationId = statusChanged
+        ? editAssetStatus === 'AVAILABLE'
+          ? fallbackLocation
+          : editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED'
             ? null
-            : (asset.assigned_to_user_id ?? null),
+            : editAssetLocationId || null
+        : editAssetLocationId || null;
+
+      const nextAssignedTo =
+        statusChanged &&
+        (editAssetStatus === 'AVAILABLE' || editAssetStatus === 'DAMAGED' || editAssetStatus === 'UNDER_REPAIR')
+          ? null
+          : (editingAsset.assigned_to_user_id ?? null);
+
+      await updateFirestoreDocument(COLLECTIONS.ASSETS, editingAsset.id, {
+        name: editAssetName.trim(),
+        notes: editAssetNotes,
+        status: editAssetStatus,
+        location_id: nextLocationId,
+        assigned_to_user_id: nextAssignedTo,
+        storage_location: null,
+        updated_at: new Date().toISOString(),
       });
 
       try {
         InventoryStorage.updateAssetStatus(
-          asset.id,
-          nextStatus,
-          nextStatus === 'AVAILABLE' ? fallbackLocation : asset.location_id,
-          `Status updated in asset register`
+          editingAsset.id,
+          editAssetStatus,
+          nextLocationId,
+          `Asset updated via edit modal`
         );
       } catch (localStorageError) {
         console.warn('Could not update the legacy local asset cache:', localStorageError);
       }
 
+      closeEditAssetModal();
       onRefreshData();
-    } catch (error) {
-      console.error('Failed to update asset status:', error);
-      alert(error instanceof Error ? error.message : 'This asset cannot be marked in that status right now.');
+    } catch (error: any) {
+      console.error('Failed to update asset:', error);
+      alert(error?.message || 'Failed to update asset.');
+    } finally {
+      setEditAssetSaving(false);
     }
   };
 
-  const startLocationEdit = (asset: Asset) => {
-    setEditingLocationId(asset.id);
-    setLocationDraft(asset.location_id || locations[0]?.id || '');
-  };
-
-  const saveLocation = async (asset: Asset) => {
+  const handleDeleteAsset = async (asset: Asset) => {
+    if (asset.status === 'ISSUED') {
+      alert('Cannot delete an asset that is currently issued. Return it first.');
+      return;
+    }
+    if (!window.confirm(`Delete asset "${asset.name || asset.asset_code}"? This cannot be undone.`)) return;
     try {
-      try {
-        InventoryStorage.updateAssetLocation(asset.id, locationDraft, '');
-      } catch (localErr) {
-        console.warn('Local storage fallback failed:', localErr);
-      }
-
-      await updateFirestoreDocument(COLLECTIONS.ASSETS, asset.id, {
-        location_id: locationDraft,
-        storage_location: null,
-      });
-      setEditingLocationId(null);
+      await deleteFirestoreDocument(COLLECTIONS.ASSETS, asset.id);
       onRefreshData();
-    } catch (error) {
-      console.error('Failed to update asset location:', error);
-      alert(error instanceof Error ? error.message : 'Could not update asset location.');
+    } catch (error: any) {
+      console.error('Failed to delete asset:', error);
+      alert(error?.message || 'Failed to delete asset.');
     }
   };
 
@@ -249,103 +285,39 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
             <thead>
               <tr className="text-[10px] font-bold text-[var(--color-idea-muted)] uppercase tracking-[0.2em] border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]">
                 <th className="px-6 py-3.5">Asset Name</th>
-                <th className="px-6 py-3.5">Condition</th>
+                <th className="px-6 py-3.5">Status</th>
                 <th className="px-6 py-3.5">Location</th>
                 <th className="px-6 py-3.5">Assigned To</th>
-                <th className="px-6 py-3.5 w-12"></th>
+                <th className="px-6 py-3.5 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[var(--color-idea-border)]">
               {filteredAssets.map((asset) => {
-                const cat = catalogItems.find((c) => c.id === asset.catalog_item_id);
                 const loc = locations.find((l) => l.id === asset.location_id);
                 const user = users.find((u) => u.id === asset.assigned_to_user_id);
                 return (
                   <tr key={asset.id} className="hover:bg-[var(--color-idea-light-grey)] transition-colors">
                     <td className="px-6 py-4">
-                      <div>
-                        <p className="text-sm font-bold text-[var(--color-idea-text)]">{asset.name || 'Asset'}</p>
-                      </div>
+                      <p className="text-sm font-bold text-[var(--color-idea-text)]">{asset.name || 'Asset'}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="space-y-2">
-                        {asset.status === 'ISSUED' ? (
-                          <div className="w-full rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-700">
-                            Auto: Issued to student
-                          </div>
-                        ) : (
-                          <div className="relative inline-block w-full">
-                            <select
-                              value={asset.status}
-                              onChange={(e) => void handleAssetStatusChange(asset, e.target.value as AssetStatus)}
-                              className={`w-full text-[9px] pl-2.5 pr-6 py-1.5 rounded-full font-bold uppercase tracking-wider border-0 outline-none cursor-pointer appearance-none text-left ${getStatusBadge(asset.status)}`}
-                            >
-                              {(['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST'] as const).map((status) => (
-                                <option
-                                  key={status}
-                                  value={status}
-                                  className="bg-white text-[var(--color-idea-text)] text-left"
-                                >
-                                  {getStatusLabel(status)}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="w-3 h-3 absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none opacity-60" />
-                          </div>
-                        )}
-                      </div>
+                      {asset.status === 'ISSUED' ? (
+                        <div className="w-fit rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-700">
+                          Auto: Issued to student
+                        </div>
+                      ) : (
+                        <span
+                          className={`inline-block text-[9px] px-2.5 py-1.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadge(
+                            asset.status
+                          )}`}
+                        >
+                          {getStatusLabel(asset.status)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-xs font-medium text-[var(--color-idea-text)]">
                       <div className="space-y-1">
-                        {editingLocationId === asset.id ? (
-                          <div className="space-y-1.5 min-w-56">
-                            <select
-                              value={locationDraft}
-                              onChange={(e) => setLocationDraft(e.target.value)}
-                              className="w-full rounded-lg border border-[var(--color-idea-border)] bg-white px-2 py-1 text-[10px]"
-                            >
-                              {locations.map((location) => (
-                                <option key={location.id} value={location.id}>
-                                  {location.name} {location.storage_path ? `(${location.storage_path})` : ''}
-                                </option>
-                              ))}
-                            </select>
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                onClick={() => void saveLocation(asset)}
-                                className="rounded-lg bg-[var(--color-idea-blue)] px-2 py-1 text-[9px] font-bold text-white cursor-pointer"
-                              >
-                                Save
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setEditingLocationId(null)}
-                                className="rounded-lg border border-[var(--color-idea-border)] px-2 py-1 text-[9px] font-bold cursor-pointer"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="font-mono text-[var(--color-idea-muted)]">
-                              {loc?.name || 'Location not set'}
-                            </div>
-                            <div className="text-[10px] text-[var(--color-idea-muted)]">
-                              {loc?.storage_path || 'No detailed path'}
-                            </div>
-                            {!['ISSUED', 'LOST', 'RETIRED'].includes(asset.status) && (
-                              <button
-                                type="button"
-                                onClick={() => startLocationEdit(asset)}
-                                className="text-[10px] font-bold text-[var(--color-idea-blue)] hover:underline cursor-pointer"
-                              >
-                                Edit location
-                              </button>
-                            )}
-                          </>
-                        )}
+                        <div className="font-bold text-[var(--color-idea-text)]">{loc?.name || 'Location not set'}</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-xs font-medium">
@@ -366,14 +338,36 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                       </div>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        type="button"
-                        onClick={() => onOpenQRGenerator(asset.asset_code, asset.name || 'Asset', 'Individual Asset')}
-                        className="p-2 idea-button rounded-lg hover:opacity-90 transition-opacity cursor-pointer inline-flex"
-                        title="Generate QR tag"
-                      >
-                        <QrCode className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onOpenQRGenerator(asset.asset_code, asset.name || 'Asset', 'Individual Asset')}
+                          className="p-2 idea-button rounded-lg hover:opacity-90 transition-opacity cursor-pointer inline-flex"
+                          title="Generate QR tag"
+                        >
+                          <QrCode className="w-4 h-4" />
+                        </button>
+                        {isStaff(userRole) && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openEditAssetModal(asset)}
+                              className="p-2 rounded-lg border border-[var(--color-idea-border)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer inline-flex"
+                              title="Edit asset"
+                            >
+                              <Pencil className="w-4 h-4 text-[var(--color-idea-text)]" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteAsset(asset)}
+                              className="p-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors cursor-pointer inline-flex"
+                              title="Delete asset"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </>
+                        )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -382,6 +376,113 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           </table>
         </div>
       </div>
+
+      {/* Edit Asset Modal */}
+      {showEditAssetModal && editingAsset && (
+        <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
+            <div className="border-b border-[var(--color-idea-border)] pb-2">
+              <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Edit Asset</h3>
+              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5 font-mono">{editingAsset.asset_code}</p>
+            </div>
+            <form onSubmit={handleEditAssetSubmit} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Asset Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={editAssetName}
+                  onChange={(e) => setEditAssetName(e.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Status
+                </label>
+                {editingAsset.status === 'ISSUED' ? (
+                  <div className="mt-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+                    Issued to student
+                  </div>
+                ) : (
+                  <select
+                    value={editAssetStatus}
+                    onChange={(e) => setEditAssetStatus(e.target.value as AssetStatus)}
+                    className="idea-input mt-1 p-2.5 text-xs w-full"
+                  >
+                    {EDITABLE_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {getStatusLabel(status)}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Location
+                </label>
+                <select
+                  value={editAssetLocationId}
+                  onChange={(e) => setEditAssetLocationId(e.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                  disabled={editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED'}
+                >
+                  <option value="" disabled>
+                    {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
+                  </option>
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {(editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED') && (
+                  <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
+                    Location is cleared automatically for this status.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Inspection Notes
+                </label>
+                <input
+                  type="text"
+                  value={editAssetNotes}
+                  onChange={(e) => setEditAssetNotes(e.target.value)}
+                  placeholder="e.g. Minor cosmetic scratch on body"
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                />
+              </div>
+
+              <div className="pt-2 flex gap-3">
+                <button
+                  type="button"
+                  onClick={closeEditAssetModal}
+                  disabled={editAssetSaving}
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editAssetSaving}
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50"
+                >
+                  {editAssetSaving ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Add Asset Modal */}
       {showAddModal && (
@@ -418,7 +519,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Initial Storage Location
+                  Location
                 </label>
                 <select
                   value={newLocationId}
@@ -431,7 +532,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   </option>
                   {locations.map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.name}
+                      {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
                     </option>
                   ))}
                 </select>

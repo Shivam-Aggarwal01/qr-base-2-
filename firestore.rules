@@ -1,117 +1,216 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
+    // -----------------------------
+    // Authentication and roles
+    // -----------------------------
     function signedIn() {
       return request.auth != null;
     }
     function userDocPath() {
       return /databases/$(database)/documents/users/$(request.auth.uid);
     }
+    // Firestore user document is the primary role source.
+    // Auth custom claim is used as a fallback.
     function role() {
-      return signedIn() && exists(userDocPath())
-        ? get(userDocPath()).data.role
+      return signedIn()
+        ? (
+            exists(userDocPath())
+              ? get(userDocPath()).data.role
+              : request.auth.token.role
+          )
         : null;
     }
     function isAdmin() {
-      return signedIn() &&
-        request.auth.token.role == 'ADMIN';
+      return role() == 'ADMIN';
     }
     function isStaff() {
-      return signedIn() &&
-        request.auth.token.role in [
-          'ADMIN',
-          'STUDENT_LEAD',
-          'STUDENT_AMBASSADOR'
-        ];
+      return role() in [
+        'ADMIN',
+        'STUDENT_LEAD',
+        'STUDENT_AMBASSADOR'
+      ];
     }
     function isStudent() {
-      return signedIn() &&
-        request.auth.token.role == 'STUDENT';
+      return role() == 'STUDENT';
     }
 
+
+    // -----------------------------
+    // Users
+    // -----------------------------
     match /users/{userId} {
+      // Users can read themselves.
+      // Staff can read all users.
       allow read: if signedIn() &&
-        (request.auth.uid == userId || isStaff());
+        (
+          request.auth.uid == userId ||
+          isStaff()
+        );
+      // User can create their own profile only when
+      // an approved account request exists.
+      //
+      // Students cannot choose another role during signup.
       allow create: if signedIn() && (
         isAdmin() ||
         (
           request.auth.uid == userId &&
-          exists(/databases/$(database)/documents/account_requests/$(userId)) &&
-          get(/databases/$(database)/documents/account_requests/$(userId)).data.status == 'APPROVED'
+          exists(
+            /databases/$(database)/documents/account_requests/$(userId)
+          ) &&
+          get(
+            /databases/$(database)/documents/account_requests/$(userId)
+          ).data.status == 'APPROVED' &&
+          request.resource.data.role == 'STUDENT'
         )
       );
+      // Admin can update any user.
+      //
+      // Non-admin users can only update their own profile,
+      // and only non-sensitive profile fields.
       allow update: if isAdmin() ||
         (
           signedIn() &&
           request.auth.uid == userId &&
-          request.resource.data.role == resource.data.role
+
+          // Role cannot be changed.
+          request.resource.data.role == resource.data.role &&
+
+          // Sensitive account fields cannot be changed.
+          request.resource.data.email == resource.data.email &&
+          request.resource.data.status == resource.data.status
         );
       allow delete: if isAdmin();
     }
 
+
+    // -----------------------------
+    // Account Requests
+    // -----------------------------
     match /account_requests/{requestId} {
-      allow create: if signedIn()
-        && request.auth.uid == requestId
-        && request.resource.data.status == 'PENDING';
+      // User can submit their own account request.
+      allow create: if signedIn() &&
+        request.auth.uid == requestId &&
+        request.resource.data.status == 'PENDING';
+      // User can read their own request.
+      // Admin can read all requests.
       allow read: if signedIn() &&
-        (request.auth.uid == requestId || isAdmin());
+        (
+          request.auth.uid == requestId ||
+          isAdmin()
+        );
+      // Only admin can approve/reject/delete.
       allow update, delete: if isAdmin();
     }
 
+    // -----------------------------
+    // Catalog Items
+    // -----------------------------
     match /catalog_items/{itemId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
+    // -----------------------------
+    // Locations
+    // -----------------------------
     match /locations/{locationId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
+    // -----------------------------
+    // Stock Levels
+    // -----------------------------
     match /stock_levels/{stockId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
+    // -----------------------------
+    // Assets
+    // -----------------------------
     match /assets/{assetId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
+    // -----------------------------
+    // Asset Assignments
+    // -----------------------------
     match /asset_assignments/{assignmentId} {
       allow read: if signedIn();
       allow create, update, delete: if isStaff();
     }
 
+    // -----------------------------
+    // Requests
+    // -----------------------------
     match /requests/{requestId} {
-      allow read: if signedIn() &&
-        (request.auth.uid == resource.data.user_id || isStaff());
+      // Staff can read all requests.
+      //
+      // A student can read only their own request.
+      // Using isStaff() as a separate condition ensures
+      // collection/list queries work correctly.
+      allow read: if isStaff() ||
+        (
+          signedIn() &&
+          resource.data.user_id == request.auth.uid
+        );
+      // A signed-in user can create only their own request.
       allow create: if signedIn() &&
         request.auth.uid == request.resource.data.user_id;
+      // Staff manage requests.
       allow update: if isStaff();
       allow delete: if isAdmin();
     }
 
+    // -----------------------------
+    // Request Items
+    // -----------------------------
     match /requests/{requestId}/request_items/{requestItemId} {
-      allow read: if signedIn();
+      // Staff can read all request items.
+      //
+      // Students can only read request items belonging
+      // to their own request.
+      allow read: if isStaff() ||
+        (
+          signedIn() &&
+          get(
+            /databases/$(database)/documents/requests/$(requestId)
+          ).data.user_id == request.auth.uid
+        );
+      // Request owner or staff can add request items.
       allow create: if signedIn() && (
-        request.auth.uid ==
-          get(/databases/$(database)/documents/requests/$(requestId)).data.user_id ||
-        isStaff()
+        isStaff() ||
+        get(
+          /databases/$(database)/documents/requests/$(requestId)
+        ).data.user_id == request.auth.uid
       );
+      // Staff manage request items.
       allow update, delete: if isStaff();
     }
 
+    // -----------------------------
+    // Inventory Transactions
+    // -----------------------------
     match /inventory_transactions/{txId} {
+      // Historical inventory transactions should not be
+      // modified or created directly by clients.
       allow read: if isStaff();
-      allow create: if isStaff();
-      allow update, delete: if false;
+      allow create, update, delete: if false;
     }
 
+    // -----------------------------
+    // Audit Logs
+    // -----------------------------
     match /audit_logs/{logId} {
+      // Audit logs are visible to staff.
       allow read: if isStaff();
-      allow create: if isStaff();
-      allow update, delete: if false;
+      // Audit logs should be written by trusted
+      // server-side code only.
+      allow create, update, delete: if false;
     }
   }
 }

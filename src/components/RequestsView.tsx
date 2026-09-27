@@ -1,11 +1,21 @@
-import React, { useState } from 'react';
-import { Plus, ClipboardList, AlertTriangle, CheckCircle2, Truck, RotateCcw, XCircle, Clock } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import {
+  Plus,
+  ClipboardList,
+  AlertTriangle,
+  CheckCircle2,
+  RotateCcw,
+  XCircle,
+  Clock,
+  ChevronUp,
+  ChevronDown,
+} from 'lucide-react';
 import { Request, RequestItem, CatalogItem, User, RequestStatus, Asset, Location } from '../types/inventory';
 import { canApproveRequests, isStudent } from '../services/authRoles';
 import {
   completeLabRequest,
   getRequestLineKind,
-  handoverLabRequest,
+  approveAndHandoverLabRequest,
   reviewLabRequest,
 } from '../services/requestWorkflow';
 import confetti from 'canvas-confetti';
@@ -21,47 +31,23 @@ interface RequestsViewProps {
   onRefreshData: () => void;
 }
 
+// "HANDED_OVER" is still the underlying status written to Firestore (see
+// requestWorkflow.ts), but the UI treats it as the terminal "in use" state
+// reached the moment a request is approved — there's no separate handover step.
 type FilterKey = RequestStatus | 'ALL';
-const FILTERS: FilterKey[] = ['ALL', 'PENDING', 'APPROVED', 'HANDED_OVER', 'COMPLETED', 'REJECTED'];
+const FILTERS: FilterKey[] = ['ALL', 'PENDING', 'APPROVED', 'COMPLETED', 'REJECTED'];
 
-const STATUS_CFG: Record<string, { label: string; badge: string; stripe: string; icon: React.ReactNode }> = {
-  PENDING: {
-    label: 'Pending',
-    badge: 'idea-warning',
-    stripe: 'bg-[var(--color-idea-yellow)]',
-    icon: <Clock className="w-3 h-3" />,
-  },
-  APPROVED: {
-    label: 'Approved',
-    badge: 'idea-info',
-    stripe: 'bg-[var(--color-idea-blue)]',
-    icon: <CheckCircle2 className="w-3 h-3" />,
-  },
-  HANDED_OVER: {
-    label: 'Handed Over',
-    badge: 'idea-success',
-    stripe: 'bg-[var(--color-idea-green)]',
-    icon: <Truck className="w-3 h-3" />,
-  },
-  COMPLETED: {
-    label: 'Completed',
-    badge: 'idea-success',
-    stripe: 'bg-[var(--color-idea-green)]',
-    icon: <RotateCcw className="w-3 h-3" />,
-  },
-  REJECTED: {
-    label: 'Rejected',
-    badge: 'idea-error',
-    stripe: 'bg-[var(--color-idea-red)]',
-    icon: <XCircle className="w-3 h-3" />,
-  },
-  CANCELLED: {
-    label: 'Rejected',
-    badge: 'idea-error',
-    stripe: 'bg-[var(--color-idea-red)]',
-    icon: <XCircle className="w-3 h-3" />,
-  },
+const STATUS_CFG: Record<string, { label: string; badge: string; icon: React.ReactNode }> = {
+  PENDING: { label: 'Pending', badge: 'idea-warning', icon: <Clock className="w-3 h-3" /> },
+  APPROVED: { label: 'Issued', badge: 'idea-success', icon: <CheckCircle2 className="w-3 h-3" /> },
+  HANDED_OVER: { label: 'Issued', badge: 'idea-success', icon: <CheckCircle2 className="w-3 h-3" /> },
+  COMPLETED: { label: 'Returned', badge: 'idea-info', icon: <RotateCcw className="w-3 h-3" /> },
+  REJECTED: { label: 'Rejected', badge: 'idea-error', icon: <XCircle className="w-3 h-3" /> },
+  CANCELLED: { label: 'Rejected', badge: 'idea-error', icon: <XCircle className="w-3 h-3" /> },
 };
+
+type SortKey = 'request_number' | 'student' | 'status' | 'deadline_at';
+type ModalMode = 'review' | 'complete';
 
 export const RequestsView: React.FC<RequestsViewProps> = ({
   requests,
@@ -74,8 +60,10 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   onRefreshData,
 }) => {
   const [statusFilter, setStatusFilter] = useState<FilterKey>('ALL');
+  const [sortKey, setSortKey] = useState<SortKey>('deadline_at');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [selectedRequest, setSelectedRequest] = useState<Request | null>(null);
-  const [modalMode, setModalMode] = useState<'review' | 'handover' | 'complete'>('review');
+  const [modalMode, setModalMode] = useState<ModalMode>('review');
   const [remarks, setRemarks] = useState('');
   const [returnLocationId, setReturnLocationId] = useState('');
   const [processingError, setProcessingError] = useState<string | null>(null);
@@ -84,18 +72,54 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   const canProcessRequests = canApproveRequests(activeUser?.role);
   const visibleRequests = isStudent(activeUser?.role) ? requests.filter((r) => r.user_id === activeUser.id) : requests;
 
+  const displayStatus = (status: RequestStatus) => (status === 'HANDED_OVER' ? 'APPROVED' : status);
+
   const filterCount = (f: FilterKey) => {
     if (f === 'ALL') return visibleRequests.length;
     if (f === 'REJECTED')
       return visibleRequests.filter((r) => r.status === 'REJECTED' || r.status === 'CANCELLED').length;
+    if (f === 'APPROVED')
+      return visibleRequests.filter((r) => r.status === 'APPROVED' || r.status === 'HANDED_OVER').length;
     return visibleRequests.filter((r) => r.status === f).length;
   };
 
   const filteredRequests = visibleRequests.filter((r) => {
     if (statusFilter === 'ALL') return true;
     if (statusFilter === 'REJECTED') return r.status === 'REJECTED' || r.status === 'CANCELLED';
+    if (statusFilter === 'APPROVED') return r.status === 'APPROVED' || r.status === 'HANDED_OVER';
     return r.status === statusFilter;
   });
+
+  const studentName = (req: Request) => users.find((u) => u.id === req.user_id)?.name || 'Student';
+
+  const sortedRequests = useMemo(() => {
+    const dir = sortDir === 'asc' ? 1 : -1;
+    return [...filteredRequests].sort((a, b) => {
+      switch (sortKey) {
+        case 'request_number':
+          return a.request_number.localeCompare(b.request_number) * dir;
+        case 'student':
+          return studentName(a).localeCompare(studentName(b)) * dir;
+        case 'status':
+          return displayStatus(a.status).localeCompare(displayStatus(b.status)) * dir;
+        case 'deadline_at':
+        default: {
+          const av = a.deadline_at ? new Date(a.deadline_at).getTime() : Infinity;
+          const bv = b.deadline_at ? new Date(b.deadline_at).getTime() : Infinity;
+          return (av - bv) * dir;
+        }
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredRequests, sortKey, sortDir, users]);
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    else {
+      setSortKey(key);
+      setSortDir('asc');
+    }
+  };
 
   const lineLabel = (item: RequestItem) => {
     const kind = getRequestLineKind(item);
@@ -113,18 +137,19 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     };
   };
 
-  const openModal = (req: Request, mode: 'review' | 'handover' | 'complete') => {
+  const openModal = (req: Request, mode: ModalMode) => {
     setSelectedRequest(req);
     setModalMode(mode);
     setProcessingError(null);
     setIsProcessing(false);
     setReturnLocationId(locations[0]?.id || '');
+    const hasReturnables = req.items?.some((i) => getRequestLineKind(i) === 'ASSET' || i.usage === 'REUSABLE');
     setRemarks(
       mode === 'review'
-        ? 'Approved. Inventory changes only after handover.'
-        : mode === 'handover'
-          ? `Items/assets handed over for ${req.request_number}.`
-          : `Return accepted for ${req.request_number}.`
+        ? `Approved and issued for ${req.request_number}.`
+        : hasReturnables
+          ? `Return accepted for ${req.request_number}.`
+          : `Request completed for ${req.request_number}.`
     );
   };
 
@@ -141,11 +166,12 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     setProcessingError(null);
     setIsProcessing(true);
     try {
-      if (modalMode === 'review') await reviewLabRequest(selectedRequest, 'APPROVED', activeUser, remarks.trim());
-      else if (modalMode === 'handover') {
-        await handoverLabRequest(selectedRequest, activeUser, remarks.trim());
+      if (modalMode === 'review') {
+        await approveAndHandoverLabRequest(selectedRequest, activeUser, remarks.trim());
         confetti({ particleCount: 40, spread: 60, origin: { y: 0.6 } });
-      } else await completeLabRequest(selectedRequest, activeUser, remarks.trim(), returnLocationId);
+      } else {
+        await completeLabRequest(selectedRequest, activeUser, remarks.trim(), returnLocationId);
+      }
       closeModal();
       onRefreshData();
     } catch (error: any) {
@@ -170,12 +196,29 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     }
   };
 
-  const formatDate = (iso?: string) =>
-    iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+  const formatDate = (iso?: string | null) =>
+    iso ? new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+
+  const SortHeader: React.FC<{ label: string; sortKeyName: SortKey; className?: string }> = ({
+    label,
+    sortKeyName,
+    className,
+  }) => (
+    <th
+      onClick={() => toggleSort(sortKeyName)}
+      className={`px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] cursor-pointer select-none whitespace-nowrap ${className || ''}`}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {sortKey === sortKeyName &&
+          (sortDir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+      </span>
+    </th>
+  );
 
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
-      <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
+      <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
         {/* HEADER */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
@@ -183,7 +226,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               Material Requests
             </span>
             <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-              Requests <span className="text-[var(--color-idea-blue)]">Lists</span>
+              Requests <span className="text-[var(--color-idea-blue)]">List</span>
             </h2>
           </div>
           <button
@@ -219,10 +262,10 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
           })}
         </div>
 
-        {/* REQUEST CARDS */}
-        <div className="space-y-3">
-          {filteredRequests.length === 0 && (
-            <div className="idea-card p-12 flex flex-col items-center gap-3 text-center">
+        {/* TABLE */}
+        <div className="idea-card overflow-hidden">
+          {sortedRequests.length === 0 ? (
+            <div className="p-12 flex flex-col items-center gap-3 text-center">
               <div className="w-12 h-12 rounded-2xl idea-gradient-soft flex items-center justify-center">
                 <ClipboardList className="w-6 h-6 text-[var(--color-idea-blue)]" />
               </div>
@@ -231,105 +274,118 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                 <p className="text-xs text-[var(--color-idea-muted)] mt-0.5">
                   {statusFilter === 'ALL'
                     ? 'Submit a new request to get started.'
-                    : `No ${STATUS_CFG[statusFilter]?.label.toLowerCase() ?? statusFilter} requests.`}
+                    : `No ${(STATUS_CFG[statusFilter]?.label ?? statusFilter).toLowerCase()} requests.`}
                 </p>
               </div>
             </div>
-          )}
-          {filteredRequests.map((req) => {
-            const student = users.find((u) => u.id === req.user_id);
-            const cfg = STATUS_CFG[req.status] ?? STATUS_CFG['PENDING'];
-            return (
-              <div key={req.id} className="idea-card overflow-hidden flex">
-                <div className={`w-1 shrink-0 ${cfg.stripe}`} />
-                <div className="flex-1 p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="w-9 h-9 rounded-xl idea-gradient-soft flex items-center justify-center shrink-0 mt-0.5">
-                        <ClipboardList className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-mono font-bold text-[var(--color-idea-blue)] text-sm tracking-wide">
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead className="bg-[var(--color-idea-light-grey)]/60 border-b border-[var(--color-idea-border)]">
+                  <tr>
+                    <SortHeader label="Request" sortKeyName="request_number" />
+                    <SortHeader label="Student" sortKeyName="student" />
+                    <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
+                      Items
+                    </th>
+                    <SortHeader label="Status" sortKeyName="status" />
+                    <SortHeader label="Return by" sortKeyName="deadline_at" />
+                    <th className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
+                      Note
+                    </th>
+                    <th className="px-4 py-2.5 text-right text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-idea-border)]">
+                  {sortedRequests.map((req) => {
+                    const status = displayStatus(req.status);
+                    const cfg = STATUS_CFG[req.status] ?? STATUS_CFG['PENDING'];
+                    return (
+                      <tr
+                        key={req.id}
+                        className="hover:bg-[var(--color-idea-light-grey)]/40 transition-colors align-top"
+                      >
+                        <td className="px-4 py-3">
+                          <span className="font-mono font-bold text-[var(--color-idea-blue)] text-xs tracking-wide">
                             {req.request_number}
                           </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs font-semibold text-[var(--color-idea-text)]">
+                            {studentName(req)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 max-w-[260px]">
+                          <div className="flex flex-wrap gap-1">
+                            {(req.items ?? []).map((item) => {
+                              const ll = lineLabel(item);
+                              return (
+                                <span
+                                  key={item.id}
+                                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md border text-[10px] font-semibold bg-[var(--color-idea-light-grey)] border-[var(--color-idea-border)] whitespace-nowrap"
+                                  title={ll.isAsset ? 'Asset' : ll.isReuse ? 'Reusable' : 'Consumable'}
+                                >
+                                  <span className="text-[var(--color-idea-text)]">{ll.name}</span>
+                                  <span className="text-[var(--color-idea-blue)] font-mono">
+                                    {ll.isAsset ? '×1' : ll.qty}
+                                  </span>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
                           <span
-                            className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest ${cfg.badge}`}
+                            className={`inline-flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-widest whitespace-nowrap ${cfg.badge}`}
                           >
                             {cfg.icon}
                             {cfg.label}
                           </span>
-                        </div>
-                        <p className="text-[11px] text-[var(--color-idea-muted)] mt-0.5">
-                          {student?.name || 'Student'}
-                          {req.deadline_at ? ` · Return by ${formatDate(req.deadline_at)}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {req.status === 'PENDING' && canProcessRequests && (
-                        <button
-                          onClick={() => openModal(req, 'review')}
-                          className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] hover:bg-[var(--color-idea-blue)] hover:text-white transition-colors cursor-pointer"
-                        >
-                          Review
-                        </button>
-                      )}
-                      {req.status === 'APPROVED' && canProcessRequests && (
-                        <button
-                          onClick={() => openModal(req, 'handover')}
-                          className="px-3.5 py-1.5 idea-button text-xs font-semibold rounded-lg cursor-pointer"
-                        >
-                          Hand Over
-                        </button>
-                      )}
-                      {req.status === 'HANDED_OVER' && canProcessRequests && (
-                        <button
-                          onClick={() => openModal(req, 'complete')}
-                          className="px-3.5 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-idea-green)] text-[#3d6b10] hover:bg-[var(--color-idea-green)] hover:text-white transition-colors cursor-pointer"
-                        >
-                          Accept Return
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  <p className="text-xs text-[var(--color-idea-text)] mt-3 italic opacity-70">"{req.purpose}"</p>
-                  {req.items && req.items.length > 0 && (
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {req.items.map((item) => {
-                        const ll = lineLabel(item);
-                        return (
-                          <div
-                            key={item.id}
-                            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[10px] font-semibold bg-[var(--color-idea-light-grey)] border-[var(--color-idea-border)]"
-                          >
-                            <span className="text-[var(--color-idea-text)]">{ll.name}</span>
-                            <span className="text-[var(--color-idea-muted)]">·</span>
-                            <span className="text-[var(--color-idea-blue)] font-mono">
-                              {ll.isAsset ? 'Asset' : ll.qty}
-                            </span>
-                            {!ll.isAsset && (
-                              <span
-                                className={`px-1 py-px rounded text-[8px] uppercase font-bold ${ll.isReuse ? 'bg-[var(--color-idea-blue)]/10 text-[var(--color-idea-deep-blue)]' : 'bg-[var(--color-idea-green)]/10 text-[#3d6b10]'}`}
-                              >
-                                {ll.isReuse ? 'Reuse' : 'Consume'}
-                              </span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                  {req.remarks && (
-                    <p className="text-[10px] text-[var(--color-idea-muted)] mt-2.5 italic">
-                      <span className="font-semibold not-italic">Note: </span>
-                      {req.remarks}
-                    </p>
-                  )}
-                </div>
-              </div>
-            );
-          })}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-xs text-[var(--color-idea-muted)] whitespace-nowrap">
+                            {formatDate(req.deadline_at)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 max-w-[220px]">
+                          {req.purpose && (
+                            <p className="text-[11px] text-[var(--color-idea-text)] leading-snug">{req.purpose}</p>
+                          )}
+                          {req.remarks && (
+                            <p className="text-[10px] text-[var(--color-idea-muted)] mt-1 leading-snug">
+                              <span className="font-semibold">Note:</span> {req.remarks}
+                            </p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          {req.status === 'PENDING' && canProcessRequests && (
+                            <button
+                              onClick={() => openModal(req, 'review')}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] hover:bg-[var(--color-idea-blue)] hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+                            >
+                              Review
+                            </button>
+                          )}
+                          {(req.status === 'APPROVED' || req.status === 'HANDED_OVER') && canProcessRequests && (
+                            <button
+                              onClick={() => openModal(req, 'complete')}
+                              className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-idea-green)] text-[#3d6b10] hover:bg-[var(--color-idea-green)] hover:text-white transition-colors cursor-pointer whitespace-nowrap"
+                            >
+                              {req.items?.some((i) => getRequestLineKind(i) === 'ASSET' || i.usage === 'REUSABLE')
+                                ? 'Accept Return'
+                                : 'Complete'}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
 
@@ -341,19 +397,19 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               <div className="w-8 h-8 rounded-xl idea-gradient-soft flex items-center justify-center shrink-0">
                 {modalMode === 'review' ? (
                   <CheckCircle2 className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                ) : modalMode === 'handover' ? (
-                  <Truck className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                ) : (
+                ) : selectedRequest.items?.some((i) => getRequestLineKind(i) === 'ASSET' || i.usage === 'REUSABLE') ? (
                   <RotateCcw className="w-4 h-4 text-[var(--color-idea-blue)]" />
+                ) : (
+                  <CheckCircle2 className="w-4 h-4 text-[var(--color-idea-blue)]" />
                 )}
               </div>
               <div>
                 <p className="font-bold text-[var(--color-idea-text)] text-sm">
                   {modalMode === 'review'
-                    ? 'Review Request'
-                    : modalMode === 'handover'
-                      ? 'Hand Over Items'
-                      : 'Accept Return'}
+                    ? 'Approve & Issue Request'
+                    : selectedRequest.items?.some((i) => getRequestLineKind(i) === 'ASSET' || i.usage === 'REUSABLE')
+                      ? 'Accept Return'
+                      : 'Complete Request'}
                 </p>
                 <p className="text-[10px] font-mono text-[var(--color-idea-blue)] mt-0.5">
                   {selectedRequest.request_number}
@@ -369,10 +425,10 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               )}
               <p className="text-xs text-[var(--color-idea-muted)] leading-relaxed">
                 {modalMode === 'review'
-                  ? 'Approval gives permission only. Inventory does not change until handover.'
-                  : modalMode === 'handover'
-                    ? 'Records the physical handover. Updates stock levels, asset status, and the ledger.'
-                    : 'Confirm items have been returned. Inventory will be restored and the request closed.'}
+                  ? 'Approving deducts stock and marks any assets issued immediately — there is no separate handover step.'
+                  : selectedRequest.items?.some((i) => getRequestLineKind(i) === 'ASSET' || i.usage === 'REUSABLE')
+                    ? 'Confirm the items have physically come back. Stock and asset status will be restored and the request closed.'
+                    : 'Mark this request as completed. Consumables are already deducted.'}
               </p>
               <div className="space-y-1.5">
                 <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
@@ -395,17 +451,17 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               </div>
               <div>
                 <label className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] block mb-1.5">
-                  Remarks
+                  Note
                 </label>
                 <input
                   type="text"
                   value={remarks}
                   onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Add a note…"
+                  placeholder="Add a note for this request…"
                   className="idea-input px-3 py-2.5 text-xs"
                 />
               </div>
-              {modalMode === 'complete' && (
+              {modalMode === 'complete' && selectedRequest.items?.some((i) => getRequestLineKind(i) === 'ASSET') && (
                 <div>
                   <label className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] block mb-1.5">
                     Return Location
@@ -429,7 +485,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               <button
                 onClick={closeModal}
                 disabled={isProcessing}
-                className="px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
+                className="flex-1 px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -445,15 +501,15 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               <button
                 onClick={handleAction}
                 disabled={isProcessing}
-                className="flex-1 py-2.5 idea-button rounded-xl text-xs font-bold cursor-pointer disabled:opacity-60"
+                className="py-2.5 flex-1 px-4 idea-button rounded-xl text-xs font-bold cursor-pointer disabled:opacity-60"
               >
                 {isProcessing
                   ? 'Processing…'
                   : modalMode === 'review'
-                    ? 'Approve'
-                    : modalMode === 'handover'
-                      ? 'Confirm Handover'
-                      : 'Accept Return'}
+                    ? 'Approve & Issue'
+                    : selectedRequest.items?.some((i) => getRequestLineKind(i) === 'ASSET' || i.usage === 'REUSABLE')
+                      ? 'Accept Return'
+                      : 'Complete Request'}
               </button>
             </div>
           </div>
