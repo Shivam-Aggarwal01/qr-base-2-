@@ -11,7 +11,7 @@ export type RequestUsage = 'CONSUMABLE' | 'REUSABLE';
 
 export type AssetStatus = 'AVAILABLE' | 'ISSUED' | 'UNDER_REPAIR' | 'DAMAGED' | 'LOST' | 'RETIRED';
 
-export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'HANDED_OVER' | 'COMPLETED' | 'PARTIAL' | 'CANCELLED';
+export type RequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'HANDED_OVER' | 'RETURN_REQUESTED' | 'COMPLETED' | 'PARTIAL' | 'CANCELLED';
 
 export type RequestLineKind = 'CATALOG' | 'ASSET';
 

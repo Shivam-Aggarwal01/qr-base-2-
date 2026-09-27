@@ -14,7 +14,6 @@ const isStaff = (role?: UserRole) => role === 'ADMIN' || role === 'STUDENT_LEAD'
 
 interface AssetsViewProps {
   assets: Asset[];
-  catalogItems: CatalogItem[];
   locations: Location[];
   users: User[];
   userRole?: UserRole;
@@ -26,7 +25,6 @@ const EDITABLE_STATUSES: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED'
 
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
-  catalogItems,
   locations,
   users,
   userRole,
@@ -64,13 +62,10 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
-      const cat = catalogItems.find((c) => c.id === asset.catalog_item_id || c.item_code === asset.catalog_item_id);
-
       if (
         !asset.asset_code.toLowerCase().includes(q) &&
         !asset.storage_location?.toLowerCase().includes(q) &&
-        !asset.name?.toLowerCase().includes(q) &&
-        !cat?.name.toLowerCase().includes(q)
+        !asset.name?.toLowerCase().includes(q)
       ) {
         return false;
       }
@@ -89,7 +84,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     try {
       await createAssetInFirestore({
         name: newAssetName.trim(),
-        catalog_item_id: '',
         status: 'AVAILABLE',
         location_id: newLocationId,
         storage_location: null,

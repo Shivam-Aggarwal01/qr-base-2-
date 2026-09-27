@@ -18,9 +18,13 @@ service cloud.firestore {
     function role() {
       return signedIn()
         ? (
-            exists(userDocPath())
-              ? get(userDocPath()).data.role
-              : request.auth.token.role
+            request.auth.token.get('role', null) != null
+              ? request.auth.token.get('role', null)
+              : (
+                  exists(userDocPath())
+                    ? get(userDocPath()).data.role
+                    : null
+                )
           )
         : null;
     }
@@ -195,8 +199,19 @@ service cloud.firestore {
       allow create: if signedIn() &&
         request.auth.uid == request.resource.data.user_id;
 
-      // Staff can update requests.
-      allow update: if isStaff();
+      // Students can request a return for their own issued request.
+      // Staff must still confirm receipt and complete the return.
+      allow update: if isStaff() ||
+        (
+          isStudent() &&
+          resource.data.user_id == request.auth.uid &&
+          resource.data.status in ['HANDED_OVER', 'APPROVED'] &&
+          request.resource.data.status == 'RETURN_REQUESTED' &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'updated_at'
+          ])
+        );
 
       // Only admins can delete requests.
       allow delete: if isAdmin();
@@ -242,8 +257,9 @@ service cloud.firestore {
       // Historical inventory transactions are readable by staff.
       allow read: if isStaff();
 
-      // Transactions must be written by trusted backend code.
-      allow create, update, delete: if false;
+      // Staff may create historical entries; entries are immutable afterward.
+      allow create: if isStaff();
+      allow update, delete: if false;
     }
 
 

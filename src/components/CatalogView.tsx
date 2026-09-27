@@ -1,22 +1,23 @@
 import React, { useState } from 'react';
 import { Plus, Search, QrCode, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
-import { CatalogItem, Location, StockLevel, Asset, UserRole } from '../types/inventory';
+import { CatalogItem, Location, StockLevel, UserRole } from '../types/inventory';
 import {
   createCatalogItemInFirestore,
   deleteFirestoreDocument,
   updateFirestoreDocument,
   COLLECTIONS,
 } from '../services/firebaseInventory';
+import { receiveCatalogStock } from '../services/firebaseCollections';
 import { InventoryStorage } from '../services/storage';
 
 // Mirrors Firestore rule: isStaff = ADMIN | STUDENT_LEAD | STUDENT_AMBASSADOR
-const isStaff = (role?: UserRole) => role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
+const isStaff = (role?: UserRole) =>
+  role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
 
 interface CatalogViewProps {
   catalogItems: CatalogItem[];
   stockLevels: StockLevel[];
   locations: Location[];
-  assets: Asset[];
   userRole?: UserRole;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
   onRefreshData: () => void;
@@ -26,7 +27,6 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   catalogItems,
   stockLevels,
   locations,
-  assets,
   userRole,
   onOpenQRGenerator,
   onRefreshData,
@@ -57,30 +57,50 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   const [targetLocId, setTargetLocId] = useState('');
   const [restockQty, setRestockQty] = useState(10);
 
-  // Calculate low stock items count for the badge
+  // ------------------------------------------------------------
+  // Stock helpers
+  // ------------------------------------------------------------
+
+  const getItemStock = (item: CatalogItem) => {
+    return stockLevels
+      .filter((stock) => stock.catalog_item_id === item.id)
+      .reduce((sum, stock) => sum + (stock.quantity || 0), 0);
+  };
+
   const lowStockCount = catalogItems.filter((item) => {
-    const totalStock = stockLevels
-      .filter((s) => s.catalog_item_id === item.id || s.catalog_item_id === item.item_code)
-      .reduce((sum, s) => sum + s.quantity, 0);
+    const totalStock = getItemStock(item);
     const minStock = item.min_stock_alert ?? 10;
+
     return totalStock <= minStock;
   }).length;
 
   const filteredItems = catalogItems.filter((item) => {
-    if (searchFilter) {
-      const q = searchFilter.toLowerCase();
-      if (!(item.name || '').toLowerCase().includes(q) && !(item.item_code || '').toLowerCase().includes(q))
+    if (searchFilter.trim()) {
+      const query = searchFilter.trim().toLowerCase();
+
+      const matchesName = (item.name || '').toLowerCase().includes(query);
+      const matchesCode = (item.item_code || '').toLowerCase().includes(query);
+
+      if (!matchesName && !matchesCode) {
         return false;
+      }
     }
+
     if (stockFilterMode === 'low') {
-      const totalStock = stockLevels
-        .filter((s) => s.catalog_item_id === item.id || s.catalog_item_id === item.item_code)
-        .reduce((sum, s) => sum + s.quantity, 0);
+      const totalStock = getItemStock(item);
       const minStock = item.min_stock_alert ?? 10;
-      if (totalStock > minStock) return false;
+
+      if (totalStock > minStock) {
+        return false;
+      }
     }
+
     return true;
   });
+
+  // ------------------------------------------------------------
+  // Create catalog item
+  // ------------------------------------------------------------
 
   const handleCreateCatalogItem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -91,18 +111,23 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
     }
 
     if (!isStaff(userRole)) {
-      alert(`Only staff (Admin, Student Lead, Ambassador) can add items. Your role: ${userRole || 'NOT SET'}`);
+      alert(
+        `Only staff (Admin, Student Lead, Ambassador) can add items. Your role: ${userRole || 'NOT SET'
+        }`
+      );
       return;
     }
 
     try {
-      const selectedLoc = locations.find((l) => l.id === newLocationId) || locations[0];
+      const selectedLoc =
+        locations.find((location) => location.id === newLocationId) || locations[0];
+
       await createCatalogItemInFirestore({
         name: newItemName.trim(),
-        description: newItemDesc,
+        description: newItemDesc.trim(),
         category: 'Uncategorized',
         is_consumable: false,
-        unit: newItemUnit,
+        unit: newItemUnit.trim() || 'pcs',
         min_stock_alert: newItemMinStock,
         storage_place: selectedLoc ? selectedLoc.name : null,
       });
@@ -110,13 +135,24 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       setShowAddModal(false);
       setNewItemName('');
       setNewItemDesc('');
+      setNewItemUnit('pcs');
+      setNewItemMinStock(10);
       setNewLocationId('');
+
       onRefreshData();
     } catch (error: any) {
       console.error('Failed to create catalog item:', error?.message || error);
-      alert(`Failed to create item. ${error?.message || 'Check Firebase permissions.'}`);
+
+      alert(
+        `Failed to create item. ${error?.message || 'Check Firebase permissions.'
+        }`
+      );
     }
   };
+
+  // ------------------------------------------------------------
+  // Edit catalog item
+  // ------------------------------------------------------------
 
   const openEditModal = (item: CatalogItem) => {
     setEditingItem(item);
@@ -129,146 +165,188 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingItem || !editName.trim()) return;
+
+    if (!editingItem || !editName.trim()) {
+      return;
+    }
+
+    if (!isStaff(userRole)) {
+      alert('You do not have permission to edit items.');
+      return;
+    }
+
     setEditSaving(true);
+
     try {
       await updateFirestoreDocument(COLLECTIONS.CATALOG_ITEMS, editingItem.id, {
         name: editName.trim(),
-        description: editDesc,
-        unit: editUnit,
+        description: editDesc.trim(),
+        unit: editUnit.trim() || 'pcs',
         min_stock_alert: editMinStock,
         updated_at: new Date().toISOString(),
       });
+
       setShowEditModal(false);
       setEditingItem(null);
+
       onRefreshData();
     } catch (error: any) {
       console.error('Failed to update catalog item:', error);
+
       alert(error?.message || 'Failed to update item.');
     } finally {
       setEditSaving(false);
     }
   };
 
+  // ------------------------------------------------------------
+  // Restock
+  // ------------------------------------------------------------
+
   const handleRestockSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedCatalogItem || !targetLocId) {
-      alert('Please select a target location');
+
+    if (!selectedCatalogItem) {
+      alert('No item selected.');
+      return;
+    }
+
+    if (!targetLocId) {
+      alert('Please select a target location.');
+      return;
+    }
+
+    if (!Number.isFinite(restockQty) || restockQty <= 0) {
+      alert('Quantity must be greater than zero.');
       return;
     }
 
     try {
-      InventoryStorage.adjustStock(
+      await receiveCatalogStock(
         selectedCatalogItem.id,
         targetLocId,
         restockQty,
-        'RECEIVE',
         `Restocked ${restockQty} ${selectedCatalogItem.unit}`
       );
 
-      const { createFirestoreDocument, updateDocument } = await import('../services/firebaseCollections');
+      alert(
+        `✓ Added ${restockQty} ${selectedCatalogItem.unit} to stock`
+      );
 
-      try {
-        const { getCollection } = await import('../services/firebaseCollections');
-        const allStocks = await getCollection<{
-          id: string;
-          catalog_item_id: string;
-          location_id: string;
-          quantity: number;
-        }>('stock_levels');
-        const existingStock = allStocks.find(
-          (s: any) => s.catalog_item_id === selectedCatalogItem.id && s.location_id === targetLocId
-        );
-
-        if (existingStock) {
-          await updateDocument('stock_levels', existingStock.id, {
-            quantity: existingStock.quantity + restockQty,
-            updated_at: new Date().toISOString(),
-          });
-        } else {
-          await createFirestoreDocument('stock_levels', {
-            catalog_item_id: selectedCatalogItem.id,
-            location_id: targetLocId,
-            quantity: restockQty,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          });
-        }
-      } catch (fbError) {
-        console.warn('⚠️ Firestore update skipped:', fbError);
-      }
-
-      alert(`✓ Added ${restockQty} ${selectedCatalogItem.unit} to stock`);
       setShowRestockModal(false);
       setSelectedCatalogItem(null);
+      setTargetLocId('');
+      setRestockQty(10);
+
       onRefreshData();
     } catch (error: any) {
-      console.error('❌ Restock failed:', error);
-      alert(`Error: ${error?.message || 'Failed to restock'}`);
+      console.error('Restock failed:', error);
+
+      alert(
+        `Error: ${error?.message || 'Failed to restock'}`
+      );
     }
   };
+
+  // ------------------------------------------------------------
+  // Delete stock records
+  // ------------------------------------------------------------
 
   const handleDeleteStock = async (item: CatalogItem) => {
-    if (!window.confirm(`Delete all stock records for ${item.name}? The catalog item and assets will remain.`)) {
-      return;
-    }
-
-    try {
-      const { getCollection } = await import('../services/firebaseCollections');
-      const allStocks = await getCollection<StockLevel>('stock_levels');
-      const matchingStocks = allStocks.filter(
-        (stock) => stock.catalog_item_id === item.id || stock.catalog_item_id === item.item_code
-      );
-
-      await Promise.all(
-        matchingStocks.filter((stock) => stock.id).map((stock) => deleteFirestoreDocument('stock_levels', stock.id))
-      );
-      InventoryStorage.deleteStockForItem(item.id, item.item_code);
-      alert(`Deleted stock records for ${item.name}.`);
-      onRefreshData();
-    } catch (error: any) {
-      console.error('Failed to delete stock:', error);
-      alert(error?.message || 'Failed to delete stock records.');
-    }
-  };
-
-  const handleDeleteItem = async (item: CatalogItem) => {
-    const linkedAssets = assets.filter(
-      (asset) => asset.catalog_item_id === item.id || asset.catalog_item_id === item.item_code
-    );
-
-    if (linkedAssets.length > 0) {
-      alert(
-        `Cannot delete ${item.name} because ${linkedAssets.length} asset(s) still use this catalog item. Remove or reassign those assets first.`
-      );
-      return;
-    }
-
     if (
-      !window.confirm(`Delete the catalog item ${item.name}? This also removes its stock records and cannot be undone.`)
+      !window.confirm(
+        `Delete all stock records for ${item.name}? The catalog item itself will remain.`
+      )
     ) {
       return;
     }
 
     try {
       const { getCollection } = await import('../services/firebaseCollections');
+
       const allStocks = await getCollection<StockLevel>('stock_levels');
+
       const matchingStocks = allStocks.filter(
-        (stock) => stock.catalog_item_id === item.id || stock.catalog_item_id === item.item_code
+        (stock) => stock.catalog_item_id === item.id
       );
 
       await Promise.all(
-        matchingStocks.filter((stock) => stock.id).map((stock) => deleteFirestoreDocument('stock_levels', stock.id))
+        matchingStocks
+          .filter((stock) => stock.id)
+          .map((stock) =>
+            deleteFirestoreDocument('stock_levels', stock.id)
+          )
       );
-      await deleteFirestoreDocument('catalog_items', item.id);
+
       InventoryStorage.deleteStockForItem(item.id, item.item_code);
+
+      alert(`Deleted stock records for ${item.name}.`);
+
+      onRefreshData();
+    } catch (error: any) {
+      console.error('Failed to delete stock:', error);
+
+      alert(
+        error?.message || 'Failed to delete stock records.'
+      );
+    }
+  };
+
+  // ------------------------------------------------------------
+  // Delete catalog item
+  //
+  // Catalog items and assets are completely independent.
+  // There is NO asset relationship check here.
+  // ------------------------------------------------------------
+
+  const handleDeleteItem = async (item: CatalogItem) => {
+    if (
+      !window.confirm(
+        `Delete the catalog item ${item.name}? This also removes its stock records and cannot be undone.`
+      )
+    ) {
+      return;
+    }
+
+    try {
+      const { getCollection } = await import('../services/firebaseCollections');
+
+      const allStocks = await getCollection<StockLevel>('stock_levels');
+
+      const matchingStocks = allStocks.filter(
+        (stock) => stock.catalog_item_id === item.id
+      );
+
+      await Promise.all(
+        matchingStocks
+          .filter((stock) => stock.id)
+          .map((stock) =>
+            deleteFirestoreDocument('stock_levels', stock.id)
+          )
+      );
+
+      await deleteFirestoreDocument(
+        COLLECTIONS.CATALOG_ITEMS,
+        item.id
+      );
+
+      InventoryStorage.deleteStockForItem(item.id, item.item_code);
+
       alert(`Deleted catalog item ${item.name}.`);
+
       onRefreshData();
     } catch (error: any) {
       console.error('Failed to delete catalog item:', error);
-      alert(error?.message || 'Failed to delete catalog item.');
+
+      alert(
+        error?.message || 'Failed to delete catalog item.'
+      );
     }
   };
+
+  // ------------------------------------------------------------
+  // UI
+  // ------------------------------------------------------------
 
   return (
     <div className="flex-1 space-y-6 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
@@ -278,21 +356,26 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
           <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
             LAB ITEMS
           </span>
+
           <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
             Items <span className="text-[var(--color-idea-blue)]">List</span>
           </h2>
         </div>
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="idea-button flex items-center gap-2 px-5 py-2.5 text-xs font-semibold cursor-pointer"
-        >
-          <Plus className="w-4 h-4" /> Add New Item
-        </button>
+
+        {isStaff(userRole) && (
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="idea-button flex items-center gap-2 px-5 py-2.5 text-xs font-semibold cursor-pointer"
+          >
+            <Plus className="w-4 h-4" />
+            Add New Item
+          </button>
+        )}
       </div>
 
-      {/* Structured Toolbar & Filter Tabs */}
+      {/* Toolbar */}
       <div className="idea-card p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
-        {/* Search Input */}
+        {/* Search */}
         <div className="relative w-full lg:w-80">
           <input
             type="text"
@@ -301,20 +384,21 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
             placeholder="Search items directory..."
             className="idea-input pl-9 pr-4 py-2 text-xs w-full"
           />
+
           <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-2.5" />
         </div>
 
-        {/* Clean Segmented Filter Pills */}
+        {/* Stock Filters */}
         <div className="flex items-center gap-1 bg-[var(--color-idea-light-grey)] p-1 rounded-xl border border-[var(--color-idea-border)] w-full lg:w-auto">
           <button
             onClick={() => setStockFilterMode('all')}
-            className={`flex-1 lg:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              stockFilterMode === 'all'
-                ? 'bg-white text-[var(--color-idea-text)] shadow-sm'
-                : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
-            }`}
+            className={`flex-1 lg:flex-none px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${stockFilterMode === 'all'
+              ? 'bg-white text-[var(--color-idea-text)] shadow-sm'
+              : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
+              }`}
           >
             All Items
+
             <span className="ml-1.5 px-1.5 py-0.5 text-[10px] rounded-md bg-[var(--color-idea-light-grey)] font-mono">
               {catalogItems.length}
             </span>
@@ -322,16 +406,25 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
           <button
             onClick={() => setStockFilterMode('low')}
-            className={`flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-              stockFilterMode === 'low'
-                ? 'bg-red-500 text-white shadow-sm'
-                : 'text-[var(--color-idea-muted)] hover:text-red-600'
-            }`}
+            className={`flex-1 lg:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer ${stockFilterMode === 'low'
+              ? 'bg-red-500 text-white shadow-sm'
+              : 'text-[var(--color-idea-muted)] hover:text-red-600'
+              }`}
           >
-            <AlertTriangle className={`w-3.5 h-3.5 ${stockFilterMode === 'low' ? 'text-white' : 'text-red-500'}`} />
+            <AlertTriangle
+              className={`w-3.5 h-3.5 ${stockFilterMode === 'low'
+                ? 'text-white'
+                : 'text-red-500'
+                }`}
+            />
+
             <span>Low Stock</span>
+
             <span
-              className={`ml-1 px-1.5 py-0.5 text-[10px] rounded-md font-mono ${stockFilterMode === 'low' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600'}`}
+              className={`ml-1 px-1.5 py-0.5 text-[10px] rounded-md font-mono ${stockFilterMode === 'low'
+                ? 'bg-red-600 text-white'
+                : 'bg-red-50 text-red-600'
+                }`}
             >
               {lowStockCount}
             </span>
@@ -342,21 +435,24 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
       {/* Catalog Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredItems.map((item) => {
-          const itemStocks = stockLevels.filter(
-            (s) => s.catalog_item_id === item.id || s.catalog_item_id === item.item_code
-          );
-          const totalStock = itemStocks.reduce((a, b) => a + (b.quantity || 0), 0);
+          const totalStock = getItemStock(item);
+
           const minStock = item.min_stock_alert ?? 10;
+
           const isLowStock = totalStock <= minStock;
 
           return (
-            <div key={item.id} className="idea-card p-5 flex flex-col gap-4 relative group">
-              {/* Top: name/desc + icon actions */}
+            <div
+              key={item.id}
+              className="idea-card p-5 flex flex-col gap-4 relative group"
+            >
+              {/* Item Header */}
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <h3 className="text-base font-bold text-[var(--color-idea-text)] leading-snug truncate group-hover:text-[var(--color-idea-blue)] transition-colors">
                     {item.name}
                   </h3>
+
                   {item.description && (
                     <p className="text-xs text-[var(--color-idea-muted)] mt-1 line-clamp-2 leading-relaxed">
                       {item.description}
@@ -367,12 +463,19 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
-                    onClick={() => onOpenQRGenerator(item.id, item.name, 'Inventory Item')}
+                    onClick={() =>
+                      onOpenQRGenerator(
+                        item.item_code,
+                        item.name,
+                        'Inventory Item'
+                      )
+                    }
                     title="Generate QR label"
                     className="w-8 h-8 grid place-items-center rounded-full idea-button cursor-pointer"
                   >
                     <QrCode className="w-3.5 h-3.5" />
                   </button>
+
                   {isStaff(userRole) && (
                     <>
                       <button
@@ -383,6 +486,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
+
                       <button
                         type="button"
                         onClick={() => void handleDeleteItem(item)}
@@ -396,20 +500,28 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 </div>
               </div>
 
-              {/* Stock readout */}
+              {/* Item Code */}
+              <div className="text-[9px] font-mono text-[var(--color-idea-blue)] truncate">
+                {item.item_code}
+              </div>
+
+              {/* Stock */}
               <div className="rounded-xl bg-[var(--color-idea-light-grey)] px-4 py-3">
                 <div className="flex items-baseline justify-between">
                   <span className="text-[10px] font-semibold uppercase tracking-widest text-[var(--color-idea-muted)]">
                     In stock
                   </span>
+
                   <span className="flex items-baseline gap-1">
                     <span
-                      className={`text-xl font-mono font-bold leading-none ${
-                        isLowStock ? 'text-[var(--color-idea-red)]' : 'text-[var(--color-idea-text)]'
-                      }`}
+                      className={`text-xl font-mono font-bold leading-none ${isLowStock
+                        ? 'text-[var(--color-idea-red)]'
+                        : 'text-[var(--color-idea-text)]'
+                        }`}
                     >
                       {totalStock}
                     </span>
+
                     <span className="text-[10px] font-medium text-[var(--color-idea-muted)] uppercase">
                       {item.unit}
                     </span>
@@ -419,6 +531,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 {isLowStock && (
                   <div className="flex items-center gap-1.5 text-[var(--color-idea-red)] text-[10px] font-semibold mt-2">
                     <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+
                     <span>
                       Below minimum threshold ({minStock} {item.unit})
                     </span>
@@ -434,12 +547,15 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                     onClick={() => {
                       setSelectedCatalogItem(item);
                       setTargetLocId(locations[0]?.id || '');
+                      setRestockQty(10);
                       setShowRestockModal(true);
                     }}
                     className="idea-button flex-1 h-9 rounded-xl text-xs font-semibold cursor-pointer flex items-center justify-center gap-1.5"
                   >
-                    <Plus className="w-3.5 h-3.5" /> Add Stock
+                    <Plus className="w-3.5 h-3.5" />
+                    Add Stock
                   </button>
+
                   <button
                     type="button"
                     onClick={() => void handleDeleteStock(item)}
@@ -459,19 +575,41 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         })}
       </div>
 
-      {/* Edit Catalog Item Modal */}
+      {/* Empty State */}
+      {filteredItems.length === 0 && (
+        <div className="idea-card p-10 text-center">
+          <p className="text-sm font-semibold text-[var(--color-idea-text)]">
+            No items found
+          </p>
+
+          <p className="text-xs text-[var(--color-idea-muted)] mt-1">
+            Try changing your search or stock filter.
+          </p>
+        </div>
+      )}
+
+      {/* ============================================================
+          EDIT ITEM MODAL
+          ============================================================ */}
       {showEditModal && editingItem && (
         <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
             <div className="border-b border-[var(--color-idea-border)] pb-2">
-              <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Edit Item</h3>
-              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5 font-mono">{editingItem.item_code}</p>
+              <h3 className="font-bold text-[var(--color-idea-text)] text-lg">
+                Edit Item
+              </h3>
+
+              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5 font-mono">
+                {editingItem.item_code}
+              </p>
             </div>
+
             <form onSubmit={handleEditSubmit} className="space-y-3">
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Item Name
                 </label>
+
                 <input
                   type="text"
                   required
@@ -481,10 +619,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   className="idea-input mt-1 p-2.5 text-xs"
                 />
               </div>
+
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Unit
                 </label>
+
                 <input
                   type="text"
                   value={editUnit}
@@ -493,10 +633,12 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   className="idea-input mt-1 p-2.5 text-xs w-full"
                 />
               </div>
+
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Description
                 </label>
+
                 <textarea
                   rows={2}
                   value={editDesc}
@@ -505,18 +647,23 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   className="idea-input mt-1 p-2.5 text-xs resize-none"
                 />
               </div>
+
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Min Stock Threshold
                 </label>
+
                 <input
                   type="number"
                   min="1"
                   value={editMinStock}
-                  onChange={(e) => setEditMinStock(Number(e.target.value))}
+                  onChange={(e) =>
+                    setEditMinStock(Number(e.target.value))
+                  }
                   className="idea-input mt-1 p-2.5 text-xs font-mono"
                 />
               </div>
+
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
@@ -529,6 +676,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
                   disabled={editSaving}
@@ -542,21 +690,28 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         </div>
       )}
 
-      {/* Add Catalog Item Modal */}
+      {/* ============================================================
+          ADD ITEM MODAL
+          ============================================================ */}
       {showAddModal && (
         <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
             <div className="border-b border-[var(--color-idea-border)] pb-2">
-              <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Add Item</h3>
+              <h3 className="font-bold text-[var(--color-idea-text)] text-lg">
+                Add Item
+              </h3>
+
               <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">
                 A unique item code will be generated automatically.
               </p>
             </div>
+
             <form onSubmit={handleCreateCatalogItem} className="space-y-3">
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Item Name
                 </label>
+
                 <input
                   type="text"
                   required
@@ -572,6 +727,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Unit
                 </label>
+
                 <input
                   type="text"
                   value={newItemUnit}
@@ -585,6 +741,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Description
                 </label>
+
                 <textarea
                   rows={2}
                   value={newItemDesc}
@@ -598,11 +755,14 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Min Stock Threshold
                 </label>
+
                 <input
                   type="number"
                   min="1"
                   value={newItemMinStock}
-                  onChange={(e) => setNewItemMinStock(Number(e.target.value))}
+                  onChange={(e) =>
+                    setNewItemMinStock(Number(e.target.value))
+                  }
                   className="idea-input mt-1 p-2.5 text-xs font-mono"
                 />
               </div>
@@ -611,6 +771,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Storage Place
                 </label>
+
                 <select
                   value={newLocationId}
                   onChange={(e) => setNewLocationId(e.target.value)}
@@ -620,9 +781,10 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                   <option value="" disabled>
                     Select Storage Location
                   </option>
-                  {locations.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
+
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
                     </option>
                   ))}
                 </select>
@@ -636,6 +798,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
                   className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
@@ -648,16 +811,21 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         </div>
       )}
 
-      {/* Restock Modal */}
+      {/* ============================================================
+          RESTOCK MODAL
+          ============================================================ */}
       {showRestockModal && selectedCatalogItem && (
         <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-sm overflow-hidden p-6 space-y-4">
             <h3 className="font-bold text-[var(--color-idea-text)] text-base border-b border-[var(--color-idea-border)] pb-2">
               Receive Shipment / Add Stock
             </h3>
+
             <p className="text-xs text-[var(--color-idea-muted)]">
               Adding stock to catalog item:{' '}
-              <span className="font-bold text-[var(--color-idea-text)]">{selectedCatalogItem.name}</span>
+              <span className="font-bold text-[var(--color-idea-text)]">
+                {selectedCatalogItem.name}
+              </span>
             </p>
 
             <form onSubmit={handleRestockSubmit} className="space-y-3">
@@ -665,16 +833,20 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Storage Bin
                 </label>
+
                 <select
                   value={targetLocId}
                   onChange={(e) => setTargetLocId(e.target.value)}
                   className="idea-input mt-1 p-2.5 text-xs"
                   required
                 >
-                  <option value="">-- Choose Storage Location --</option>
-                  {locations.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
+                  <option value="">
+                    -- Choose Storage Location --
+                  </option>
+
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
                     </option>
                   ))}
                 </select>
@@ -684,11 +856,14 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                   Quantity ({selectedCatalogItem.unit})
                 </label>
+
                 <input
                   type="number"
                   min="1"
                   value={restockQty}
-                  onChange={(e) => setRestockQty(Number(e.target.value))}
+                  onChange={(e) =>
+                    setRestockQty(Number(e.target.value))
+                  }
                   className="idea-input mt-1 p-2.5 text-xs font-mono"
                 />
               </div>
@@ -696,11 +871,15 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               <div className="pt-2 flex gap-3">
                 <button
                   type="button"
-                  onClick={() => setShowRestockModal(false)}
+                  onClick={() => {
+                    setShowRestockModal(false);
+                    setSelectedCatalogItem(null);
+                  }}
                   className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
                 >
                   Cancel
                 </button>
+
                 <button
                   type="submit"
                   className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"

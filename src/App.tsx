@@ -584,7 +584,6 @@ export default function App() {
           {currentView === 'assets' && (
             <AssetsView
               assets={assets}
-              catalogItems={catalogItems}
               locations={locations}
               users={users}
               userRole={effectiveRole ?? currentUser.role}

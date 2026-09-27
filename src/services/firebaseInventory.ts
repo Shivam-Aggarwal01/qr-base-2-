@@ -427,7 +427,6 @@ export async function createLocationInFirestore(payload: {
  */
 export async function createAssetInFirestore(payload: {
   name: string;
-  catalog_item_id: string;
   serial_number?: string;
   status?: string;
   location_id?: string | null;
@@ -441,7 +440,6 @@ export async function createAssetInFirestore(payload: {
 }): Promise<{ id: string; asset_code: string }> {
   const docRef = await addDoc(collection(db, COLLECTIONS.ASSETS), {
     name: payload.name,
-    catalog_item_id: payload.catalog_item_id,
     serial_number: payload.serial_number ?? null,
     status: payload.status ?? 'AVAILABLE',
     location_id: payload.location_id ?? null,

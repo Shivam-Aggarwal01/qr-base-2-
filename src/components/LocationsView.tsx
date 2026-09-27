@@ -49,17 +49,11 @@ const LocationPathBreadcrumb: React.FC<{ path?: string | null }> = ({ path }) =>
     return <span className="text-[var(--color-idea-muted)] italic">Position not set</span>;
   }
   return (
-    <div className="flex items-center flex-wrap gap-1 text-xs">
+    <div className="flex items-center gap-1 text-xs overflow-x-auto whitespace-nowrap scrollbar-none">
       {steps.map((step, index) => (
         <React.Fragment key={index}>
           {index > 0 && <ChevronRight className="w-3 h-3 text-[var(--color-idea-muted)] shrink-0" />}
-          <span
-            className={
-              index === steps.length - 1
-                ? 'font-semibold text-[var(--color-idea-text)] truncate'
-                : 'text-[var(--color-idea-muted)] truncate'
-            }
-          >
+          <span className={index === steps.length - 1 ? 'font-semibold text-[var(--color-idea-text)]' : 'text-[var(--color-idea-muted)]'}>
             {step}
           </span>
         </React.Fragment>
@@ -142,14 +136,6 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
       );
     });
   }, [contentsByLocation, searchFilter]);
-
-  const storedAssetCount = useMemo(() => {
-    return assets.filter((asset) => asset.status !== 'ISSUED' && Boolean(asset.location_id)).length;
-  }, [assets]);
-
-  const totalStockQuantity = useMemo(() => {
-    return stockLevels.reduce((total, stock) => total + (stock.quantity ?? 0), 0);
-  }, [stockLevels]);
 
   const resetLocationForm = () => {
     setLocName('');
@@ -337,7 +323,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                       <div className="flex items-start gap-3 min-w-0 text-left">
                         <div className="min-w-0">
                           <h3 className="font-bold text-[var(--color-idea-text)] text-sm truncate">{loc.name}</h3>
-                          <div className="mt-1">
+                          <div className="mt-1 truncate">
                             <LocationPathBreadcrumb path={loc.storage_path} />
                           </div>
                         </div>
@@ -405,16 +391,13 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                         Stored Contents Preview
                       </p>
                       <div className="space-y-1.5 bg-[var(--color-idea-light-grey)]/40 p-2.5 rounded-xl border border-[var(--color-idea-border)]/60">
-                        {previewAssets.map((asset) => {
-                          const catalogItem = catalogById.get(asset.catalog_item_id);
-                          return (
-                            <div key={asset.id} className="flex items-center justify-between text-xs py-0.5">
-                              <span className="text-[var(--color-idea-text)] font-medium truncate pr-2">
-                                • {catalogItem?.name}
-                              </span>
-                            </div>
-                          );
-                        })}
+                        {previewAssets.map((asset) => (
+                          <div key={asset.id} className="flex items-center justify-between text-xs py-0.5">
+                            <span className="text-[var(--color-idea-text)] font-medium truncate pr-2">
+                              • {asset.name}
+                            </span>
+                          </div>
+                        ))}
                         {previewStock.map((stock) => {
                           const catalogItem = catalogById.get(stock.catalog_item_id);
                           return (
@@ -495,7 +478,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
               </div>
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Lab Hierarchy / Placement Route
+                  Detailed Path
                 </label>
                 <input
                   type="text"
@@ -576,7 +559,7 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
 
               <div>
                 <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Lab Hierarchy / Placement Route
+                  Detailed Path
                 </label>
                 <input
                   type="text"

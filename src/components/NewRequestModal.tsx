@@ -33,44 +33,68 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const getInitialItems = (): RequestLineDraft[] => {
     if (initialItems && initialItems.length > 0) {
       return initialItems.map((item) =>
-        item.kind === 'CATALOG' ? { ...item, usage: item.usage || 'CONSUMABLE' } : item
+        item.kind === 'CATALOG'
+          ? {
+            ...item,
+            usage: item.usage || 'CONSUMABLE',
+          }
+          : {
+            kind: 'ASSET',
+            asset_id: item.asset_id || '',
+            requested_qty: 1,
+          }
       );
     }
-    return [{ kind: 'CATALOG', catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1, usage: 'CONSUMABLE' }];
+
+    return [
+      {
+        kind: 'CATALOG',
+        catalog_item_id: catalogItems[0]?.id || '',
+        requested_qty: 1,
+        usage: 'CONSUMABLE',
+      },
+    ];
   };
 
   const [requestItems, setRequestItems] = useState<RequestLineDraft[]>(getInitialItems());
 
   useEffect(() => {
     if (!isOpen) return;
+
     setPurpose('');
     setRemarks('');
     setDeadlineAt('');
     setIsSubmitting(false);
     setRequestItems(getInitialItems());
-  }, [isOpen, initialItems, catalogItems, assets]);
+  }, [isOpen, initialItems, catalogItems]);
 
   if (!isOpen) return null;
 
   const handleAddItem = () => {
     setRequestItems([
       ...requestItems,
-      { kind: 'CATALOG', catalog_item_id: catalogItems[0]?.id || '', requested_qty: 1, usage: 'CONSUMABLE' },
+      {
+        kind: 'CATALOG',
+        catalog_item_id: catalogItems[0]?.id || '',
+        requested_qty: 1,
+        usage: 'CONSUMABLE',
+      },
     ]);
   };
 
   const handleRemoveItem = (index: number) => {
     if (requestItems.length === 1) return;
+
     setRequestItems(requestItems.filter((_, idx) => idx !== index));
   };
 
   const handleKindChange = (index: number, kind: RequestLineDraft['kind']) => {
     const updated = [...requestItems];
+
     if (kind === 'ASSET') {
       updated[index] = {
         kind: 'ASSET',
         asset_id: availableAssets[0]?.id || '',
-        catalog_item_id: availableAssets[0]?.catalog_item_id || catalogItems[0]?.id,
         requested_qty: 1,
       };
     } else {
@@ -81,6 +105,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
         usage: 'CONSUMABLE',
       };
     }
+
     setRequestItems(updated);
   };
 
@@ -91,37 +116,63 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   ) => {
     const updated = [...requestItems];
     const current = { ...updated[index] };
+
     if (field === 'requested_qty') {
       current.requested_qty = Number(value) || 1;
     } else if (field === 'usage') {
       current.usage = value as RequestUsage;
     } else if (field === 'asset_id') {
-      const asset = assets.find((item) => item.id === value);
       current.asset_id = String(value);
-      current.catalog_item_id = asset?.catalog_item_id;
       current.requested_qty = 1;
-    } else {
+
+      // Asset and CatalogItem are completely independent.
+      // Do NOT set catalog_item_id here.
+    } else if (field === 'catalog_item_id') {
       current.catalog_item_id = String(value);
     }
+
     updated[index] = current;
     setRequestItems(updated);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!purpose.trim()) return alert('Please enter project purpose');
-    if (!deadlineAt) return alert('Please choose when you will return the items.');
-    if (new Date(deadlineAt).getTime() <= Date.now()) return alert('Return deadline must be in the future.');
+
+    if (!purpose.trim()) {
+      return alert('Please enter project purpose');
+    }
+
+    if (!deadlineAt) {
+      return alert('Please choose when you will return the items.');
+    }
+
+    if (new Date(deadlineAt).getTime() <= Date.now()) {
+      return alert('Return deadline must be in the future.');
+    }
 
     const invalidCatalog = requestItems.some(
-      (item) => item.kind !== 'ASSET' && (!item.catalog_item_id || item.requested_qty <= 0)
+      (item) =>
+        item.kind === 'CATALOG' &&
+        (!item.catalog_item_id || item.requested_qty <= 0)
     );
-    const invalidAsset = requestItems.some((item) => item.kind === 'ASSET' && !item.asset_id);
-    if (invalidCatalog || invalidAsset) return alert('Please select valid items or available assets.');
 
-    const requestNumber = `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+    const invalidAsset = requestItems.some(
+      (item) =>
+        item.kind === 'ASSET' &&
+        !item.asset_id
+    );
+
+    if (invalidCatalog || invalidAsset) {
+      return alert('Please select valid items or available assets.');
+    }
+
+    const requestNumber = `REQ-${new Date()
+      .toISOString()
+      .slice(0, 10)
+      .replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
 
     setIsSubmitting(true);
+
     try {
       await createRequestFirestore({
         request_number: requestNumber,
@@ -130,51 +181,87 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
         status: 'PENDING',
         deadline_at: new Date(deadlineAt).toISOString(),
         remarks: remarks || '',
+
         items: requestItems.map((item, idx) => {
           const line: Record<string, unknown> = {
             id: `reqi-${Date.now()}-${idx}`,
             request_id: requestNumber,
             kind: item.kind,
             requested_qty: item.kind === 'ASSET' ? 1 : item.requested_qty,
-            ...(item.kind === 'CATALOG' && item.usage ? { usage: item.usage } : {}),
           };
-          if (item.catalog_item_id) line.catalog_item_id = item.catalog_item_id;
-          if (item.kind === 'ASSET' && item.asset_id) line.asset_id = item.asset_id;
+
+          if (item.kind === 'CATALOG') {
+            if (item.catalog_item_id) {
+              line.catalog_item_id = item.catalog_item_id;
+            }
+
+            if (item.usage) {
+              line.usage = item.usage;
+            }
+          }
+
+          if (item.kind === 'ASSET' && item.asset_id) {
+            line.asset_id = item.asset_id;
+          }
+
           return line;
         }),
       });
 
-      confetti({ particleCount: 50, spread: 60, origin: { y: 0.6 } });
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.6 },
+      });
+
       onRefreshData();
       onClose();
     } catch (error: any) {
-      alert(error?.message || 'Request could not be created. Please check your Firebase permissions.');
+      alert(
+        error?.message ||
+        'Request could not be created. Please check your Firebase permissions.'
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const assetLabel = (asset: Asset) => {
-    const catalog = catalogItems.find(
-      (item) => item.id === asset.catalog_item_id || item.item_code === asset.catalog_item_id
-    );
-    return `${asset.asset_code}${catalog ? ` · ${catalog.name}` : ''}`;
+    const parts = [];
+
+    if (asset.name) {
+      parts.push(asset.name);
+    }
+
+    if (asset.serial_number) {
+      parts.push(`SN: ${asset.serial_number}`);
+    }
+
+    return parts.join(' · ');
   };
 
   return (
     <div className="fixed inset-0 bg-[var(--color-idea-text)]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
       <div className="bg-white rounded-2xl shadow-2xl border border-[var(--color-idea-border)] w-full max-w-lg overflow-hidden flex flex-col">
+
         {/* Header */}
         <div className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between bg-[var(--color-idea-light-grey)]/50">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-[var(--color-idea-blue)] text-white rounded-xl flex items-center justify-center shadow-md">
               <Package className="w-5 h-5" />
             </div>
+
             <div>
-              <h3 className="font-bold text-[var(--color-idea-text)] text-lg leading-tight">New Request</h3>
-              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">Ask for items or assets</p>
+              <h3 className="font-bold text-[var(--color-idea-text)] text-lg leading-tight">
+                New Request
+              </h3>
+
+              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">
+                Ask for items or assets
+              </p>
             </div>
           </div>
+
           <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors cursor-pointer"
@@ -184,13 +271,16 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
+
           {/* Requested By */}
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
               Requester
             </label>
+
             <div className="p-3 bg-[var(--color-idea-light-grey)]/60 border border-[var(--color-idea-border)] rounded-xl text-xs font-semibold text-[var(--color-idea-text)] flex justify-between items-center">
               <span>{activeUser.name}</span>
+
               <span className="text-[9px] bg-[var(--color-idea-blue)]/10 text-[var(--color-idea-blue)] font-bold px-2 py-0.5 rounded-lg uppercase tracking-wider">
                 {activeUser.role}
               </span>
@@ -202,6 +292,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
               Purpose <span className="text-[var(--color-idea-red)]">*</span>
             </label>
+
             <input
               type="text"
               required
@@ -217,6 +308,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
               Return By <span className="text-[var(--color-idea-red)]">*</span>
             </label>
+
             <input
               type="datetime-local"
               required
@@ -233,12 +325,14 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
               <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
                 Items
               </label>
+
               <button
                 type="button"
                 onClick={handleAddItem}
                 className="text-[10px] text-[var(--color-idea-blue)] font-bold hover:text-[var(--color-idea-deep-blue)] flex items-center gap-1 cursor-pointer bg-[var(--color-idea-blue)]/10 px-2 py-1 rounded-lg"
               >
-                <Plus className="w-3 h-3" /> Add Line
+                <Plus className="w-3 h-3" />
+                Add Line
               </button>
             </div>
 
@@ -249,10 +343,17 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                   className="p-3 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/30 space-y-2.5 hover:border-[var(--color-idea-blue)]/30 transition-colors"
                 >
                   <div className="flex gap-2 w-full">
+
+                    {/* Type */}
                     <div className="w-1/3 shrink-0">
                       <select
                         value={item.kind}
-                        onChange={(event) => handleKindChange(idx, event.target.value as RequestLineDraft['kind'])}
+                        onChange={(event) =>
+                          handleKindChange(
+                            idx,
+                            event.target.value as RequestLineDraft['kind']
+                          )
+                        }
                         className="idea-input w-full px-2 py-2 text-xs font-medium"
                       >
                         <option value="CATALOG">Item</option>
@@ -260,16 +361,30 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                       </select>
                     </div>
 
+                    {/* Selection */}
                     <div className="flex-1 min-w-0">
                       {item.kind === 'ASSET' ? (
                         <select
-                          value={availableAssets.some((a) => a.id === item.asset_id) ? item.asset_id : ''}
-                          onChange={(event) => handleItemChange(idx, 'asset_id', event.target.value)}
+                          value={
+                            availableAssets.some(
+                              (asset) => asset.id === item.asset_id
+                            )
+                              ? item.asset_id
+                              : ''
+                          }
+                          onChange={(event) =>
+                            handleItemChange(
+                              idx,
+                              'asset_id',
+                              event.target.value
+                            )
+                          }
                           className="idea-input w-full px-3 py-2 text-xs truncate"
                         >
                           <option value="" disabled>
                             Select asset…
                           </option>
+
                           {availableAssets.map((asset) => (
                             <option key={asset.id} value={asset.id}>
                               {assetLabel(asset)}
@@ -278,22 +393,37 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                         </select>
                       ) : (
                         <select
-                          value={catalogItems.some((c) => c.id === item.catalog_item_id) ? item.catalog_item_id : ''}
-                          onChange={(event) => handleItemChange(idx, 'catalog_item_id', event.target.value)}
+                          value={
+                            catalogItems.some(
+                              (catalog) =>
+                                catalog.id === item.catalog_item_id
+                            )
+                              ? item.catalog_item_id
+                              : ''
+                          }
+                          onChange={(event) =>
+                            handleItemChange(
+                              idx,
+                              'catalog_item_id',
+                              event.target.value
+                            )
+                          }
                           className="idea-input w-full px-3 py-2 text-xs truncate"
                         >
                           <option value="" disabled>
                             Select item…
                           </option>
-                          {catalogItems.map((cat) => (
-                            <option key={cat.id} value={cat.id}>
-                              {cat.name}
+
+                          {catalogItems.map((catalog) => (
+                            <option key={catalog.id} value={catalog.id}>
+                              {catalog.name}
                             </option>
                           ))}
                         </select>
                       )}
                     </div>
 
+                    {/* Remove */}
                     {requestItems.length > 1 && (
                       <button
                         type="button"
@@ -305,28 +435,51 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                     )}
                   </div>
 
-                  {item.kind !== 'ASSET' && (
+                  {/* Catalog item options */}
+                  {item.kind === 'CATALOG' && (
                     <div className="flex gap-2 w-full">
+
+                      {/* Quantity */}
                       <div className="relative w-1/3 shrink-0">
                         <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[10px] font-medium text-[var(--color-idea-muted)]">
                           Qty
                         </span>
+
                         <input
                           type="number"
                           min="1"
                           value={item.requested_qty}
-                          onChange={(event) => handleItemChange(idx, 'requested_qty', Number(event.target.value))}
+                          onChange={(event) =>
+                            handleItemChange(
+                              idx,
+                              'requested_qty',
+                              Number(event.target.value)
+                            )
+                          }
                           className="idea-input w-full pl-9 pr-2 py-2 text-xs font-medium text-center"
                         />
                       </div>
+
+                      {/* Usage */}
                       <div className="flex-1 min-w-0">
                         <select
                           value={item.usage || 'CONSUMABLE'}
-                          onChange={(event) => handleItemChange(idx, 'usage', event.target.value)}
+                          onChange={(event) =>
+                            handleItemChange(
+                              idx,
+                              'usage',
+                              event.target.value
+                            )
+                          }
                           className="idea-input w-full px-3 py-2 text-xs font-medium truncate"
                         >
-                          <option value="CONSUMABLE">Consumable</option>
-                          <option value="REUSABLE">Reusable</option>
+                          <option value="CONSUMABLE">
+                            Consumable
+                          </option>
+
+                          <option value="REUSABLE">
+                            Reusable
+                          </option>
                         </select>
                       </div>
                     </div>
@@ -341,6 +494,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             <label className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] mb-1.5 block">
               Notes
             </label>
+
             <input
               type="text"
               value={remarks}
@@ -360,6 +514,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             >
               Cancel
             </button>
+
             <button
               type="submit"
               disabled={isSubmitting}
@@ -369,7 +524,8 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
                 <span>Submitting…</span>
               ) : (
                 <>
-                  <Send className="w-4 h-4" /> Submit Request
+                  <Send className="w-4 h-4" />
+                  Submit Request
                 </>
               )}
             </button>

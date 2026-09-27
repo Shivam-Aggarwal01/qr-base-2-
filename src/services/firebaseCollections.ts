@@ -1,5 +1,6 @@
 import {
   addDoc,
+  writeBatch,
   collection,
   doc,
   getDoc,
@@ -312,4 +313,52 @@ export async function createFirestoreDocument<T>(collectionName: string, data: T
 
   const docRef = await addDoc(collection(db, collectionName), payload as Record<string, unknown>);
   return docRef.id;
+}
+
+export async function receiveCatalogStock(
+  catalogItemId: string,
+  locationId: string,
+  quantity: number,
+  remarks: string
+): Promise<void> {
+  requireSignedInUser();
+
+  const stocksQuery = query(
+    collection(db, 'stock_levels'),
+    where('catalog_item_id', '==', catalogItemId),
+    where('location_id', '==', locationId)
+  );
+  const stockSnapshot = await getDocs(stocksQuery);
+  const batch = writeBatch(db);
+  const now = new Date().toISOString();
+
+  if (stockSnapshot.empty) {
+    const stockRef = doc(collection(db, 'stock_levels'));
+    batch.set(stockRef, {
+      catalog_item_id: catalogItemId,
+      location_id: locationId,
+      quantity,
+      created_at: now,
+      updated_at: now,
+    });
+  } else {
+    const stockDoc = stockSnapshot.docs[0];
+    batch.update(stockDoc.ref, {
+      quantity: (stockDoc.data().quantity || 0) + quantity,
+      updated_at: now,
+    });
+  }
+
+  const transactionRef = doc(collection(db, 'inventory_transactions'));
+  batch.set(transactionRef, {
+    catalog_item_id: catalogItemId,
+    transaction_type: 'RECEIVE',
+    quantity,
+    to_location_id: locationId,
+    processed_by_user_id: auth.currentUser!.uid,
+    remarks,
+    created_at: now,
+  });
+
+  await batch.commit();
 }
