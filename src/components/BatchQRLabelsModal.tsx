@@ -89,9 +89,10 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
     switch (filterType) {
       case 'ASSETS':
         return assets.map((asset) => {
+          const catalogItem = catalogItems.find((item) => item.id === asset.catalog_item_id);
           return {
             code: asset.asset_code || asset.id,
-            title: asset.name,
+            title: catalogItem?.name || asset.asset_code || 'Unknown asset',
             subtitle: asset.serial_number ? `SN ${asset.serial_number}` : undefined,
           };
         });
@@ -188,10 +189,12 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
           role="dialog"
           aria-modal="true"
           aria-labelledby="qr-modal-title"
-          className="flex w-full max-w-4xl max-h-[92vh] flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)]"
+          className="flex w-full max-w-4xl max-h-[94vh] max-h-[94dvh] flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)]"
         >
+          <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-black/15 sm:hidden" aria-hidden="true" />
+
           {/* Header */}
-          <div className="flex items-start justify-between gap-4 px-6 pt-5 pb-4">
+          <div className="flex items-start justify-between gap-4 px-4 pb-3 pt-3 sm:px-6 sm:pb-4 sm:pt-5">
             <div className="min-w-0">
               <h2
                 id="qr-modal-title"
@@ -206,7 +209,7 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
                 type="button"
                 onClick={onClose}
                 aria-label="Close"
-                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/5 text-[var(--color-idea-muted)] transition-colors hover:bg-black/10 hover:text-[var(--color-idea-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)]"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/5 sm:h-8 sm:w-8 text-[var(--color-idea-muted)] transition-colors hover:bg-black/10 hover:text-[var(--color-idea-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)]"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -214,21 +217,21 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
           </div>
 
           {/* Controls */}
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-3 px-6 pb-4">
+          <div className="flex flex-col gap-3 px-4 pb-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:px-6 sm:pb-4">
             <Segmented
               label="Label type"
               value={filterType}
               onChange={setFilterType}
               options={TYPES.map((t) => ({ id: t.id, label: t.label, badge: counts[t.id] }))}
             />
-            <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-3">
+            <div className="flex flex-col gap-3 sm:ml-auto sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4">
               <Segmented
                 label="Label size"
                 value={size}
                 onChange={setSize}
                 options={(Object.keys(SIZES) as LabelSize[]).map((s) => ({ id: s, label: SIZES[s].name }))}
               />
-              <label className="flex cursor-pointer items-center gap-2 text-[13px] text-[var(--color-idea-text)]">
+              <label className="flex cursor-pointer items-center justify-between gap-3 px-1 text-[14px] text-[var(--color-idea-text)] sm:justify-start sm:px-0 sm:text-[13px]">
                 Cut guides
                 <button
                   type="button"
@@ -250,7 +253,7 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
           </div>
 
           {/* Preview. Same markup and millimetre sizes as the printed sheet. */}
-          <div className="flex-1 overflow-y-auto bg-[#f5f5f7] px-6 py-5">
+          <div className="flex-1 overflow-y-auto overscroll-contain bg-[#f5f5f7] px-3 py-4 sm:px-6 sm:py-5">
             {printItems.length === 0 ? (
               <div className="flex h-56 flex-col items-center justify-center text-center">
                 <p className="text-[15px] font-medium text-[var(--color-idea-text)]">No labels yet</p>
@@ -259,7 +262,7 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
                 </p>
               </div>
             ) : (
-              <div className="mx-auto w-fit max-w-full rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/5">
+              <div className="mx-auto w-fit max-w-full rounded-xl bg-white p-3 shadow-sm ring-1 ring-black/5 sm:p-4">
                 <div className={`qrl-grid ${guides ? 'qrl-guides' : ''}`} style={gridVars}>
                   {renderGrid()}
                 </div>
@@ -268,15 +271,15 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
           </div>
 
           {/* Footer */}
-          <div className="flex items-center justify-between gap-4 border-t border-black/5 px-6 py-4">
-            <p className="text-[12px] leading-snug text-[var(--color-idea-muted)]">
-              {spec.hint} labels · print at 100% scale, no margins override
+          <div className="flex flex-col gap-3 border-t border-black/5 px-4 pt-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-4">
+            <p className="text-center text-[12px] leading-snug text-[var(--color-idea-muted)] sm:text-left">
+              {spec.hint} per label. Print at 100% scale.
             </p>
             <button
               type="button"
               onClick={() => window.print()}
               disabled={printItems.length === 0 || !ready}
-              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[var(--color-idea-blue)] px-5 py-2.5 text-[13px] font-semibold text-white transition active:scale-[0.98] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-idea-blue)]"
+              className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-full bg-[var(--color-idea-blue)] px-5 py-3 text-[15px] font-semibold sm:w-auto sm:py-2.5 sm:text-[13px] text-white transition active:scale-[0.98] hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-idea-blue)]"
             >
               <Printer className="h-4 w-4" />
               {ready ? 'Print' : 'Preparing…'}
@@ -310,7 +313,11 @@ interface SegmentedProps<T extends string> {
 
 function Segmented<T extends string>({ label, value, onChange, options }: SegmentedProps<T>) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex rounded-[10px] bg-black/[0.06] p-0.5">
+    <div
+      role="radiogroup"
+      aria-label={label}
+      className="flex w-full rounded-[10px] bg-black/[0.06] p-0.5 sm:inline-flex sm:w-auto"
+    >
       {options.map((o) => {
         const active = o.id === value;
         return (
@@ -320,7 +327,7 @@ function Segmented<T extends string>({ label, value, onChange, options }: Segmen
             role="radio"
             aria-checked={active}
             onClick={() => onChange(o.id)}
-            className={`rounded-[8px] px-3 py-1.5 text-[13px] font-medium transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)] ${
+            className={`flex-1 whitespace-nowrap rounded-[8px] px-3 py-2 text-[13px] font-medium transition-all sm:flex-none sm:py-1.5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)] ${
               active
                 ? 'bg-white text-[var(--color-idea-text)] shadow-[0_1px_3px_rgba(0,0,0,0.12)]'
                 : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
