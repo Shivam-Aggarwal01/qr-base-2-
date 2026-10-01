@@ -265,11 +265,7 @@ export async function completeLabRequest(
   returnLocationId?: string
 ): Promise<void> {
   requireSignedInUser();
-  if (
-    request.status !== 'HANDED_OVER' &&
-    request.status !== 'APPROVED' &&
-    request.status !== 'RETURN_REQUESTED'
-  ) {
+  if (request.status !== 'HANDED_OVER' && request.status !== 'APPROVED' && request.status !== 'RETURN_REQUESTED') {
     throw new Error('Only handed-over requests can be marked completed.');
   }
 

@@ -11,11 +11,7 @@ import {
   RequestLineDraft,
 } from '../types/inventory';
 import { InventoryStorage } from '../services/storage';
-import {
-  canIssueInventory,
-  canReturnOrRepairItems,
-  isStudent,
-} from '../services/authRoles';
+import { canIssueInventory, canReturnOrRepairItems, isStudent } from '../services/authRoles';
 import confetti from 'canvas-confetti';
 
 interface QuickActionModalProps {
@@ -59,13 +55,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const [statusInput, setStatusInput] = useState<AssetStatus>('DAMAGED');
 
   const role = activeUser?.role;
-  const quickStatusOptions: AssetStatus[] = [
-    'AVAILABLE',
-    'UNDER_REPAIR',
-    'DAMAGED',
-    'LOST',
-    'RETIRED',
-  ];
+  const quickStatusOptions: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST', 'RETIRED'];
 
   const canIssue = canIssueInventory(role);
   const canReturnOrRepair = canReturnOrRepairItems(role);
@@ -84,20 +74,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
       return undefined;
     }
 
-    return catalogItems.find(
-      (item) =>
-        item.id === catalogItemId ||
-        item.item_code === catalogItemId
-    );
+    return catalogItems.find((item) => item.id === catalogItemId || item.item_code === catalogItemId);
   };
 
   /*
    * Create a catalog request using the actual CatalogItem.id.
    */
-  const openRequestForCatalogItem = (
-    catalogItemId: string,
-    requestedQty: number
-  ) => {
+  const openRequestForCatalogItem = (catalogItemId: string, requestedQty: number) => {
     const catalogItem = findCatalogItem(catalogItemId);
 
     if (!catalogItem) {
@@ -181,17 +164,12 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const renderAssetActions = (asset: Asset) => {
     const catalogItem = findCatalogItem(asset.catalog_item_id);
 
-    const assignedUser = users.find(
-      (user) => user.id === asset.assigned_to_user_id
-    );
+    const assignedUser = users.find((user) => user.id === asset.assigned_to_user_id);
 
-    const location = locations.find(
-      (item) => item.id === asset.location_id
-    );
+    const location = locations.find((item) => item.id === asset.location_id);
 
     if (studentMode) {
-      const requestBlockedByAssetStatus =
-        asset.status !== 'AVAILABLE';
+      const requestBlockedByAssetStatus = asset.status !== 'AVAILABLE';
 
       return (
         <div className="space-y-6">
@@ -278,11 +256,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         return alert('Please select a user.');
       }
 
-      InventoryStorage.issueAsset(
-        asset.id,
-        selectedUser,
-        remarksInput
-      );
+      InventoryStorage.issueAsset(asset.id, selectedUser, remarksInput);
 
       triggerSuccess();
     };
@@ -290,18 +264,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     const handleReturnSubmit = (event: React.FormEvent) => {
       event.preventDefault();
 
-      const returnLocation =
-        selectedLoc || location?.id || locations[0]?.id;
+      const returnLocation = selectedLoc || location?.id || locations[0]?.id;
 
       if (!returnLocation) {
         return alert('Please select a storage location.');
       }
 
-      InventoryStorage.returnAsset(
-        asset.id,
-        returnLocation,
-        remarksInput
-      );
+      InventoryStorage.returnAsset(asset.id, returnLocation, remarksInput);
 
       triggerSuccess();
     };
@@ -309,12 +278,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     const handleStatusSubmit = (event: React.FormEvent) => {
       event.preventDefault();
 
-      InventoryStorage.updateAssetStatus(
-        asset.id,
-        statusInput,
-        selectedLoc || asset.location_id,
-        remarksInput
-      );
+      InventoryStorage.updateAssetStatus(asset.id, statusInput, selectedLoc || asset.location_id, remarksInput);
 
       triggerSuccess();
     };
@@ -334,9 +298,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 {asset.name || catalogItem?.name || asset.asset_code}
               </h4>
 
-              <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
-                {asset.asset_code}
-              </p>
+              <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">{asset.asset_code}</p>
 
               {asset.serial_number && (
                 <p className="mt-1 text-[11px] font-mono text-[var(--color-idea-muted)]">
@@ -362,9 +324,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-5">
           <div className="mb-3 flex items-center justify-between gap-2">
             <div>
-              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">
-                Asset Status
-              </h5>
+              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Asset Status</h5>
 
               <p className="mt-0.5 text-[10px] text-[var(--color-idea-muted)]">
                 Update the current condition of this asset.
@@ -388,10 +348,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                     setStatusInput(status);
                     setSubAction('status');
                   }}
-                  className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${selected
-                    ? 'border-[var(--color-idea-blue)] bg-[var(--color-idea-blue)] text-white'
-                    : 'border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] hover:border-[var(--color-idea-blue)]'
-                    }`}
+                  className={`rounded-lg border px-2 py-2 text-[10px] font-bold uppercase tracking-wider transition-colors ${
+                    selected
+                      ? 'border-[var(--color-idea-blue)] bg-[var(--color-idea-blue)] text-white'
+                      : 'border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] hover:border-[var(--color-idea-blue)]'
+                  }`}
                 >
                   {status.replace('_', ' ')}
                 </button>
@@ -426,13 +387,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className="space-y-4 rounded-2xl border border-[var(--color-idea-border)] bg-white p-5"
           >
             <div>
-              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">
-                Issue Asset
-              </h5>
+              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Issue Asset</h5>
 
-              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-                Assign this specific asset to a user.
-              </p>
+              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">Assign this specific asset to a user.</p>
             </div>
 
             <div>
@@ -479,10 +436,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 Cancel
               </button>
 
-              <button
-                type="submit"
-                className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold"
-              >
+              <button type="submit" className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold">
                 Confirm Issue
               </button>
             </div>
@@ -495,9 +449,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className="space-y-4 rounded-2xl border border-[var(--color-idea-border)] bg-white p-5"
           >
             <div>
-              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">
-                Return Asset
-              </h5>
+              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Return Asset</h5>
 
               <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
                 Return the asset to a physical storage location.
@@ -548,10 +500,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 Cancel
               </button>
 
-              <button
-                type="submit"
-                className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold"
-              >
+              <button type="submit" className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold">
                 Confirm Return
               </button>
             </div>
@@ -564,13 +513,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             className="space-y-4 rounded-2xl border border-[var(--color-idea-border)] bg-white p-5"
           >
             <div>
-              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">
-                Update Asset Status
-              </h5>
+              <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Update Asset Status</h5>
 
-              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-                Change the current state of this asset.
-              </p>
+              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">Change the current state of this asset.</p>
             </div>
 
             <div>
@@ -580,9 +525,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
               <select
                 value={statusInput}
-                onChange={(event) =>
-                  setStatusInput(event.target.value as AssetStatus)
-                }
+                onChange={(event) => setStatusInput(event.target.value as AssetStatus)}
                 className="idea-input w-full p-2.5 text-xs"
               >
                 {quickStatusOptions.map((status) => (
@@ -638,10 +581,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 Cancel
               </button>
 
-              <button
-                type="submit"
-                className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold"
-              >
+              <button type="submit" className="idea-button flex-1 rounded-xl py-2.5 text-xs font-semibold">
                 Update Status
               </button>
             </div>
@@ -657,14 +597,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
      * StockLevel.catalog_item_id must reference item.id.
      * Do not match item_code here for new data.
      */
-    const itemStock = stockLevels.filter(
-      (stock) => stock.catalog_item_id === item.id
-    );
+    const itemStock = stockLevels.filter((stock) => stock.catalog_item_id === item.id);
 
-    const totalQuantity = itemStock.reduce(
-      (total, stock) => total + (stock.quantity || 0),
-      0
-    );
+    const totalQuantity = itemStock.reduce((total, stock) => total + (stock.quantity || 0), 0);
 
     if (studentMode) {
       return (
@@ -676,39 +611,23 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               ITEM
             </span>
 
-            <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">
-              {item.name}
-            </h4>
+            <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{item.name}</h4>
 
-            <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
-              {item.item_code}
-            </p>
+            <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">{item.item_code}</p>
 
-            {item.description && (
-              <p className="mt-2 text-xs text-[var(--color-idea-muted)]">
-                {item.description}
-              </p>
-            )}
+            {item.description && <p className="mt-2 text-xs text-[var(--color-idea-muted)]">{item.description}</p>}
 
             <div className="mt-5 flex items-end gap-1">
-              <span className="text-3xl font-bold text-[var(--color-idea-text)]">
-                {totalQuantity}
-              </span>
+              <span className="text-3xl font-bold text-[var(--color-idea-text)]">{totalQuantity}</span>
 
-              <span className="mb-1 text-xs font-semibold text-[var(--color-idea-muted)]">
-                {item.unit}
-              </span>
+              <span className="mb-1 text-xs font-semibold text-[var(--color-idea-muted)]">{item.unit}</span>
             </div>
 
-            <p className="mt-1 text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">
-              Available stock
-            </p>
+            <p className="mt-1 text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">Available stock</p>
           </div>
 
           <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
-            <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">
-              Stock by Location
-            </h5>
+            <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">Stock by Location</h5>
 
             {itemStock.length === 0 ? (
               <p className="text-xs italic text-[var(--color-idea-muted)]">
@@ -717,9 +636,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             ) : (
               <div className="space-y-2">
                 {itemStock.map((stock) => {
-                  const location = locations.find(
-                    (item) => item.id === stock.location_id
-                  );
+                  const location = locations.find((item) => item.id === stock.location_id);
 
                   return (
                     <div
@@ -755,9 +672,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
             <button
               type="button"
-              onClick={() =>
-                onOpenQRGenerator(item.id, item.name, 'Inventory Item')
-              }
+              onClick={() => onOpenQRGenerator(item.id, item.name, 'Inventory Item')}
               className="rounded-xl border border-[var(--color-idea-border)] px-4 py-2.5 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
             >
               Print QR
@@ -794,37 +709,23 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-5">
           <div className="absolute left-0 top-0 h-1 w-full bg-[var(--color-idea-blue)]" />
 
-          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">
-            ITEM
-          </span>
+          <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">ITEM</span>
 
-          <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">
-            {item.name}
-          </h4>
+          <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{item.name}</h4>
 
-          <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
-            {item.item_code}
-          </p>
+          <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">{item.item_code}</p>
 
           <div className="mt-5 flex items-end gap-1">
-            <span className="text-3xl font-bold text-[var(--color-idea-text)]">
-              {totalQuantity}
-            </span>
+            <span className="text-3xl font-bold text-[var(--color-idea-text)]">{totalQuantity}</span>
 
-            <span className="mb-1 text-xs font-semibold text-[var(--color-idea-muted)]">
-              {item.unit}
-            </span>
+            <span className="mb-1 text-xs font-semibold text-[var(--color-idea-muted)]">{item.unit}</span>
           </div>
 
-          <p className="mt-1 text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">
-            Total stock
-          </p>
+          <p className="mt-1 text-[10px] uppercase tracking-wider text-[var(--color-idea-muted)]">Total stock</p>
         </div>
 
         <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
-          <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">
-            Stock by Location
-          </h5>
+          <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">Stock by Location</h5>
 
           {itemStock.length === 0 ? (
             <p className="text-xs italic text-[var(--color-idea-muted)]">
@@ -833,9 +734,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           ) : (
             <div className="space-y-2">
               {itemStock.map((stock) => {
-                const location = locations.find(
-                  (item) => item.id === stock.location_id
-                );
+                const location = locations.find((item) => item.id === stock.location_id);
 
                 return (
                   <div
@@ -857,9 +756,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         </div>
 
         <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-5">
-          <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">
-            Update Stock
-          </h5>
+          <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Update Stock</h5>
 
           <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
             Add or remove quantity from a specific storage location.
@@ -895,9 +792,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 type="number"
                 min="1"
                 value={qtyInput}
-                onChange={(event) =>
-                  setQtyInput(Math.max(1, Number(event.target.value)))
-                }
+                onChange={(event) => setQtyInput(Math.max(1, Number(event.target.value)))}
                 className="idea-input w-full p-2.5 text-xs font-mono"
               />
             </div>
@@ -934,13 +829,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   };
 
   const renderLocationActions = (location: Location) => {
-    const assetsInLocation = assets.filter(
-      (asset) => asset.location_id === location.id
-    );
+    const assetsInLocation = assets.filter((asset) => asset.location_id === location.id);
 
-    const stockInLocation = stockLevels.filter(
-      (stock) => stock.location_id === location.id
-    );
+    const stockInLocation = stockLevels.filter((stock) => stock.location_id === location.id);
 
     const itemsInLocation = stockInLocation
       .map((stock) => {
@@ -971,9 +862,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 LOCATION
               </span>
 
-              <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">
-                {location.name}
-              </h4>
+              <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{location.name}</h4>
 
               <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
                 {location.code || location.id}
@@ -982,13 +871,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
             <button
               type="button"
-              onClick={() =>
-                onOpenQRGenerator(
-                  location.id,
-                  location.name,
-                  'Storage Location'
-                )
-              }
+              onClick={() => onOpenQRGenerator(location.id, location.name, 'Storage Location')}
               className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-idea-border)] px-3 py-2 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-white"
             >
               <QrCode className="h-4 w-4" />
@@ -998,15 +881,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         </div>
 
         <div>
-          <h5 className="mb-2 text-sm font-semibold text-[var(--color-idea-text)]">
-            Items in this Location
-          </h5>
+          <h5 className="mb-2 text-sm font-semibold text-[var(--color-idea-text)]">Items in this Location</h5>
 
           <div className="max-h-52 space-y-2 overflow-y-auto">
             {itemsInLocation.length === 0 ? (
-              <p className="text-xs italic text-[var(--color-idea-muted)]">
-                No item stock is currently stored here.
-              </p>
+              <p className="text-xs italic text-[var(--color-idea-muted)]">No item stock is currently stored here.</p>
             ) : (
               itemsInLocation.map(({ stock, catalogItem }) => (
                 <div
@@ -1014,9 +893,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                   className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-idea-border)] bg-white p-3"
                 >
                   <div className="min-w-0">
-                    <p className="truncate text-xs font-semibold text-[var(--color-idea-text)]">
-                      {catalogItem.name}
-                    </p>
+                    <p className="truncate text-xs font-semibold text-[var(--color-idea-text)]">{catalogItem.name}</p>
 
                     <p className="mt-0.5 text-[10px] font-mono text-[var(--color-idea-muted)]">
                       {stock.quantity} {catalogItem.unit}
@@ -1026,9 +903,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                   {studentMode && (
                     <button
                       type="button"
-                      onClick={() =>
-                        openRequestForCatalogItem(catalogItem.id, 1)
-                      }
+                      onClick={() => openRequestForCatalogItem(catalogItem.id, 1)}
                       className="shrink-0 rounded-lg border border-[var(--color-idea-border)] px-3 py-2 text-[10px] font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
                     >
                       Request
@@ -1041,15 +916,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         </div>
 
         <div>
-          <h5 className="mb-2 text-sm font-semibold text-[var(--color-idea-text)]">
-            Assets in this Location
-          </h5>
+          <h5 className="mb-2 text-sm font-semibold text-[var(--color-idea-text)]">Assets in this Location</h5>
 
           <div className="max-h-52 space-y-2 overflow-y-auto">
             {assetsInLocation.length === 0 ? (
-              <p className="text-xs italic text-[var(--color-idea-muted)]">
-                No assets are currently stored here.
-              </p>
+              <p className="text-xs italic text-[var(--color-idea-muted)]">No assets are currently stored here.</p>
             ) : (
               assetsInLocation.map((asset) => {
                 const catalogItem = findCatalogItem(asset.catalog_item_id);
@@ -1064,9 +935,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                         {asset.name || catalogItem?.name || asset.asset_code}
                       </p>
 
-                      <p className="mt-0.5 text-[10px] font-mono text-[var(--color-idea-blue)]">
-                        {asset.asset_code}
-                      </p>
+                      <p className="mt-0.5 text-[10px] font-mono text-[var(--color-idea-blue)]">{asset.asset_code}</p>
                     </div>
 
                     <span className="shrink-0 rounded-lg border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-2 py-1 text-[9px] font-semibold uppercase tracking-wide text-[var(--color-idea-muted)]">
@@ -1083,9 +952,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   };
 
   const renderRequestActions = (request: Request) => {
-    const requester = users.find(
-      (user) => user.id === request.user_id
-    );
+    const requester = users.find((user) => user.id === request.user_id);
 
     return (
       <div className="space-y-5">
@@ -1098,9 +965,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 REQUEST
               </span>
 
-              <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">
-                {request.request_number}
-              </h4>
+              <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{request.request_number}</h4>
 
               <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
                 {requester?.name || 'Unknown requester'}
@@ -1114,9 +979,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         </div>
 
         <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
-          <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">
-            Request summary
-          </h5>
+          <h5 className="text-sm font-semibold text-[var(--color-idea-text)]">Request summary</h5>
 
           <div className="mt-3 space-y-2 text-xs text-[var(--color-idea-muted)]">
             <div className="flex items-center justify-between gap-3">
@@ -1140,9 +1003,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 <span>Deadline</span>
 
                 <span className="font-mono font-semibold text-[var(--color-idea-text)]">
-                  {new Date(
-                    request.deadline_at
-                  ).toLocaleDateString()}
+                  {new Date(request.deadline_at).toLocaleDateString()}
                 </span>
               </div>
             )}
@@ -1151,19 +1012,14 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
         {request.items && request.items.length > 0 && (
           <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
-            <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">
-              Requested items
-            </h5>
+            <h5 className="mb-3 text-sm font-semibold text-[var(--color-idea-text)]">Requested items</h5>
 
             <div className="space-y-2">
               {request.items.map((item) => {
                 const itemName = item.catalog_item_id
-                  ? findCatalogItem(item.catalog_item_id)?.name ||
-                  'Catalog item'
+                  ? findCatalogItem(item.catalog_item_id)?.name || 'Catalog item'
                   : item.asset_id
-                    ? assets.find(
-                      (asset) => asset.id === item.asset_id
-                    )?.asset_code || 'Asset'
+                    ? assets.find((asset) => asset.id === item.asset_id)?.asset_code || 'Asset'
                     : 'Inventory item';
 
                 return (
@@ -1171,9 +1027,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                     key={item.id}
                     className="flex items-center justify-between gap-3 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-3 py-2"
                   >
-                    <span className="text-xs font-medium text-[var(--color-idea-text)]">
-                      {itemName}
-                    </span>
+                    <span className="text-xs font-medium text-[var(--color-idea-text)]">{itemName}</span>
 
                     <span className="font-mono text-[10px] font-semibold text-[var(--color-idea-muted)]">
                       Qty {item.requested_qty}
@@ -1205,9 +1059,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
             </div>
 
             <div className="min-w-0">
-              <h3 className="truncate text-lg font-bold text-[var(--color-idea-text)]">
-                QR Action
-              </h3>
+              <h3 className="truncate text-lg font-bold text-[var(--color-idea-text)]">QR Action</h3>
 
               <p className="truncate text-[10px] font-mono uppercase tracking-widest text-[var(--color-idea-muted)]">
                 {qrData.rawCode}
@@ -1226,26 +1078,20 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         </div>
 
         <div className="overflow-y-auto p-6">
-          {qrData.type === 'asset' &&
-            renderAssetActions(qrData.entity)}
+          {qrData.type === 'asset' && renderAssetActions(qrData.entity)}
 
-          {qrData.type === 'catalog' &&
-            renderCatalogActions(qrData.entity)}
+          {qrData.type === 'catalog' && renderCatalogActions(qrData.entity)}
 
-          {qrData.type === 'location' &&
-            renderLocationActions(qrData.entity)}
+          {qrData.type === 'location' && renderLocationActions(qrData.entity)}
 
-          {qrData.type === 'request' &&
-            renderRequestActions(qrData.entity)}
+          {qrData.type === 'request' && renderRequestActions(qrData.entity)}
 
           {qrData.type === 'unknown' && (
             <div className="space-y-4 py-10 text-center">
               <AlertTriangle className="mx-auto h-12 w-12 text-[var(--color-idea-blue)]" />
 
               <div>
-                <h4 className="text-lg font-bold text-[var(--color-idea-text)]">
-                  Code Not Found
-                </h4>
+                <h4 className="text-lg font-bold text-[var(--color-idea-text)]">Code Not Found</h4>
 
                 <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-[var(--color-idea-muted)]">
                   No matching item, equipment, or location was found for this code.

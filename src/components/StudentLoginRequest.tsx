@@ -14,9 +14,7 @@ export const StudentLoginRequest: React.FC<StudentLoginRequestProps> = ({ status
   return (
     <div
       className={`mt-5 rounded-xl border p-4 text-left ${
-        isRejected
-          ? 'bg-red-50/80 border-red-200 text-red-900'
-          : 'bg-amber-50/80 border-amber-200 text-amber-900'
+        isRejected ? 'bg-red-50/80 border-red-200 text-red-900' : 'bg-amber-50/80 border-amber-200 text-amber-900'
       }`}
     >
       <div className="flex items-start gap-2.5">

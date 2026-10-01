@@ -78,9 +78,7 @@ const viewPaths: Record<ViewMode, string> = {
 };
 
 const pathViews: Record<string, ViewMode> = {
-  ...Object.fromEntries(
-    Object.entries(viewPaths).map(([view, path]) => [path, view as ViewMode])
-  ),
+  ...Object.fromEntries(Object.entries(viewPaths).map(([view, path]) => [path, view as ViewMode])),
   '/privacy': 'legal',
   '/terms': 'legal',
 };
@@ -376,7 +374,13 @@ export default function App() {
       navigate(viewPaths.dashboard, { replace: true });
       return;
     }
-    if (isStudentUser && currentView !== 'dashboard' && currentView !== 'requests' && currentView !== 'inventory' && currentView !== 'legal') {
+    if (
+      isStudentUser &&
+      currentView !== 'dashboard' &&
+      currentView !== 'requests' &&
+      currentView !== 'inventory' &&
+      currentView !== 'legal'
+    ) {
       navigate(viewPaths.requests, { replace: true });
     }
   }, [isStudentUser, currentView, location.pathname, navigate]);
@@ -518,7 +522,10 @@ export default function App() {
   // ---------------------------------------------------------------------------
   // Authentication screens
   // ---------------------------------------------------------------------------
-  if (!currentUser && (location.pathname === '/privacy' || location.pathname === '/terms' || location.pathname === '/legal')) {
+  if (
+    !currentUser &&
+    (location.pathname === '/privacy' || location.pathname === '/terms' || location.pathname === '/legal')
+  ) {
     return (
       <>
         {pageHead}
@@ -677,10 +684,7 @@ export default function App() {
             />
           )}
           {currentView === 'legal' && (
-            <LegalPage
-              kind={location.pathname === '/terms' ? 'terms' : 'privacy'}
-              inAppShell={true}
-            />
+            <LegalPage kind={location.pathname === '/terms' ? 'terms' : 'privacy'} inAppShell={true} />
           )}
         </main>
       </div>

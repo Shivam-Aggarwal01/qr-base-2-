@@ -1,13 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CalendarClock, Package, Search, Plus } from 'lucide-react';
-import {
-  Asset,
-  CatalogItem,
-  Location,
-  Request,
-  StockLevel,
-  User,
-} from '../types/inventory';
+import { Asset, CatalogItem, Location, Request, StockLevel, User } from '../types/inventory';
 
 interface StudentInventoryViewProps {
   catalogItems: CatalogItem[];
@@ -23,9 +16,9 @@ interface StudentInventoryViewProps {
 const formatDate = (value?: string | null) =>
   value
     ? new Intl.DateTimeFormat(undefined, {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }).format(new Date(value))
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }).format(new Date(value))
     : 'No deadline set';
 
 export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
@@ -52,9 +45,7 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
       return undefined;
     }
 
-    return catalogItems.find(
-      (item) => item.id === catalogItemId
-    );
+    return catalogItems.find((item) => item.id === catalogItemId);
   };
 
   const myOpenDeadlines = useMemo(
@@ -63,23 +54,15 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
         (request) =>
           request.user_id === currentUser.id &&
           request.deadline_at &&
-          (request.status === 'APPROVED' ||
-            request.status === 'HANDED_OVER' ||
-            request.status === 'RETURN_REQUESTED')
+          (request.status === 'APPROVED' || request.status === 'HANDED_OVER' || request.status === 'RETURN_REQUESTED')
       ),
     [currentUser.id, requests]
   );
 
-  const overdueRequests = myOpenDeadlines.filter(
-    (request) =>
-      new Date(request.deadline_at as string).getTime() <= now
-  );
+  const overdueRequests = myOpenDeadlines.filter((request) => new Date(request.deadline_at as string).getTime() <= now);
 
   useEffect(() => {
-    const timer = window.setInterval(
-      () => setNow(Date.now()),
-      60_000
-    );
+    const timer = window.setInterval(() => setNow(Date.now()), 60_000);
 
     return () => window.clearInterval(timer);
   }, []);
@@ -89,9 +72,7 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
       return;
     }
 
-    const key = `lablogic-overdue-${currentUser.id}-${overdueRequests
-      .map((request) => request.id)
-      .join('-')}`;
+    const key = `lablogic-overdue-${currentUser.id}-${overdueRequests.map((request) => request.id).join('-')}`;
 
     if (window.sessionStorage.getItem(key)) {
       return;
@@ -113,9 +94,7 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
       return true;
     }
 
-    return `${item.name} ${item.item_code} ${item.description || ''}`
-      .toLowerCase()
-      .includes(query);
+    return `${item.name} ${item.item_code} ${item.description || ''}`.toLowerCase().includes(query);
   });
 
   const visibleAssets = assets.filter((asset) => {
@@ -125,8 +104,7 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
       return true;
     }
 
-    return `${asset.name || ''} ${asset.asset_code} ${asset.serial_number || ''
-      } ${catalog?.name || ''}`
+    return `${asset.name || ''} ${asset.asset_code} ${asset.serial_number || ''} ${catalog?.name || ''}`
       .toLowerCase()
       .includes(query);
   });
@@ -136,18 +114,11 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
    */
   const stockFor = (catalogItemId: string) =>
     stockLevels
-      .filter(
-        (stock) => stock.catalog_item_id === catalogItemId
-      )
-      .reduce(
-        (total, stock) => total + (Number(stock.quantity) || 0),
-        0
-      );
+      .filter((stock) => stock.catalog_item_id === catalogItemId)
+      .reduce((total, stock) => total + (Number(stock.quantity) || 0), 0);
 
   const borrowerFor = (asset: Asset) =>
-    users.find(
-      (user) => user.id === asset.assigned_to_user_id
-    )?.name || 'Borrower not recorded';
+    users.find((user) => user.id === asset.assigned_to_user_id)?.name || 'Borrower not recorded';
 
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
@@ -180,12 +151,7 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
 
         {/* Return Deadlines */}
         {myOpenDeadlines.length > 0 && (
-          <section
-            className={`idea-card p-4 ${overdueRequests.length > 0
-              ? 'idea-error'
-              : 'idea-warning'
-              }`}
-          >
+          <section className={`idea-card p-4 ${overdueRequests.length > 0 ? 'idea-error' : 'idea-warning'}`}>
             <div className="flex items-start gap-3">
               {overdueRequests.length > 0 ? (
                 <AlertTriangle className="h-5 w-5 shrink-0" />
@@ -195,18 +161,14 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
 
               <div className="min-w-0">
                 <p className="text-xs font-bold">
-                  {overdueRequests.length > 0
-                    ? 'Return deadline passed'
-                    : 'Your return deadlines'}
+                  {overdueRequests.length > 0 ? 'Return deadline passed' : 'Your return deadlines'}
                 </p>
 
                 <div className="mt-2 grid gap-1 text-[11px]">
                   {myOpenDeadlines.map((request) => (
                     <p key={request.id}>
-                      <span className="font-mono font-bold">
-                        {request.request_number}
-                      </span>{' '}
-                      · {formatDate(request.deadline_at)}
+                      <span className="font-mono font-bold">{request.request_number}</span> ·{' '}
+                      {formatDate(request.deadline_at)}
                     </p>
                   ))}
                 </div>
@@ -234,13 +196,9 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
             <Package className="h-5 w-5 text-[var(--color-idea-blue)]" />
 
             <div>
-              <h3 className="text-sm font-bold">
-                Complete consumable inventory
-              </h3>
+              <h3 className="text-sm font-bold">Complete consumable inventory</h3>
 
-              <p className="text-[10px] text-[var(--color-idea-muted)]">
-                Available quantity across all lab locations
-              </p>
+              <p className="text-[10px] text-[var(--color-idea-muted)]">Available quantity across all lab locations</p>
             </div>
           </div>
 
@@ -266,47 +224,24 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
                   const total = stockFor(catalogItemId);
 
                   const itemLocations = stockLevels
-                    .filter(
-                      (stock) =>
-                        stock.catalog_item_id === catalogItemId &&
-                        Number(stock.quantity) > 0
-                    )
-                    .map(
-                      (stock) =>
-                        locations.find(
-                          (location) =>
-                            location.id === stock.location_id
-                        )?.name
-                    )
-                    .filter(
-                      (name): name is string => Boolean(name)
-                    );
+                    .filter((stock) => stock.catalog_item_id === catalogItemId && Number(stock.quantity) > 0)
+                    .map((stock) => locations.find((location) => location.id === stock.location_id)?.name)
+                    .filter((name): name is string => Boolean(name));
 
                   return (
                     <tr key={item.id} className="text-xs">
-                      <td className="px-4 py-3 font-semibold sm:px-6">
-                        {item.name}
-                      </td>
+                      <td className="px-4 py-3 font-semibold sm:px-6">{item.name}</td>
 
-                      <td className="px-4 py-3 font-mono text-[var(--color-idea-muted)] sm:px-6">
-                        {item.item_code}
-                      </td>
+                      <td className="px-4 py-3 font-mono text-[var(--color-idea-muted)] sm:px-6">{item.item_code}</td>
 
                       <td className="px-4 py-3 sm:px-6">
-                        <span
-                          className={`font-bold ${total > 0
-                            ? 'text-[#5e8a27]'
-                            : 'text-[var(--color-idea-red)]'
-                            }`}
-                        >
+                        <span className={`font-bold ${total > 0 ? 'text-[#5e8a27]' : 'text-[var(--color-idea-red)]'}`}>
                           {total} {item.unit}
                         </span>
                       </td>
 
                       <td className="px-4 py-3 text-[var(--color-idea-muted)] sm:px-6">
-                        {item.storage_place ||
-                          itemLocations.join(', ') ||
-                          'Lab store'}
+                        {item.storage_place || itemLocations.join(', ') || 'Lab store'}
                       </td>
                     </tr>
                   );
@@ -325,13 +260,10 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
         {/* Tracked Assets */}
         <section className="idea-card overflow-hidden">
           <div className="border-b border-[var(--color-idea-border)] px-4 py-4 sm:px-6">
-            <h3 className="text-sm font-bold">
-              Tracked assets
-            </h3>
+            <h3 className="text-sm font-bold">Tracked assets</h3>
 
             <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-              See whether each asset is available and who has it
-              when issued.
+              See whether each asset is available and who has it when issued.
             </p>
           </div>
 
@@ -340,15 +272,11 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
               /*
                * asset.catalog_item_id must reference CatalogItem.id.
                */
-              const catalog = findCatalogItem(
-                asset.catalog_item_id
-              );
+              const catalog = findCatalogItem(asset.catalog_item_id);
 
               const available = asset.status === 'AVAILABLE';
 
-              const location = locations.find(
-                (item) => item.id === asset.location_id
-              )?.name;
+              const location = locations.find((item) => item.id === asset.location_id)?.name;
 
               return (
                 <article
@@ -368,14 +296,11 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
                     </div>
 
                     <span
-                      className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-bold uppercase ${available
-                        ? 'idea-success'
-                        : 'idea-error'
-                        }`}
+                      className={`shrink-0 whitespace-nowrap rounded-full px-2 py-1 text-[9px] font-bold uppercase ${
+                        available ? 'idea-success' : 'idea-error'
+                      }`}
                     >
-                      {available
-                        ? 'Available'
-                        : asset.status.replace(/_/g, ' ')}
+                      {available ? 'Available' : asset.status.replace(/_/g, ' ')}
                     </span>
                   </div>
 
@@ -394,9 +319,7 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
                         <span>Location</span>
 
                         <span className="text-right font-medium text-[var(--color-idea-text)]">
-                          {asset.storage_location ||
-                            location ||
-                            'Lab store'}
+                          {asset.storage_location || location || 'Lab store'}
                         </span>
                       </div>
                     ) : (
@@ -415,9 +338,7 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
           </div>
 
           {visibleAssets.length === 0 && (
-            <p className="p-8 text-center text-xs text-[var(--color-idea-muted)]">
-              No assets match your search.
-            </p>
+            <p className="p-8 text-center text-xs text-[var(--color-idea-muted)]">No assets match your search.</p>
           )}
         </section>
       </div>

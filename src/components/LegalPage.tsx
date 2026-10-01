@@ -1,21 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
-import {
-  Shield,
-  FileText,
-  Search,
-  Printer,
-  ArrowLeft,
-  ChevronRight,
-  ExternalLink,
-  CheckCircle2,
-  Lock,
-  Clock,
-  Sparkles,
-  HelpCircle,
-  Building,
-} from 'lucide-react';
 
 export type LegalPageKind = 'privacy' | 'terms';
 
@@ -32,9 +17,7 @@ interface LegalSection {
 
 interface LegalPageContent {
   title: string;
-  eyebrow: string;
   description: string;
-  summaryHighlights: { title: string; desc: string }[];
   sections: LegalSection[];
 }
 
@@ -43,23 +26,8 @@ const EFFECTIVE_DATE = 'September 27, 2026';
 const pageContent: Record<LegalPageKind, LegalPageContent> = {
   privacy: {
     title: 'Privacy Policy',
-    eyebrow: 'Data Protection & Governance',
     description:
       'This Privacy Policy explains how the AICTE IDEA Lab Inventory Management System collects, uses, stores, and protects information when authorized users access the laboratory platform.',
-    summaryHighlights: [
-      {
-        title: 'Authentication Only',
-        desc: 'Google Sign-In is strictly used to identify authorized laboratory personnel and students. Passwords are never seen or stored.',
-      },
-      {
-        title: 'Zero Advertising or Data Selling',
-        desc: 'User information and activity records are strictly used for lab accountability and are never sold or shared with advertisers.',
-      },
-      {
-        title: 'Institutional Equipment Records',
-        desc: 'Equipment requests, checkouts, and returns are logged in an immutable audit ledger to protect public laboratory resources.',
-      },
-    ],
     sections: [
       {
         heading: '1. About this application',
@@ -178,23 +146,8 @@ const pageContent: Record<LegalPageKind, LegalPageContent> = {
 
   terms: {
     title: 'Terms of Service',
-    eyebrow: 'Rules & User Conduct',
     description:
       'These Terms of Service govern authorized use of the AICTE IDEA Lab Inventory Management System for laboratory inventory, equipment tracking, requests, assignments, and operational records.',
-    summaryHighlights: [
-      {
-        title: 'Authorized Personnel Only',
-        desc: 'Access is limited to approved students, faculty, and lab managers. Credentials may never be shared or loaned.',
-      },
-      {
-        title: 'Duty of Care for Equipment',
-        desc: 'Users are personally accountable for borrowed tools and materials, requiring prompt return by stated deadlines.',
-      },
-      {
-        title: 'QR & Inventory Integrity',
-        desc: 'QR codes, serial numbers, and storage tags must not be altered, removed, or cloned under any circumstances.',
-      },
-    ],
     sections: [
       {
         heading: '1. About the service',
@@ -302,320 +255,87 @@ const pageContent: Record<LegalPageKind, LegalPageContent> = {
   },
 };
 
-export const LegalPage: React.FC<LegalPageProps> = ({ kind: initialKind, inAppShell = false }) => {
-  const [activeTab, setActiveTab] = useState<LegalPageKind>(initialKind);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+export const LegalPage: React.FC<LegalPageProps> = ({ kind, inAppShell = false }) => {
+  const content = pageContent[kind];
   const navigate = useNavigate();
 
-  const content = pageContent[activeTab];
-
-  const handleTabSwitch = (newTab: LegalPageKind) => {
-    setActiveTab(newTab);
-    navigate(newTab === 'privacy' ? '/privacy' : '/terms', { replace: true });
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const filteredSections = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    if (!q) return content.sections;
-    return content.sections.filter((section) => {
-      const inHeading = section.heading.toLowerCase().includes(q);
-      const inParagraphs = section.paragraphs?.some((p) => p.toLowerCase().includes(q));
-      const inBullets = section.bullets?.some((b) => b.toLowerCase().includes(q));
-      return inHeading || inParagraphs || inBullets;
-    });
-  }, [content.sections, searchQuery]);
-
   return (
-    <div className={`flex-1 overflow-y-auto idea-bg ${inAppShell ? '' : 'min-h-screen'}`}>
+    <div className={`flex-1 bg-white ${inAppShell ? 'overflow-y-auto' : 'min-h-screen'}`}>
       <Helmet>
         <title>{content.title} | AICTE IDEA Lab Inventory Management</title>
         <meta name="description" content={content.description} />
       </Helmet>
 
-      {/* Standalone Top Bar if not inside App Shell */}
       {!inAppShell && (
-        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-[var(--color-idea-border)] px-4 sm:px-8 py-3.5">
-          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
-            <Link to="/" className="flex items-center gap-3">
-              <img src="/logo.png" alt="AICTE IDEA Lab" className="h-10 sm:h-12 w-auto object-contain" />
-              <div>
-                <span className="text-base sm:text-lg font-bold tracking-tight text-[var(--color-idea-text)]">
-                  AICTE <span className="text-[var(--color-idea-blue)] font-normal">IDEA LAB</span>
-                </span>
-                <p className="text-[9px] sm:text-[10px] text-[var(--color-idea-muted)] tracking-wide uppercase">
-                  Inventory Management System
-                </p>
-              </div>
-            </Link>
-
-            <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[var(--color-idea-text)] bg-white border border-[var(--color-idea-border)] rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-all cursor-pointer"
-              >
-                <Printer className="w-4 h-4 text-[var(--color-idea-muted)]" />
-                <span>Print</span>
-              </button>
-              <Link
-                to="/"
-                className="idea-button flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl cursor-pointer"
-              >
-                <ArrowLeft className="w-4 h-4" />
-                <span>Return to Portal</span>
-              </Link>
-            </div>
+        <header className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-10">
+          <Link to="/" className="text-[13px] font-semibold tracking-tight text-[var(--color-idea-text)] uppercase">
+            Inventory Portal
+          </Link>
+          <div className="flex gap-6">
+            <button
+              onClick={() => navigate('/privacy')}
+              className={`text-xs transition-colors ${kind === 'privacy' ? 'text-[var(--color-idea-text)] font-semibold' : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'}`}
+            >
+              Privacy
+            </button>
+            <button
+              onClick={() => navigate('/terms')}
+              className={`text-xs transition-colors ${kind === 'terms' ? 'text-[var(--color-idea-text)] font-semibold' : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'}`}
+            >
+              Terms
+            </button>
           </div>
         </header>
       )}
 
-      {/* Main Container */}
-      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Standard Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-blue)]">
-                IDEA Lab · Governance
-              </span>
-            </div>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
-              {content.title}
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
-              {content.description}
-            </p>
-          </div>
+      <main className="max-w-3xl mx-auto w-full px-6 py-12 md:py-24 space-y-16">
+        <header className="space-y-6">
+          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-[var(--color-idea-text)] leading-tight">
+            {content.title}
+          </h1>
+          <p className="text-sm md:text-base text-[var(--color-idea-muted)] leading-relaxed max-w-xl">
+            {content.description}
+          </p>
+          <p className="text-xs font-mono text-[var(--color-idea-muted)]">Effective Date: {EFFECTIVE_DATE}</p>
+        </header>
 
-          <div className="flex items-center gap-2 shrink-0">
-            {inAppShell && (
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[var(--color-idea-text)] bg-white border border-[var(--color-idea-border)] rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-all cursor-pointer"
-              >
-                <Printer className="w-4 h-4 text-[var(--color-idea-muted)]" />
-                <span>Print Policy</span>
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Tab Switcher & Search Bar */}
-        <div className="idea-card p-3 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
-          {/* Segmented Tab Controls */}
-          <div className="inline-flex p-1 bg-[var(--color-idea-light-grey)] rounded-xl border border-[var(--color-idea-border)] shrink-0">
-            <button
-              type="button"
-              onClick={() => handleTabSwitch('privacy')}
-              className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                activeTab === 'privacy'
-                  ? 'bg-white text-[var(--color-idea-deep-blue)] shadow-sm'
-                  : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
-              }`}
-            >
-              <Shield className="w-3.5 h-3.5" />
-              <span>Privacy Policy</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabSwitch('terms')}
-              className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
-                activeTab === 'terms'
-                  ? 'bg-white text-[var(--color-idea-deep-blue)] shadow-sm'
-                  : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
-              }`}
-            >
-              <FileText className="w-3.5 h-3.5" />
-              <span>Terms of Service</span>
-            </button>
-          </div>
-
-          {/* Search within document */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search policy sections, Google auth, rules..."
-              className="idea-input w-full pl-9 pr-4 py-2 text-xs"
-            />
-          </div>
-
-          {/* Effective Date Stamp */}
-          <div className="hidden lg:flex items-center gap-2 text-xs text-[var(--color-idea-muted)] shrink-0 font-medium">
-            <Clock className="w-3.5 h-3.5 text-[var(--color-idea-blue)]" />
-            <span>Effective: {EFFECTIVE_DATE}</span>
-          </div>
-        </div>
-
-        {/* Key Takeaways Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {content.summaryHighlights.map((highlight, idx) => (
-            <div
-              key={idx}
-              className="idea-card p-4 sm:p-5 flex flex-col justify-between hover:border-[var(--color-idea-blue)]/40 transition-all"
-            >
-              <div className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-lg bg-[var(--color-idea-blue)]/10 text-[var(--color-idea-blue)] flex items-center justify-center shrink-0 mt-0.5">
-                  <CheckCircle2 className="w-4 h-4" />
+        <div className="space-y-12">
+          {content.sections.map((section, idx) => (
+            <section key={idx} className="space-y-4">
+              <h2 className="text-sm font-semibold tracking-wider text-[var(--color-idea-text)] uppercase">
+                {section.heading}
+              </h2>
+              {section.paragraphs && (
+                <div className="space-y-4">
+                  {section.paragraphs.map((p, pIdx) => (
+                    <p key={pIdx} className="text-[13px] md:text-sm text-[var(--color-idea-muted)] leading-relaxed">
+                      {p}
+                    </p>
+                  ))}
                 </div>
-                <div>
-                  <h3 className="text-xs sm:text-sm font-bold text-[var(--color-idea-text)]">
-                    {highlight.title}
-                  </h3>
-                  <p className="mt-1 text-xs text-[var(--color-idea-muted)] leading-relaxed">
-                    {highlight.desc}
-                  </p>
-                </div>
-              </div>
-            </div>
+              )}
+              {section.bullets && (
+                <ul className="list-disc list-inside space-y-2 mt-4">
+                  {section.bullets.map((b, bIdx) => (
+                    <li
+                      key={bIdx}
+                      className="text-[13px] md:text-sm text-[var(--color-idea-muted)] leading-relaxed marker:text-[var(--color-idea-border)]"
+                    >
+                      {b}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
           ))}
-        </div>
-
-        {/* Content Layout with Quick Jump */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
-          {/* Quick Index Sidebar (Desktop) */}
-          <div className="hidden lg:block lg:col-span-4 sticky top-20 space-y-4">
-            <div className="idea-card p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-idea-muted)] mb-3">
-                Table of Contents
-              </p>
-              <nav className="space-y-1 max-h-[60vh] overflow-y-auto pr-2">
-                {content.sections.map((section, idx) => (
-                  <a
-                    key={idx}
-                    href={`#section-${idx}`}
-                    className="block px-3 py-1.5 text-xs text-[var(--color-idea-muted)] hover:text-[var(--color-idea-deep-blue)] hover:bg-[var(--color-idea-light-grey)] rounded-lg transition-colors truncate"
-                  >
-                    {section.heading}
-                  </a>
-                ))}
-              </nav>
-            </div>
-
-            <div className="idea-card p-4 bg-gradient-to-br from-[var(--color-idea-light-grey)] to-white border-[var(--color-idea-blue)]/20">
-              <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-idea-deep-blue)]">
-                <Building className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                <span>AICTE IDEA Lab Directorate</span>
-              </div>
-              <p className="mt-2 text-xs text-[var(--color-idea-muted)] leading-relaxed">
-                Operating strictly under institutional lab protocols for technical innovation and skill development.
-              </p>
-            </div>
-          </div>
-
-          {/* Policy Sections */}
-          <div className="lg:col-span-8 space-y-4">
-            {filteredSections.length === 0 ? (
-              <div className="idea-card p-8 sm:p-12 text-center">
-                <Search className="w-8 h-8 text-[var(--color-idea-muted)] mx-auto mb-3" />
-                <p className="font-semibold text-sm text-[var(--color-idea-text)]">
-                  No matching policy sections found
-                </p>
-                <p className="text-xs text-[var(--color-idea-muted)] mt-1">
-                  Try searching for keywords like "Google", "equipment", "returns", or "security".
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery('')}
-                  className="mt-4 px-4 py-2 text-xs font-semibold text-[var(--color-idea-blue)] bg-[var(--color-idea-blue)]/10 rounded-xl hover:bg-[var(--color-idea-blue)]/20 transition-all cursor-pointer"
-                >
-                  Clear Search
-                </button>
-              </div>
-            ) : (
-              filteredSections.map((section, idx) => {
-                const sectionId = `section-${idx}`;
-                return (
-                  <article
-                    id={sectionId}
-                    key={section.heading}
-                    className="idea-card p-5 sm:p-7 space-y-4 scroll-mt-24 transition-all"
-                  >
-                    <h2 className="text-base sm:text-lg font-bold text-[var(--color-idea-text)] flex items-center justify-between">
-                      <span>{section.heading}</span>
-                    </h2>
-
-                    {section.paragraphs && (
-                      <div className="space-y-3">
-                        {section.paragraphs.map((p, pIdx) => (
-                          <p key={pIdx} className="text-xs sm:text-sm text-[var(--color-idea-muted)] leading-relaxed">
-                            {p}
-                          </p>
-                        ))}
-                      </div>
-                    )}
-
-                    {section.bullets && (
-                      <ul className="space-y-2 pt-2 border-t border-[var(--color-idea-border)]/60">
-                        {section.bullets.map((b, bIdx) => (
-                          <li key={bIdx} className="flex items-start gap-2.5 text-xs sm:text-sm text-[var(--color-idea-text)]">
-                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-idea-blue)] shrink-0 mt-2" />
-                            <span className="leading-relaxed">{b}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </article>
-                );
-              })
-            )}
-
-            {/* Bottom Support / Switch Box */}
-            <div className="idea-card p-5 sm:p-6 bg-white border-[var(--color-idea-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <p className="text-xs font-bold text-[var(--color-idea-text)]">
-                  Need clarification on lab policies or access?
-                </p>
-                <p className="text-xs text-[var(--color-idea-muted)] mt-0.5">
-                  Contact your designated AICTE IDEA Lab Coordinator or Laboratory Assistant.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => handleTabSwitch(activeTab === 'privacy' ? 'terms' : 'privacy')}
-                className="idea-button shrink-0 flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl cursor-pointer"
-              >
-                <span>Read {activeTab === 'privacy' ? 'Terms of Service' : 'Privacy Policy'}</span>
-                <ChevronRight className="w-4 h-4" />
-              </button>
-            </div>
-          </div>
         </div>
       </main>
 
-      {/* Quiet Unified Footer */}
       {!inAppShell && (
-        <footer className="mt-12 border-t border-[var(--color-idea-border)] bg-white py-6 px-4 sm:px-8">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--color-idea-muted)]">
-            <p>© {new Date().getFullYear()} AICTE IDEA Lab Inventory Management System</p>
-            <div className="flex items-center gap-6">
-              <button
-                type="button"
-                onClick={() => handleTabSwitch('privacy')}
-                className="hover:text-[var(--color-idea-deep-blue)] cursor-pointer"
-              >
-                Privacy Policy
-              </button>
-              <button
-                type="button"
-                onClick={() => handleTabSwitch('terms')}
-                className="hover:text-[var(--color-idea-deep-blue)] cursor-pointer"
-              >
-                Terms of Service
-              </button>
-              <Link to="/" className="text-[var(--color-idea-blue)] font-semibold hover:underline">
-                Portal Sign-in
-              </Link>
-            </div>
-          </div>
+        <footer className="border-t border-[var(--color-idea-border)] py-8 px-6 text-center">
+          <p className="text-[11px] text-[var(--color-idea-muted)] uppercase tracking-widest">
+            © {new Date().getFullYear()} AICTE IDEA Lab
+          </p>
         </footer>
       )}
     </div>

@@ -35,11 +35,7 @@ interface DashboardViewProps {
   stockLevels: StockLevel[];
   currentUser?: User | null;
   onSelectView: (view: ViewMode) => void;
-  onOpenQRGenerator: (
-    code: string,
-    title: string,
-    subtitle?: string
-  ) => void;
+  onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
   onRefreshData: () => void;
   onOpenNewRequest?: () => void;
 }
@@ -54,8 +50,7 @@ const STATUS_BADGE: Record<string, string> = {
 };
 
 const getStatusBadge = (status: string) =>
-  STATUS_BADGE[status] ??
-  'bg-slate-100 text-slate-600 border border-slate-200';
+  STATUS_BADGE[status] ?? 'bg-slate-100 text-slate-600 border border-slate-200';
 
 const formatStatus = (status: string) => {
   switch (status) {
@@ -130,9 +125,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       )
       .filter((item) => item.catalogItemId && item.quantity > 0);
 
-    const currentlyHeldCount =
-      issuedAssets.length +
-      reusableItems.reduce((total, item) => total + item.quantity, 0);
+    const currentlyHeldCount = issuedAssets.length + reusableItems.reduce((total, item) => total + item.quantity, 0);
 
     return (
       <div className="flex-1 overflow-y-auto idea-bg">
@@ -143,9 +136,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <span className="text-[10px] font-semibold uppercase tracking-wider text-[#0071e3]">
                 IDEA Lab · Student Desk
               </span>
-              <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-                My Activity
-              </h1>
+              <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">My Activity</h1>
               <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-2xl">
                 Track your active requests, approvals, and borrowed equipment.
               </p>
@@ -192,14 +183,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               },
             ].map((metric) => (
               <div key={metric.label} className="idea-card relative overflow-hidden p-4 sm:p-5">
-                <div
-                  className="absolute left-0 top-0 h-1 w-full"
-                  style={{ backgroundColor: metric.accent }}
-                />
+                <div className="absolute left-0 top-0 h-1 w-full" style={{ backgroundColor: metric.accent }} />
                 <p className="text-xs font-medium text-slate-500">{metric.label}</p>
-                <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                  {metric.value}
-                </p>
+                <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{metric.value}</p>
                 <p className="mt-1 text-[11px] text-slate-400">{metric.sub}</p>
               </div>
             ))}
@@ -240,9 +226,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   >
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className="font-mono text-xs font-bold text-slate-900">
-                          {request.request_number}
-                        </span>
+                        <span className="font-mono text-xs font-bold text-slate-900">{request.request_number}</span>
                         <span
                           className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(
                             request.status
@@ -308,10 +292,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     [locations, stockLevels]
   );
 
-  const maxLocationQty = useMemo(
-    () => Math.max(1, ...stockByLocation.map((l) => l.qty)),
-    [stockByLocation]
-  );
+  const maxLocationQty = useMemo(() => Math.max(1, ...stockByLocation.map((l) => l.qty)), [stockByLocation]);
 
   const totalTrackedAssets = assets.length;
 
@@ -324,9 +305,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-[10px] font-semibold uppercase tracking-wider text-[#0071e3]">
               IDEA Lab · Overview
             </span>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
-              Overview
-            </h1>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">Overview</h1>
             <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-2xl">
               A live look at equipment, stock, and current requests.
             </p>
@@ -377,17 +356,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 onClick={() => onSelectView(metric.view)}
                 className="idea-card relative cursor-pointer overflow-hidden p-4 sm:p-5 text-left transition-colors hover:border-slate-300"
               >
-                <div
-                  className="absolute left-0 top-0 h-1 w-full"
-                  style={{ backgroundColor: metric.accent }}
-                />
+                <div className="absolute left-0 top-0 h-1 w-full" style={{ backgroundColor: metric.accent }} />
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-slate-500">{metric.label}</span>
                   <Icon className="h-4 w-4 text-slate-400" />
                 </div>
-                <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
-                  {metric.value}
-                </p>
+                <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">{metric.value}</p>
                 <p className="mt-1 text-[11px] text-slate-400 truncate">{metric.sub}</p>
               </button>
             );
@@ -405,9 +379,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="p-5 flex-1 flex flex-col justify-center">
               {totalTrackedAssets === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">
-                  No equipment tracked yet.
-                </div>
+                <div className="py-8 text-center text-slate-400 text-xs">No equipment tracked yet.</div>
               ) : (
                 <div className="flex flex-col sm:flex-row items-center gap-6">
                   {/* Clean Vector Donut */}
@@ -519,9 +491,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
             <div className="p-5 flex-1 flex flex-col justify-center space-y-3.5">
               {stockByLocation.length === 0 ? (
-                <div className="py-8 text-center text-slate-400 text-xs">
-                  No inventory locations recorded yet.
-                </div>
+                <div className="py-8 text-center text-slate-400 text-xs">No inventory locations recorded yet.</div>
               ) : (
                 stockByLocation.map((loc) => {
                   const pct = Math.round((loc.qty / maxLocationQty) * 100);
@@ -590,7 +560,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     </div>
                     <div className="text-right shrink-0">
                       <span className="font-bold text-red-600">{quantity}</span>
-                      <span className="text-slate-400"> / {threshold} {item.unit}</span>
+                      <span className="text-slate-400">
+                        {' '}
+                        / {threshold} {item.unit}
+                      </span>
                     </div>
                   </div>
                 ))
@@ -627,13 +600,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div key={tx.id} className="flex items-center justify-between gap-3 px-5 py-3 text-xs">
                     <div className="min-w-0">
                       <p className="font-semibold text-slate-900 truncate">
-                        {tx.type} · {tx.quantity} units
+                        {tx.transaction_type} · {tx.quantity} units
                       </p>
                       <p className="text-[11px] text-slate-400 truncate">{tx.remarks || 'Standard update'}</p>
                     </div>
-                    <span className="text-[11px] text-slate-400 shrink-0 font-medium">
-                      {getTimeAgo(tx.created_at)}
-                    </span>
+                    <span className="text-[11px] text-slate-400 shrink-0 font-medium">{getTimeAgo(tx.created_at)}</span>
                   </div>
                 ))
               )}

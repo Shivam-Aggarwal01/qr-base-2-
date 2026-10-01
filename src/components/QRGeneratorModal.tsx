@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Download, Printer, AlertCircle } from 'lucide-react';
 import QRCode from 'qrcode';
-
 interface QRGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -10,7 +9,6 @@ interface QRGeneratorModalProps {
   subtitle?: string;
   typeBadge?: string;
 }
-
 export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
   isOpen,
   onClose,
@@ -22,27 +20,20 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
-
   useEffect(() => {
     if (!isOpen || !code || !canvasRef.current) {
       return;
     }
-
     let cancelled = false;
-
     const generateQRCode = async () => {
       setGenerating(true);
       setGenerationError(null);
-
       try {
         await QRCode.toCanvas(canvasRef.current, code, {
           width: 220,
-          margin: 2,
+          margin: 1,
           errorCorrectionLevel: 'M',
-          color: {
-            dark: '#172b3a',
-            light: '#ffffff',
-          },
+          color: { dark: '#172b3a', light: '#ffffff' },
         });
       } catch (error) {
         console.error('QR generation error:', error);
@@ -55,20 +46,16 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
         }
       }
     };
-
     void generateQRCode();
-
     return () => {
       cancelled = true;
     };
   }, [isOpen, code]);
-
   useEffect(() => {
     if (!isOpen) {
       setGenerationError(null);
     }
   }, [isOpen]);
-
   const handleDownload = () => {
     if (!canvasRef.current || !code || generationError) {
       return;
@@ -78,200 +65,171 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
     link.href = canvasRef.current.toDataURL('image/png');
     link.click();
   };
-
+  const escapeHtml = (value: string) =>
+    value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   const handlePrint = () => {
-    if (!canvasRef.current || generationError) {
+    if (!canvasRef.current || !code || generationError) {
       return;
     }
-
     const qrImage = canvasRef.current.toDataURL('image/png');
+    const safeTitle = escapeHtml(title);
+    const safeSubtitle = subtitle ? escapeHtml(subtitle) : '';
+    const safeCode = escapeHtml(code);
     const iframe = document.createElement('iframe');
     iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
     iframe.style.width = '0';
     iframe.style.height = '0';
     iframe.style.border = '0';
+    iframe.style.opacity = '0';
+    iframe.style.pointerEvents = 'none';
     document.body.appendChild(iframe);
-
-    const doc = iframe.contentWindow?.document;
-    if (!doc) {
-      window.print();
+    const printDocument = iframe.contentWindow?.document;
+    if (!printDocument) {
+      document.body.removeChild(iframe);
       return;
     }
-
-    doc.open();
-    doc.write(`
-      <!doctype html>
-      <html>
-        <head>
-          <title>${title} - QR Label</title>
-          <style>
-            @page { size: auto; margin: 10mm; }
-            body {
-              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              padding: 20px;
-              margin: 0;
-            }
-            .label-card {
-              border: 2px solid #172b3a;
-              border-radius: 12px;
-              padding: 16px;
-              width: 240px;
-              text-align: center;
-              background: #fff;
-            }
-            .brand {
-              font-size: 9px;
-              font-weight: 800;
-              letter-spacing: 0.15em;
-              color: #0b4ca3;
-              text-transform: uppercase;
-              margin-bottom: 6px;
-            }
-            .title {
-              font-size: 13px;
-              font-weight: 700;
-              color: #172b3a;
-              margin-bottom: 8px;
-              word-break: break-word;
-            }
-            img {
-              width: 160px;
-              height: 160px;
-              display: block;
-              margin: 0 auto 8px auto;
-            }
-            .code {
-              font-family: monospace;
-              font-size: 10px;
-              font-weight: 600;
-              color: #687782;
-              word-break: break-all;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="label-card">
-            <div class="brand">AICTE IDEA LAB</div>
-            <div class="title">${title}</div>
-            <img src="${qrImage}" alt="QR Code" />
-            <div class="code">${code}</div>
-          </div>
-        </body>
-      </html>
-    `);
-    doc.close();
-
-    iframe.contentWindow?.focus();
+    printDocument.open();
+    printDocument.write(
+      ` <!doctype html> <html> <head> <title>${safeTitle} - QR Label</title> <style> @page { size: 70mm 70mm; margin: 0; } * { box-sizing: border-box; } html, body { width: 70mm; height: 70mm; margin: 0; padding: 0; background: #ffffff; } body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; display: flex; align-items: center; justify-content: center; } .label { width: 64mm; height: 64mm; padding: 4mm; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; border: 0.3mm solid #d9dee5; border-radius: 2.5mm; background: #ffffff; } .brand { font-size: 7px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: #0b4ca3; margin-bottom: 2mm; } .type { font-size: 7px; font-weight: 600; color: #687782; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 2mm; } .title { width: 100%; font-size: 10px; font-weight: 700; line-height: 1.2; color: #172b3a; margin-bottom: 2.5mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .qr { width: 34mm; height: 34mm; display: block; margin: 0 auto 2.5mm; } .subtitle { max-width: 100%; font-size: 7px; line-height: 1.2; color: #687782; margin-bottom: 1.5mm; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .code { max-width: 100%; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 7px; font-weight: 600; color: #172b3a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } </style> </head> <body> <div class="label"> <div class="brand"> AICTE IDEA LAB </div> ${typeBadge ? ` <div class="type"> ${escapeHtml(typeBadge)} </div> ` : ''} <div class="title"> ${safeTitle} </div> <img class="qr" src="${qrImage}" alt="QR Code" /> ${safeSubtitle ? ` <div class="subtitle"> ${safeSubtitle} </div> ` : ''} <div class="code"> ${safeCode} </div> </div> </body> </html> `
+    );
+    printDocument.close();
+    const printWindow = iframe.contentWindow;
+    if (!printWindow) {
+      document.body.removeChild(iframe);
+      return;
+    }
+    printWindow.focus();
     setTimeout(() => {
-      iframe.contentWindow?.print();
+      printWindow.print();
       setTimeout(() => {
-        document.body.removeChild(iframe);
+        if (document.body.contains(iframe)) {
+          document.body.removeChild(iframe);
+        }
       }, 1000);
-    }, 250);
+    }, 300);
   };
-
   if (!isOpen) {
     return null;
   }
-
   return (
     <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
+      className=" fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4 "
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
         }
       }}
     >
+      {' '}
       <div
-        className="bg-white rounded-2xl shadow-2xl border border-[var(--color-idea-border)] w-full max-w-sm overflow-hidden flex flex-col max-h-[92vh]"
+        className=" w-full max-w-sm bg-white rounded-2xl border border-[var(--color-idea-border)] shadow-2xl overflow-hidden "
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-generator-title"
       >
-        {/* Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-idea-border)] flex items-center justify-between bg-[var(--color-idea-light-grey)]/60 shrink-0">
-          <div>
-            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--color-idea-blue)]">
-              AICTE IDEA LAB · QR TAG
-            </span>
-            <p id="qr-generator-title" className="font-bold text-[var(--color-idea-text)] text-base leading-tight mt-0.5">
-              Equipment Label
-            </p>
-          </div>
-
+        {' '}
+        {/* Header */}{' '}
+        <div className=" px-5 py-4 border-b border-[var(--color-idea-border)] flex items-center justify-between ">
+          {' '}
+          <div className="min-w-0">
+            {' '}
+            <h2 id="qr-generator-title" className=" text-base font-semibold text-[var(--color-idea-text)] ">
+              {' '}
+              QR Label{' '}
+            </h2>{' '}
+            <p className=" mt-0.5 text-xs text-[var(--color-idea-muted)] "> Generate or print this label. </p>{' '}
+          </div>{' '}
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl hover:bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-            aria-label="Close QR label modal"
+            className=" w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-idea-muted)] hover:bg-[var(--color-idea-light-grey)] hover:text-[var(--color-idea-text)] transition-colors "
+            aria-label="Close QR label"
           >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Printable Label View */}
-        <div className="p-6 text-center flex flex-col items-center space-y-4 overflow-y-auto flex-1">
-          {typeBadge && (
-            <span className="bg-[var(--color-idea-blue)]/10 text-[var(--color-idea-deep-blue)] text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">
-              {typeBadge}
-            </span>
-          )}
-
-          <div className="p-3 bg-white rounded-2xl border-2 border-[var(--color-idea-border)] shadow-xs">
-            {generationError ? (
-              <div className="w-[220px] h-[220px] flex flex-col items-center justify-center gap-2 text-[var(--color-idea-muted)]">
-                <AlertCircle className="w-8 h-8 text-[var(--color-idea-red)]" />
-                <p className="text-xs font-medium">QR generation failed</p>
-              </div>
-            ) : (
-              <canvas
-                ref={canvasRef}
-                className={`mx-auto transition-opacity ${generating ? 'opacity-40' : 'opacity-100'}`}
-                aria-label={`QR code for ${code}`}
-              />
-            )}
-          </div>
-
-          <div className="max-w-full">
-            <h3 className="text-base font-bold text-[var(--color-idea-text)] leading-snug">
-              {title}
-            </h3>
-            {subtitle && <p className="text-xs text-[var(--color-idea-muted)] mt-1">{subtitle}</p>}
-            <p className="mt-2 font-mono text-[10px] text-[var(--color-idea-muted)] bg-[var(--color-idea-light-grey)] px-2.5 py-1 rounded-md inline-block break-all">
-              {code}
-            </p>
-          </div>
-        </div>
-
-        {/* Action Toolbar */}
-        <div className="p-4 bg-[var(--color-idea-light-grey)]/60 border-t border-[var(--color-idea-border)] flex items-center gap-2 shrink-0">
+            {' '}
+            <X className="w-4 h-4" />{' '}
+          </button>{' '}
+        </div>{' '}
+        {/* Label Preview */}{' '}
+        <div className="p-6">
+          {' '}
+          <div className=" bg-white border border-[var(--color-idea-border)] rounded-xl p-5 flex flex-col items-center text-center ">
+            {' '}
+            <p className=" text-[8px] font-semibold uppercase tracking-[0.15em] text-[var(--color-idea-deep-blue)] ">
+              {' '}
+              AICTE IDEA LAB{' '}
+            </p>{' '}
+            {typeBadge && (
+              <p className=" mt-1 text-[9px] font-medium uppercase tracking-wider text-[var(--color-idea-muted)] ">
+                {' '}
+                {typeBadge}{' '}
+              </p>
+            )}{' '}
+            <h3
+              className=" w-full mt-2 text-sm font-semibold text-[var(--color-idea-text)] leading-tight truncate "
+              title={title}
+            >
+              {' '}
+              {title}{' '}
+            </h3>{' '}
+            <div className=" mt-4 w-[220px] h-[220px] flex items-center justify-center ">
+              {' '}
+              {generationError ? (
+                <div className="flex flex-col items-center gap-2">
+                  {' '}
+                  <AlertCircle className=" w-7 h-7 text-[var(--color-idea-red)] " />{' '}
+                  <p className=" text-xs text-[var(--color-idea-muted)] "> QR generation failed </p>{' '}
+                </div>
+              ) : (
+                <canvas
+                  ref={canvasRef}
+                  className={` w-[220px] h-[220px] transition-opacity ${generating ? 'opacity-40' : 'opacity-100'} `}
+                  aria-label={`QR code for ${code}`}
+                />
+              )}{' '}
+            </div>{' '}
+            {subtitle && (
+              <p className=" w-full mt-3 text-xs text-[var(--color-idea-muted)] truncate " title={subtitle}>
+                {' '}
+                {subtitle}{' '}
+              </p>
+            )}{' '}
+            <p
+              className=" max-w-full mt-1.5 px-2 text-[10px] font-mono font-medium text-[var(--color-idea-deep-blue)] truncate "
+              title={code}
+            >
+              {' '}
+              {code}{' '}
+            </p>{' '}
+          </div>{' '}
+        </div>{' '}
+        {/* Actions */}{' '}
+        <div className=" px-5 py-4 border-t border-[var(--color-idea-border)] flex items-center gap-2 ">
+          {' '}
           <button
             type="button"
             onClick={handleDownload}
             disabled={generating || !!generationError}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-white border border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50 min-h-[44px]"
+            className=" flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[var(--color-idea-border)] bg-white text-[var(--color-idea-text)] text-xs font-semibold hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed "
           >
-            <Download className="w-4 h-4" />
-            <span>Download</span>
-          </button>
-
+            {' '}
+            <Download className="w-4 h-4" /> Download{' '}
+          </button>{' '}
           <button
             type="button"
             onClick={handlePrint}
             disabled={generating || !!generationError}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 idea-button text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50 min-h-[44px]"
+            className=" flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--color-idea-blue)] text-white text-xs font-semibold hover:brightness-95 transition disabled:opacity-50 disabled:cursor-not-allowed "
           >
-            <Printer className="w-4 h-4" />
-            <span>Print Label</span>
-          </button>
-        </div>
-      </div>
+            {' '}
+            <Printer className="w-4 h-4" /> Print Label{' '}
+          </button>{' '}
+        </div>{' '}
+      </div>{' '}
     </div>
   );
 };

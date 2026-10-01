@@ -307,299 +307,301 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           </div>
         </div>
 
-      {/* Asset Table */}
-      <div className="idea-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="text-[10px] font-bold text-[var(--color-idea-muted)] uppercase tracking-[0.2em] border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]">
-                <th className="px-6 py-3.5">Asset Name</th>
-                <th className="px-6 py-3.5">Status</th>
-                <th className="px-6 py-3.5">Location</th>
-                <th className="px-6 py-3.5">Assigned To</th>
-                <th className="px-6 py-3.5 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-[var(--color-idea-border)]">
-              {filteredAssets.map((asset) => {
-                const loc = locations.find((l) => l.id === asset.location_id);
-                const user = users.find((u) => u.id === asset.assigned_to_user_id);
-                return (
-                  <tr key={asset.id} className="hover:bg-[var(--color-idea-light-grey)] transition-colors">
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-bold text-[var(--color-idea-text)]">{asset.name || 'Asset'}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      {asset.status === 'ISSUED' ? (
-                        <div className="w-fit rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-700">
-                          Auto: Issued to student
-                        </div>
-                      ) : (
-                        <span
-                          className={`inline-block text-[9px] px-2.5 py-1.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadge(
-                            asset.status
-                          )}`}
-                        >
-                          {getStatusLabel(asset.status)}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-xs font-medium text-[var(--color-idea-text)]">
-                      <div className="space-y-1">
-                        <div className="font-bold text-[var(--color-idea-text)]">{loc?.name || 'Location not set'}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-xs font-medium">
-                      <div
-                        className={
-                          asset.assigned_to_user_id
-                            ? 'text-[var(--color-idea-blue)] font-bold'
-                            : asset.status === 'AVAILABLE'
-                              ? 'text-emerald-700 font-bold'
-                              : 'text-[var(--color-idea-muted)] font-semibold'
-                        }
-                      >
-                        {asset.assigned_to_user_id
-                          ? user?.name || 'Student'
-                          : asset.status === 'AVAILABLE'
-                            ? 'Available for issue'
-                            : `Status: ${getStatusLabel(asset.status)}`}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button
-                          type="button"
-                          onClick={() => onOpenQRGenerator(asset.asset_code, asset.name || 'Asset', 'Individual Asset')}
-                          className="p-2 idea-button rounded-lg hover:opacity-90 transition-opacity cursor-pointer inline-flex"
-                          title="Generate QR tag"
-                        >
-                          <QrCode className="w-4 h-4" />
-                        </button>
-                        {isStaff(userRole) && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => openEditAssetModal(asset)}
-                              className="p-2 rounded-lg border border-[var(--color-idea-border)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer inline-flex"
-                              title="Edit asset"
-                            >
-                              <Pencil className="w-4 h-4 text-[var(--color-idea-text)]" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => void handleDeleteAsset(asset)}
-                              className="p-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors cursor-pointer inline-flex"
-                              title="Delete asset"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </>
+        {/* Asset Table */}
+        <div className="idea-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="text-[10px] font-bold text-[var(--color-idea-muted)] uppercase tracking-[0.2em] border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]">
+                  <th className="px-6 py-3.5">Asset Name</th>
+                  <th className="px-6 py-3.5">Status</th>
+                  <th className="px-6 py-3.5">Location</th>
+                  <th className="px-6 py-3.5">Assigned To</th>
+                  <th className="px-6 py-3.5 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-idea-border)]">
+                {filteredAssets.map((asset) => {
+                  const loc = locations.find((l) => l.id === asset.location_id);
+                  const user = users.find((u) => u.id === asset.assigned_to_user_id);
+                  return (
+                    <tr key={asset.id} className="hover:bg-[var(--color-idea-light-grey)] transition-colors">
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-bold text-[var(--color-idea-text)]">{asset.name || 'Asset'}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        {asset.status === 'ISSUED' ? (
+                          <div className="w-fit rounded-lg border border-blue-200 bg-blue-50 px-2 py-1.5 text-[10px] font-semibold text-blue-700">
+                            Auto: Issued to student
+                          </div>
+                        ) : (
+                          <span
+                            className={`inline-block text-[9px] px-2.5 py-1.5 rounded-full font-bold uppercase tracking-wider ${getStatusBadge(
+                              asset.status
+                            )}`}
+                          >
+                            {getStatusLabel(asset.status)}
+                          </span>
                         )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-medium text-[var(--color-idea-text)]">
+                        <div className="space-y-1">
+                          <div className="font-bold text-[var(--color-idea-text)]">
+                            {loc?.name || 'Location not set'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-xs font-medium">
+                        <div
+                          className={
+                            asset.assigned_to_user_id
+                              ? 'text-[var(--color-idea-blue)] font-bold'
+                              : asset.status === 'AVAILABLE'
+                                ? 'text-emerald-700 font-bold'
+                                : 'text-[var(--color-idea-muted)] font-semibold'
+                          }
+                        >
+                          {asset.assigned_to_user_id
+                            ? user?.name || 'Student'
+                            : asset.status === 'AVAILABLE'
+                              ? 'Available for issue'
+                              : `Status: ${getStatusLabel(asset.status)}`}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onOpenQRGenerator(asset.asset_code, asset.name, 'Individual Asset')}
+                            className="p-2 idea-button rounded-lg hover:opacity-90 transition-opacity cursor-pointer inline-flex"
+                            title="Generate QR tag"
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </button>
+                          {isStaff(userRole) && (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => openEditAssetModal(asset)}
+                                className="p-2 rounded-lg border border-[var(--color-idea-border)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer inline-flex"
+                                title="Edit asset"
+                              >
+                                <Pencil className="w-4 h-4 text-[var(--color-idea-text)]" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => void handleDeleteAsset(asset)}
+                                className="p-2 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition-colors cursor-pointer inline-flex"
+                                title="Delete asset"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
 
-      {/* Edit Asset Modal */}
-      {showEditAssetModal && editingAsset && (
-        <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
-            <div className="border-b border-[var(--color-idea-border)] pb-2">
-              <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Edit Asset</h3>
-              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5 font-mono">{editingAsset.asset_code}</p>
-            </div>
-            <form onSubmit={handleEditAssetSubmit} className="space-y-3">
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Asset Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={editAssetName}
-                  onChange={(e) => setEditAssetName(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs w-full"
-                />
+        {/* Edit Asset Modal */}
+        {showEditAssetModal && editingAsset && (
+          <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
+              <div className="border-b border-[var(--color-idea-border)] pb-2">
+                <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Edit Asset</h3>
+                <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5 font-mono">{editingAsset.asset_code}</p>
               </div>
-
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Status
-                </label>
-                {editingAsset.status === 'ISSUED' ? (
-                  <div className="mt-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
-                    Issued to student
-                  </div>
-                ) : (
-                  <select
-                    value={editAssetStatus}
-                    onChange={(e) => setEditAssetStatus(e.target.value as AssetStatus)}
+              <form onSubmit={handleEditAssetSubmit} className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Asset Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    value={editAssetName}
+                    onChange={(e) => setEditAssetName(e.target.value)}
                     className="idea-input mt-1 p-2.5 text-xs w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Status
+                  </label>
+                  {editingAsset.status === 'ISSUED' ? (
+                    <div className="mt-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+                      Issued to student
+                    </div>
+                  ) : (
+                    <select
+                      value={editAssetStatus}
+                      onChange={(e) => setEditAssetStatus(e.target.value as AssetStatus)}
+                      className="idea-input mt-1 p-2.5 text-xs w-full"
+                    >
+                      {EDITABLE_STATUSES.map((status) => (
+                        <option key={status} value={status}>
+                          {getStatusLabel(status)}
+                        </option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Location
+                  </label>
+                  <select
+                    value={editAssetLocationId}
+                    onChange={(e) => setEditAssetLocationId(e.target.value)}
+                    className="idea-input mt-1 p-2.5 text-xs w-full"
+                    disabled={editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED'}
                   >
-                    {EDITABLE_STATUSES.map((status) => (
-                      <option key={status} value={status}>
-                        {getStatusLabel(status)}
+                    <option value="" disabled>
+                      {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
+                    </option>
+                    {locations.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
                       </option>
                     ))}
                   </select>
-                )}
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Location
-                </label>
-                <select
-                  value={editAssetLocationId}
-                  onChange={(e) => setEditAssetLocationId(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs w-full"
-                  disabled={editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED'}
-                >
-                  <option value="" disabled>
-                    {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
-                  </option>
-                  {locations.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
-                    </option>
-                  ))}
-                </select>
-                {(editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED') && (
-                  <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
-                    Location is cleared automatically for this status.
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Inspection Notes
-                </label>
-                <input
-                  type="text"
-                  value={editAssetNotes}
-                  onChange={(e) => setEditAssetNotes(e.target.value)}
-                  placeholder="e.g. Minor cosmetic scratch on body"
-                  className="idea-input mt-1 p-2.5 text-xs w-full"
-                />
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <button
-                  type="button"
-                  onClick={closeEditAssetModal}
-                  disabled={editAssetSaving}
-                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editAssetSaving}
-                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50"
-                >
-                  {editAssetSaving ? 'Saving…' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Add Asset Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
-            <h3 className="font-bold text-[var(--color-idea-text)] text-lg border-b border-[var(--color-idea-border)] pb-2">
-              Add Asset
-            </h3>
-
-            <form onSubmit={handleAddAssetSubmit} className="space-y-3">
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Asset Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="e.g. Soldering Station 01"
-                  value={newAssetName}
-                  onChange={(e) => setNewAssetName(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs w-full"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Asset Status
-                </label>
-                <div className="mt-1 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-3 py-2 text-xs font-semibold text-[var(--color-idea-text)]">
-                  Available
+                  {(editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED') && (
+                    <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
+                      Location is cleared automatically for this status.
+                    </p>
+                  )}
                 </div>
-              </div>
 
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Location
-                </label>
-                <select
-                  value={newLocationId}
-                  onChange={(e) => setNewLocationId(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs w-full"
-                  required
-                >
-                  <option value="" disabled>
-                    {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
-                  </option>
-                  {locations.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Inspection Notes
+                  </label>
+                  <input
+                    type="text"
+                    value={editAssetNotes}
+                    onChange={(e) => setEditAssetNotes(e.target.value)}
+                    placeholder="e.g. Minor cosmetic scratch on body"
+                    className="idea-input mt-1 p-2.5 text-xs w-full"
+                  />
+                </div>
 
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Inspection Notes
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Fresh batch sealed in box"
-                  value={newNotes}
-                  onChange={(e) => setNewNotes(e.target.value)}
-                  className="idea-input mt-1 p-2.5 text-xs w-full"
-                />
-              </div>
-
-              <div className="pt-2 flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
-                >
-                  Cancel
-                </button>
-
-                <button
-                  type="submit"
-                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
-                >
-                  Add Asset
-                </button>
-              </div>
-            </form>
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={closeEditAssetModal}
+                    disabled={editAssetSaving}
+                    className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={editAssetSaving}
+                    className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50"
+                  >
+                    {editAssetSaving ? 'Saving…' : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Add Asset Modal */}
+        {showAddModal && (
+          <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
+              <h3 className="font-bold text-[var(--color-idea-text)] text-lg border-b border-[var(--color-idea-border)] pb-2">
+                Add Asset
+              </h3>
+
+              <form onSubmit={handleAddAssetSubmit} className="space-y-3">
+                <div>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Asset Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    autoFocus
+                    placeholder="e.g. Soldering Station 01"
+                    value={newAssetName}
+                    onChange={(e) => setNewAssetName(e.target.value)}
+                    className="idea-input mt-1 p-2.5 text-xs w-full"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Asset Status
+                  </label>
+                  <div className="mt-1 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-3 py-2 text-xs font-semibold text-[var(--color-idea-text)]">
+                    Available
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Location
+                  </label>
+                  <select
+                    value={newLocationId}
+                    onChange={(e) => setNewLocationId(e.target.value)}
+                    className="idea-input mt-1 p-2.5 text-xs w-full"
+                    required
+                  >
+                    <option value="" disabled>
+                      {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
+                    </option>
+                    {locations.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                    Inspection Notes
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Fresh batch sealed in box"
+                    value={newNotes}
+                    onChange={(e) => setNewNotes(e.target.value)}
+                    className="idea-input mt-1 p-2.5 text-xs w-full"
+                  />
+                </div>
+
+                <div className="pt-2 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddModal(false)}
+                    className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
+                  >
+                    Add Asset
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

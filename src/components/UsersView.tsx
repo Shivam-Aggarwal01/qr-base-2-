@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
-import { Search, Trash2, Pencil, Check, X } from 'lucide-react';
+import { Search, Pencil, Trash2, Check, X } from 'lucide-react';
 import { User, Asset, CatalogItem, AccountRequest, Request } from '../types/inventory';
-
 interface UsersViewProps {
   users: User[];
   assets: Asset[];
@@ -15,12 +14,7 @@ interface UsersViewProps {
   onReviewAccountRequest?: (requestId: string, status: 'APPROVED' | 'REJECTED') => Promise<void>;
   onRefreshData: () => void;
 }
-type LoanGroup = {
-  catalogItemId: string;
-  quantity: number;
-  assetCodes: string[];
-};
-
+type LoanGroup = { catalogItemId: string; quantity: number; assetCodes: string[] };
 const EDITABLE_ROLES: User['role'][] = ['STUDENT', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR'];
 const ACTIVE_ASSET_STATUSES = new Set([
   'ISSUED',
@@ -32,7 +26,6 @@ const ACTIVE_ASSET_STATUSES = new Set([
   'OUT',
   'ASSIGNED',
 ]);
-
 export const UsersView: React.FC<UsersViewProps> = ({
   users,
   assets,
@@ -45,67 +38,40 @@ export const UsersView: React.FC<UsersViewProps> = ({
   accountRequests = [],
   onReviewAccountRequest,
 }) => {
-  // ---------------------------------------------------------------------------
-  // State
-  // ---------------------------------------------------------------------------
   const [searchFilter, setSearchFilter] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editingRole, setEditingRole] = useState<User['role']>('STUDENT');
   const [savingUserId, setSavingUserId] = useState<string | null>(null);
   const [reviewingId, setReviewingId] = useState<string | null>(null);
-
-  // ---------------------------------------------------------------------------
-  // Derived state
-  // ---------------------------------------------------------------------------
   const isAdmin = userRole === 'ADMIN';
   const pendingAccountRequests = accountRequests.filter((request) => request.status === 'PENDING');
   const searchQuery = searchFilter.trim().toLowerCase();
   const filteredUsers = users.filter((user) => {
-    if (!searchQuery) {
-      return true;
-    }
+    if (!searchQuery) return true;
     return user.name.toLowerCase().includes(searchQuery) || user.email.toLowerCase().includes(searchQuery);
   });
-
-  // ---------------------------------------------------------------------------
-  // Role helpers
-  // ---------------------------------------------------------------------------
-  const getRoleBadge = (role: User['role']) => {
-    switch (role) {
-      case 'ADMIN':
-        return 'bg-[rgba(10,174,240,0.12)] text-[var(--color-idea-deep-blue)] border border-[var(--color-idea-blue)]/30';
-      case 'STUDENT_AMBASSADOR':
-        return 'bg-[rgba(133,180,64,0.12)] text-[#3d6b10] border border-[var(--color-idea-green)]/30';
-      case 'STUDENT_LEAD':
-        return 'bg-[rgba(255,202,8,0.15)] text-[#7a5e00] border border-[var(--color-idea-yellow)]/40';
-      case 'STUDENT':
-      default:
-        return 'bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] border border-[var(--color-idea-border)]';
-    }
-  };
-
   const getRoleName = (role: User['role']) => {
     switch (role) {
       case 'ADMIN':
-        return 'ADMIN';
+        return 'Administrator';
       case 'STUDENT_AMBASSADOR':
-        return 'STUDENT AMBASSADOR';
+        return 'Student Ambassador';
       case 'STUDENT_LEAD':
-        return 'STUDENT LEAD';
+        return 'Student Lead';
       case 'STUDENT':
-        return 'STUDENT';
+        return 'Student';
       default:
-        return (role as string).replace(/_/g, ' ');
+        return String(role).replace(/_/g, ' ');
     }
   };
-
-  // ---------------------------------------------------------------------------
-  // User editing
-  // ---------------------------------------------------------------------------
-  const startEditing = (user: User) => {
-    if (user.role === 'ADMIN') {
-      return;
+  const getRoleBadge = (role: User['role']) => {
+    if (role === 'ADMIN') {
+      return 'bg-[var(--color-idea-deep-blue)] text-white border-[var(--color-idea-deep-blue)]';
     }
+    return 'bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] border-[var(--color-idea-border)]';
+  };
+  const startEditing = (user: User) => {
+    if (user.role === 'ADMIN') return;
     setEditingUserId(user.id);
     setEditingRole(user.role);
   };
@@ -114,9 +80,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
     setEditingRole('STUDENT');
   };
   const saveRole = async (user: User) => {
-    if (!onUpdateUserRole) {
-      return;
-    }
+    if (!onUpdateUserRole) return;
     if (user.role === 'ADMIN') {
       window.alert('Admin users cannot have their role changed.');
       return;
@@ -139,14 +103,8 @@ export const UsersView: React.FC<UsersViewProps> = ({
       setSavingUserId(null);
     }
   };
-
-  // ---------------------------------------------------------------------------
-  // User deletion
-  // ---------------------------------------------------------------------------
   const handleDeleteUser = async (user: User) => {
-    if (!onDeleteUser) {
-      return;
-    }
+    if (!onDeleteUser) return;
     if (user.id === activeUser?.id) {
       window.alert('You cannot delete your own account.');
       return;
@@ -155,8 +113,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
       window.alert('Admin accounts cannot be removed from the directory.');
       return;
     }
-    const confirmed = window.confirm(`Are you sure you want to remove ${user.name}?`);
-    if (!confirmed) {
+    if (!window.confirm(`Are you sure you want to remove ${user.name}?`)) {
       return;
     }
     try {
@@ -165,21 +122,11 @@ export const UsersView: React.FC<UsersViewProps> = ({
       console.error('Failed to delete user:', error);
     }
   };
-
-  // ---------------------------------------------------------------------------
-  // Account request review
-  // ---------------------------------------------------------------------------
   const reviewRequest = async (request: AccountRequest, status: 'APPROVED' | 'REJECTED') => {
-    if (!onReviewAccountRequest) {
-      return;
-    }
+    if (!onReviewAccountRequest) return;
     const message =
-      status === 'APPROVED'
-        ? `Approve account for ${request.name}? They will be able to sign in as a student.`
-        : `Decline account request for ${request.name}?`;
-    if (!window.confirm(message)) {
-      return;
-    }
+      status === 'APPROVED' ? `Approve account for ${request.name}?` : `Decline account request for ${request.name}?`;
+    if (!window.confirm(message)) return;
     try {
       setReviewingId(request.id);
       await onReviewAccountRequest(request.id, status);
@@ -190,22 +137,16 @@ export const UsersView: React.FC<UsersViewProps> = ({
       setReviewingId(null);
     }
   };
-
-  // ---------------------------------------------------------------------------
-  // Asset helpers
-  // ---------------------------------------------------------------------------
-  const isActiveAsset = (asset: Asset) => {
-    const status = String(asset.status ?? '')
-      .trim()
-      .toUpperCase();
-    return ACTIVE_ASSET_STATUSES.has(status);
-  };
+  const isActiveAsset = (asset: Asset) =>
+    ACTIVE_ASSET_STATUSES.has(
+      String(asset.status ?? '')
+        .trim()
+        .toUpperCase()
+    );
   const getUserLoans = (user: User): LoanGroup[] => {
     const loanGroups = new Map<string, LoanGroup>();
     const addLoan = (catalogItemId: string, quantity: number, assetCode?: string) => {
-      if (!catalogItemId || quantity <= 0) {
-        return;
-      }
+      if (!catalogItemId || quantity <= 0) return;
       const existing = loanGroups.get(catalogItemId);
       if (existing) {
         existing.quantity += quantity;
@@ -214,275 +155,303 @@ export const UsersView: React.FC<UsersViewProps> = ({
         }
         return;
       }
-      loanGroups.set(catalogItemId, {
-        catalogItemId,
-        quantity,
-        assetCodes: assetCode ? [assetCode] : [],
-      });
+      loanGroups.set(catalogItemId, { catalogItemId, quantity, assetCodes: assetCode ? [assetCode] : [] });
     };
-    // Physical assets currently assigned to the user.
     assets
-      .filter((asset) => {
-        const assignedUserId = String(asset.assigned_to_user_id ?? '').trim();
-        return assignedUserId === String(user.id).trim() && isActiveAsset(asset);
-      })
-      .forEach((asset) => {
-        const catalogItemId = String(asset.catalog_item_id ?? '').trim();
-        addLoan(catalogItemId, 1, asset.asset_code ? String(asset.asset_code) : undefined);
-      });
-
-    // Reusable consumables/equipment issued through completed requests.
+      .filter(
+        (asset) => String(asset.assigned_to_user_id ?? '').trim() === String(user.id).trim() && isActiveAsset(asset)
+      )
+      .forEach((asset) =>
+        addLoan(String(asset.catalog_item_id ?? '').trim(), 1, asset.asset_code ? String(asset.asset_code) : undefined)
+      );
     requests
       .filter((request) => request.user_id === user.id && request.status === 'HANDED_OVER')
       .forEach((request) => {
         (request.items ?? [])
           .filter((item) => !item.asset_id && item.usage === 'REUSABLE')
-          .forEach((item) => {
-            const catalogItemId = String(item.catalog_item_id ?? '').trim();
-            const quantity = Number(item.requested_qty) || 0;
-            addLoan(catalogItemId, quantity);
-          });
+          .forEach((item) => addLoan(String(item.catalog_item_id ?? '').trim(), Number(item.requested_qty) || 0));
       });
     return Array.from(loanGroups.values());
   };
-
-  const getCatalogItem = (catalogItemId: string) => {
-    return catalogItems.find(
+  const getCatalogItem = (catalogItemId: string) =>
+    catalogItems.find(
       (item) => String(item.id).trim() === catalogItemId || String(item.item_code).trim() === catalogItemId
     );
-  };
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
-      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Standard Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
+      {' '}
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6">
+        {' '}
+        {/* Header */}{' '}
+        <div className="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-5">
+          {' '}
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-blue)]">
-                IDEA Lab · Directory
-              </span>
-            </div>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
-              Members
-            </h1>
-            <p className="mt-1 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
-              Manage member roles, permissions, and pending approvals.
-            </p>
-          </div>
-
-          <div className="relative w-full sm:w-72 shrink-0">
-            <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            {' '}
+            <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-[var(--color-idea-text)]">
+              {' '}
+              Directory{' '}
+            </h1>{' '}
+            <p className="mt-1.5 text-sm text-[var(--color-idea-muted)]">
+              {' '}
+              Manage laboratory members, roles, and access.{' '}
+            </p>{' '}
+          </div>{' '}
+          <div className="relative w-full lg:w-80">
+            {' '}
+            <Search className=" absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--color-idea-muted)] pointer-events-none " />{' '}
             <input
               type="text"
               value={searchFilter}
               onChange={(event) => setSearchFilter(event.target.value)}
-              placeholder="Search members by name or email…"
-              className="idea-input w-full pl-9 pr-4 py-2 text-xs sm:text-sm"
-            />
-          </div>
-        </div>
-
-      {/* Pending account requests */}
-      {isAdmin && pendingAccountRequests.length > 0 && (
-        <div className="idea-card p-5 mt-5 space-y-4">
-          <div>
-            <p className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
-              Approval Requests
-            </p>
-            <h3 className="text-lg font-bold text-[var(--color-idea-text)] mt-1">Students waiting for approval</h3>
-          </div>
-          <div className="space-y-3">
-            {pendingAccountRequests.map((request) => {
-              const isReviewing = reviewingId === request.id;
-              return (
-                <div
-                  key={request.id}
-                  className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-[var(--color-idea-border)] p-4"
-                >
-                  <div className="min-w-0">
-                    <p className="font-bold text-[var(--color-idea-text)] truncate">{request.name}</p>
-                    <p className="text-xs text-[var(--color-idea-muted)] truncate">{request.email}</p>
+              placeholder="Search members..."
+              className=" w-full pl-9 pr-4 py-2.5 bg-white border border-[var(--color-idea-border)] rounded-xl text-sm text-[var(--color-idea-text)] placeholder:text-[var(--color-idea-muted)] outline-none transition focus:border-[var(--color-idea-blue)] focus:ring-2 focus:ring-[var(--color-idea-blue)]/10 "
+            />{' '}
+          </div>{' '}
+        </div>{' '}
+        {/* Pending Account Requests */}{' '}
+        {isAdmin && pendingAccountRequests.length > 0 && (
+          <section className=" bg-white border border-[var(--color-idea-border)] rounded-2xl overflow-hidden ">
+            {' '}
+            <div className="px-5 py-4 border-b border-[var(--color-idea-border)]">
+              {' '}
+              <div className="flex items-center justify-between gap-3">
+                {' '}
+                <div>
+                  {' '}
+                  <h2 className="text-sm font-semibold text-[var(--color-idea-text)]"> Pending Approvals </h2>{' '}
+                  <p className="mt-0.5 text-xs text-[var(--color-idea-muted)]">
+                    {' '}
+                    Review requests for new laboratory members.{' '}
+                  </p>{' '}
+                </div>{' '}
+                <span className=" min-w-7 h-7 px-2 rounded-lg flex items-center justify-center bg-[var(--color-idea-light-grey)] border border-[var(--color-idea-border)] text-xs font-semibold text-[var(--color-idea-text)] ">
+                  {' '}
+                  {pendingAccountRequests.length}{' '}
+                </span>{' '}
+              </div>{' '}
+            </div>{' '}
+            <div className="divide-y divide-[var(--color-idea-border)]">
+              {' '}
+              {pendingAccountRequests.map((request) => {
+                const isReviewing = reviewingId === request.id;
+                return (
+                  <div
+                    key={request.id}
+                    className=" px-5 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 "
+                  >
+                    {' '}
+                    <div className="min-w-0">
+                      {' '}
+                      <p className="text-sm font-medium text-[var(--color-idea-text)] truncate">
+                        {' '}
+                        {request.name}{' '}
+                      </p>{' '}
+                      <p className="mt-0.5 text-xs text-[var(--color-idea-muted)] truncate"> {request.email} </p>{' '}
+                    </div>{' '}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {' '}
+                      <button
+                        type="button"
+                        disabled={isReviewing}
+                        onClick={() => reviewRequest(request, 'REJECTED')}
+                        className=" inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-idea-border)] bg-white text-xs font-medium text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 "
+                      >
+                        {' '}
+                        <X className="w-3.5 h-3.5" /> Decline{' '}
+                      </button>{' '}
+                      <button
+                        type="button"
+                        disabled={isReviewing}
+                        onClick={() => reviewRequest(request, 'APPROVED')}
+                        className=" inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--color-idea-blue)] text-white text-xs font-medium hover:brightness-95 transition disabled:opacity-50 "
+                      >
+                        {' '}
+                        <Check className="w-3.5 h-3.5" /> Approve{' '}
+                      </button>{' '}
+                    </div>{' '}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      disabled={isReviewing}
-                      onClick={() => reviewRequest(request, 'REJECTED')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold idea-error cursor-pointer disabled:opacity-50"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                      Decline
-                    </button>
-                    <button
-                      type="button"
-                      disabled={isReviewing}
-                      onClick={() => reviewRequest(request, 'APPROVED')}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--color-idea-blue)] text-white cursor-pointer disabled:opacity-50"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      Approve
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* User grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-10">
-        {filteredUsers.map((user) => {
-          const userLoans = getUserLoans(user);
-          const activeLoanCount = userLoans.reduce((total, loan) => total + loan.quantity, 0);
-          const isEditing = editingUserId === user.id;
-          const isSaving = savingUserId === user.id;
-          const isCurrentUser = user.id === activeUser?.id;
-          const isUserAdmin = user.role === 'ADMIN';
-          return (
-            <div key={user.id} className="idea-card p-6 flex flex-col justify-between space-y-4">
-              {/* User details */}
-              <div className="space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <h3 className="font-bold text-[var(--color-idea-text)] text-base truncate">{user.name}</h3>
-                    <p className="text-xs text-[var(--color-idea-muted)] mt-0.5 truncate">{user.email}</p>
-                  </div>
-                  {isEditing ? (
-                    <select
-                      value={editingRole}
-                      onChange={(event) => setEditingRole(event.target.value as User['role'])}
-                      className={`shrink-0 text-[10px] py-1.5 rounded-full font-bold uppercase tracking-wider outline-none cursor-pointer ${getRoleBadge(
-                        editingRole
-                      )}`}
-                    >
-                      {EDITABLE_ROLES.map((role) => (
-                        <option key={role} value={role}>
-                          {getRoleName(role)}
-                        </option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span
-                      className={`shrink-0 text-[10px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider ${getRoleBadge(
-                        user.role
-                      )}`}
-                    >
-                      {getRoleName(user.role)}
-                    </span>
-                  )}
-                </div>
-                {/* Active loans */}
-                <div className="pt-3 border-t border-[var(--color-idea-border)]">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-[var(--color-idea-muted)] uppercase tracking-widest">
-                      Items Assigned
-                    </span>
-                    <span className="text-xs font-bold font-mono text-[var(--color-idea-text)]">
-                      {activeLoanCount} {activeLoanCount === 1 ? 'item' : 'items'}
-                    </span>
-                  </div>
-                  {/* Loan list */}
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto">
-                    {userLoans.length === 0 ? (
-                      <p className="text-xs text-[var(--color-idea-muted)] italic">No items assigned yet.</p>
+                );
+              })}{' '}
+            </div>{' '}
+          </section>
+        )}{' '}
+        {/* User Cards */}{' '}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {' '}
+          {filteredUsers.map((user) => {
+            const userLoans = getUserLoans(user);
+            const activeLoanCount = userLoans.reduce((total, loan) => total + loan.quantity, 0);
+            const isEditing = editingUserId === user.id;
+            const isSaving = savingUserId === user.id;
+            const isCurrentUser = user.id === activeUser?.id;
+            const isUserAdmin = user.role === 'ADMIN';
+            return (
+              <article
+                key={user.id}
+                className=" bg-white border border-[var(--color-idea-border)] rounded-2xl overflow-hidden transition hover:border-[var(--color-idea-blue)]/40 hover:shadow-sm "
+              >
+                {' '}
+                {/* User Header */}{' '}
+                <div className="p-5">
+                  {' '}
+                  <div className="flex items-start justify-between gap-3">
+                    {' '}
+                    <div className="min-w-0">
+                      {' '}
+                      <h3 className="text-sm font-semibold text-[var(--color-idea-text)] truncate">
+                        {' '}
+                        {user.name}{' '}
+                      </h3>{' '}
+                      <p className="mt-1 text-xs text-[var(--color-idea-muted)] truncate"> {user.email} </p>{' '}
+                    </div>{' '}
+                    {isEditing ? (
+                      <select
+                        value={editingRole}
+                        onChange={(event) => setEditingRole(event.target.value as User['role'])}
+                        className=" shrink-0 max-w-[145px] px-2.5 py-1.5 rounded-lg bg-white border border-[var(--color-idea-border)] text-[11px] font-medium text-[var(--color-idea-text)] outline-none focus:border-[var(--color-idea-blue)] "
+                      >
+                        {' '}
+                        {EDITABLE_ROLES.map((role) => (
+                          <option key={role} value={role}>
+                            {' '}
+                            {getRoleName(role)}{' '}
+                          </option>
+                        ))}{' '}
+                      </select>
                     ) : (
-                      userLoans.map((loan) => {
-                        const catalogItem = getCatalogItem(loan.catalogItemId);
-                        return (
-                          <div
-                            key={loan.catalogItemId}
-                            className="p-2.5 idea-gradient-soft border border-[var(--color-idea-blue)]/20 rounded-xl"
-                          >
-                            <div className="flex items-center justify-between gap-3">
-                              <span className="font-bold text-[var(--color-idea-text)] truncate">
-                                {catalogItem?.name ?? 'Unknown Item'}
-                              </span>
-                              <span className="shrink-0 min-w-[32px] text-center px-2 py-1 rounded-lg bg-[rgba(10,174,240,0.10)] text-[var(--color-idea-blue)] font-mono font-bold text-xs">
-                                {loan.quantity}
-                              </span>
+                      <span
+                        className={` shrink-0 px-2.5 py-1 rounded-lg border text-[10px] font-medium whitespace-nowrap ${getRoleBadge(user.role)} `}
+                      >
+                        {' '}
+                        {getRoleName(user.role)}{' '}
+                      </span>
+                    )}{' '}
+                  </div>{' '}
+                </div>{' '}
+                {/* Assigned Items */}{' '}
+                <div className="px-5 pb-5">
+                  {' '}
+                  <div className="border-t border-[var(--color-idea-border)] pt-4">
+                    {' '}
+                    <div className="flex items-center justify-between mb-3">
+                      {' '}
+                      <span className="text-[10px] font-semibold text-[var(--color-idea-muted)] uppercase tracking-wider">
+                        {' '}
+                        Assigned Items{' '}
+                      </span>{' '}
+                      <span className="text-xs font-semibold text-[var(--color-idea-text)]">
+                        {' '}
+                        {activeLoanCount}{' '}
+                      </span>{' '}
+                    </div>{' '}
+                    {userLoans.length === 0 ? (
+                      <div className="py-3 px-3 rounded-xl bg-[var(--color-idea-light-grey)]/50">
+                        {' '}
+                        <p className="text-xs text-[var(--color-idea-muted)]"> No equipment assigned </p>{' '}
+                      </div>
+                    ) : (
+                      <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                        {' '}
+                        {userLoans.map((loan) => {
+                          const catalogItem = getCatalogItem(loan.catalogItemId);
+                          return (
+                            <div
+                              key={loan.catalogItemId}
+                              className=" flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-[var(--color-idea-light-grey)]/50 "
+                            >
+                              {' '}
+                              <span className="text-xs font-medium text-[var(--color-idea-text)] truncate">
+                                {' '}
+                                {catalogItem?.name ?? 'Unknown Item'}{' '}
+                              </span>{' '}
+                              <span className="shrink-0 text-xs font-semibold text-[var(--color-idea-muted)]">
+                                {' '}
+                                {loan.quantity}×{' '}
+                              </span>{' '}
                             </div>
-                            {loan.assetCodes.length > 0 && (
-                              <div className="mt-1.5 text-[10px] text-[var(--color-idea-muted)] font-mono">
-                                {loan.assetCodes.join(' • ')}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
-                    )}
+                          );
+                        })}{' '}
+                      </div>
+                    )}{' '}
+                  </div>{' '}
+                </div>{' '}
+                {/* Actions */}{' '}
+                {isAdmin && (
+                  <div className=" px-5 py-3.5 border-t border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/30 ">
+                    {' '}
+                    {isEditing ? (
+                      <div className="flex items-center justify-end gap-2">
+                        {' '}
+                        <button
+                          type="button"
+                          onClick={cancelEditing}
+                          disabled={isSaving}
+                          className=" inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-idea-border)] bg-white text-xs font-medium text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 "
+                        >
+                          {' '}
+                          <X className="w-3.5 h-3.5" /> Cancel{' '}
+                        </button>{' '}
+                        <button
+                          type="button"
+                          onClick={() => saveRole(user)}
+                          disabled={isSaving}
+                          className=" inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-[var(--color-idea-blue)] text-white text-xs font-medium hover:brightness-95 transition disabled:opacity-50 "
+                        >
+                          {' '}
+                          <Check className="w-3.5 h-3.5" /> {isSaving ? 'Saving...' : 'Save'}{' '}
+                        </button>{' '}
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between gap-2">
+                        {' '}
+                        <span className="text-[10px] text-[var(--color-idea-muted)]">
+                          {' '}
+                          {isCurrentUser ? 'Current account' : isUserAdmin ? 'Administrator' : 'Member'}{' '}
+                        </span>{' '}
+                        <div className="flex items-center gap-2">
+                          {' '}
+                          {!isUserAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => startEditing(user)}
+                              className=" inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[var(--color-idea-border)] bg-white text-xs font-medium text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors "
+                            >
+                              {' '}
+                              <Pencil className="w-3.5 h-3.5" /> Edit{' '}
+                            </button>
+                          )}{' '}
+                          {!isCurrentUser && !isUserAdmin && (
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteUser(user)}
+                              className=" inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-red-200 bg-white text-xs font-medium text-[var(--color-idea-red)] hover:bg-red-50 transition-colors "
+                            >
+                              {' '}
+                              <Trash2 className="w-3.5 h-3.5" /> Remove{' '}
+                            </button>
+                          )}{' '}
+                        </div>{' '}
+                      </div>
+                    )}{' '}
                   </div>
-                </div>
-              </div>
-              {/* Admin actions */}
-              {isAdmin && (
-                <div className="pt-3 border-t border-[var(--color-idea-border)] flex items-center justify-end gap-2">
-                  {isEditing ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={cancelEditing}
-                        disabled={isSaving}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[var(--color-idea-muted)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                        Cancel
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => saveRole(user)}
-                        disabled={isSaving}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--color-idea-blue)] text-white hover:opacity-90 transition-opacity cursor-pointer disabled:opacity-50"
-                      >
-                        <Check className="w-3.5 h-3.5" />
-                        {isSaving ? 'Saving...' : 'Save'}
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      {!isUserAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => startEditing(user)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-[var(--color-idea-blue)] border border-[var(--color-idea-blue)]/20 hover:bg-[rgba(10,174,240,0.08)] transition-colors cursor-pointer"
-                        >
-                          <Pencil className="w-3.5 h-3.5" />
-                          Edit
-                        </button>
-                      )}
-                      {!isCurrentUser && !isUserAdmin && (
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteUser(user)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 idea-error rounded-xl text-xs font-bold transition-colors cursor-pointer hover:opacity-80"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          Remove
-                        </button>
-                      )}
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Empty state */}
-      {filteredUsers.length === 0 && (
-        <div className="idea-card p-10 text-center">
-          <p className="text-sm font-bold text-[var(--color-idea-text)]">No users found</p>
-          <p className="text-xs text-[var(--color-idea-muted)] mt-1">
-            Try searching with a different name or user code.
-          </p>
-        </div>
-      )}
-      </div>
+                )}{' '}
+              </article>
+            );
+          })}{' '}
+        </div>{' '}
+        {/* Empty State */}{' '}
+        {filteredUsers.length === 0 && (
+          <div className=" bg-white border border-[var(--color-idea-border)] rounded-2xl py-14 px-6 text-center ">
+            {' '}
+            <div className=" w-10 h-10 mx-auto rounded-xl bg-[var(--color-idea-light-grey)] flex items-center justify-center mb-3 ">
+              {' '}
+              <Search className="w-5 h-5 text-[var(--color-idea-muted)]" />{' '}
+            </div>{' '}
+            <p className="text-sm font-semibold text-[var(--color-idea-text)]"> No members found </p>{' '}
+            <p className="mt-1 text-xs text-[var(--color-idea-muted)]"> Try a different name or email. </p>{' '}
+          </div>
+        )}{' '}
+      </div>{' '}
     </div>
   );
 };

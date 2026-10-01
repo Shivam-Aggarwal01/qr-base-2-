@@ -41,7 +41,9 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose,
         }
       } catch (err: any) {
         console.warn('Camera access error:', err);
-        setCameraError('Camera access denied or unavailable in this environment. You can enter a code manually or upload a picture.');
+        setCameraError(
+          'Camera access denied or unavailable in this environment. You can enter a code manually or upload a picture.'
+        );
       }
     }
 

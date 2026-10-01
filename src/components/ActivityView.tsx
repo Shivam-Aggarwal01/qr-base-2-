@@ -10,14 +10,7 @@ import {
   SlidersHorizontal,
   ScrollText,
 } from 'lucide-react';
-import {
-  InventoryTransaction,
-  CatalogItem,
-  Asset,
-  Location,
-  User,
-  TransactionType,
-} from '../types/inventory';
+import { InventoryTransaction, CatalogItem, Asset, Location, User, TransactionType } from '../types/inventory';
 
 interface ActivityViewProps {
   transactions: InventoryTransaction[];
@@ -25,19 +18,12 @@ interface ActivityViewProps {
   assets: Asset[];
   locations: Location[];
   users: User[];
-  onOpenQRGenerator: (
-    code: string,
-    title: string,
-    subtitle?: string
-  ) => void;
+  onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
 }
 
 type FilterType = TransactionType | 'ALL';
 
-const TYPE_CONFIG: Record<
-  string,
-  { label: string; icon: React.ReactNode; badge: string }
-> = {
+const TYPE_CONFIG: Record<string, { label: string; icon: React.ReactNode; badge: string }> = {
   RECEIVE: {
     label: 'Stock In',
     icon: <ArrowDownToLine className="w-3.5 h-3.5" />,
@@ -75,15 +61,7 @@ const TYPE_CONFIG: Record<
   },
 };
 
-const FILTER_TABS: FilterType[] = [
-  'ALL',
-  'RECEIVE',
-  'ISSUE',
-  'RETURN',
-  'MOVE',
-  'DAMAGE',
-  'ADJUSTMENT',
-];
+const FILTER_TABS: FilterType[] = ['ALL', 'RECEIVE', 'ISSUE', 'RETURN', 'MOVE', 'DAMAGE', 'ADJUSTMENT'];
 
 const formatDateTime = (iso: string) => {
   const date = new Date(iso);
@@ -97,21 +75,13 @@ const formatDateTime = (iso: string) => {
   };
 };
 
-export const ActivityView: React.FC<ActivityViewProps> = ({
-  transactions,
-  catalogItems,
-  assets,
-  locations,
-  users,
-}) => {
+export const ActivityView: React.FC<ActivityViewProps> = ({ transactions, catalogItems, assets, locations, users }) => {
   const [typeFilter, setTypeFilter] = useState<FilterType>('ALL');
   const [searchFilter, setSearchFilter] = useState('');
 
   const findCatalogItem = (tx: InventoryTransaction) => {
     if (!tx.catalog_item_id) return undefined;
-    return catalogItems.find(
-      (item) => item.id === tx.catalog_item_id || item.item_code === tx.catalog_item_id
-    );
+    return catalogItems.find((item) => item.id === tx.catalog_item_id || item.item_code === tx.catalog_item_id);
   };
 
   const findAsset = (tx: InventoryTransaction) => {
@@ -120,9 +90,7 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
   };
 
   const findPerformer = (tx: InventoryTransaction) =>
-    users.find(
-      (user) => user.id === tx.processed_by_user_id || user.id === tx.issued_to_user_id
-    );
+    users.find((user) => user.id === tx.processed_by_user_id || user.id === tx.issued_to_user_id);
 
   const filteredTxs = transactions.filter((tx) => {
     if (typeFilter !== 'ALL' && tx.transaction_type !== typeFilter) return false;
@@ -145,9 +113,7 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
   });
 
   const tabCount = (type: FilterType) =>
-    type === 'ALL'
-      ? transactions.length
-      : transactions.filter((tx) => tx.transaction_type === type).length;
+    type === 'ALL' ? transactions.length : transactions.filter((tx) => tx.transaction_type === type).length;
 
   // Single compact "movement" string instead of a dedicated Details column.
   const renderMovement = (
@@ -162,15 +128,9 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
       case 'ISSUE':
         return recipient ? `To ${recipient.name}` : fromLocation ? `From ${fromLocation.name}` : '—';
       case 'RETURN':
-        return recipient?.name
-          ? `From ${recipient.name}`
-          : fromLocation
-            ? `From ${fromLocation.name}`
-            : '—';
+        return recipient?.name ? `From ${recipient.name}` : fromLocation ? `From ${fromLocation.name}` : '—';
       case 'MOVE':
-        return fromLocation && toLocation
-          ? `${fromLocation.name} → ${toLocation.name}`
-          : '—';
+        return fromLocation && toLocation ? `${fromLocation.name} → ${toLocation.name}` : '—';
       case 'DAMAGE':
       case 'DISPOSAL':
         return fromLocation ? `at ${fromLocation.name}` : tx.remarks || '—';
@@ -216,18 +176,20 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
                     type="button"
                     aria-pressed={active}
                     onClick={() => setTypeFilter(type)}
-                    className={`inline-flex items-center gap-1.5 shrink-0 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)] ${active
+                    className={`inline-flex items-center gap-1.5 shrink-0 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)] ${
+                      active
                         ? 'bg-[var(--color-idea-blue)] text-white border-[var(--color-idea-blue)]'
                         : 'bg-white text-[var(--color-idea-muted)] border-[var(--color-idea-border)] hover:text-[var(--color-idea-text)] hover:border-[var(--color-idea-blue)]/40'
-                      }`}
+                    }`}
                   >
                     {type !== 'ALL' && config?.icon}
-                    <span>{type === 'ALL' ? 'All Activity' : config?.label ?? type}</span>
+                    <span>{type === 'ALL' ? 'All Activity' : (config?.label ?? type)}</span>
                     <span
-                      className={`min-w-5 text-center text-[9px] font-bold px-1.5 py-0.5 rounded-full ${active
+                      className={`min-w-5 text-center text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                        active
                           ? 'bg-white/20 text-white'
                           : 'bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)]'
-                        }`}
+                      }`}
                     >
                       {count}
                     </span>
@@ -309,8 +271,9 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
                       <div className="hidden md:grid grid-cols-[110px_90px_1fr_170px] gap-4 items-center">
                         {/* Activity */}
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-bold uppercase tracking-wide whitespace-nowrap w-fit ${config?.badge ?? 'bg-gray-50 text-gray-500 border-gray-100'
-                            }`}
+                          className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-bold uppercase tracking-wide whitespace-nowrap w-fit ${
+                            config?.badge ?? 'bg-gray-50 text-gray-500 border-gray-100'
+                          }`}
                         >
                           {config?.icon}
                           {config?.label ?? tx.transaction_type}
@@ -325,18 +288,14 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
                         {/* Item & Movement combined */}
                         <div className="min-w-0 flex items-baseline gap-2">
                           <div className="min-w-0">
-                            <span className="text-xs font-semibold text-[var(--color-idea-text)]">
-                              {displayName}
-                            </span>
+                            <span className="text-xs font-semibold text-[var(--color-idea-text)]">{displayName}</span>
                             {qty !== null && (
                               <span className="text-[9px] font-mono text-[var(--color-idea-muted)] ml-1.5">
                                 ×{qty}
                                 {!isAssetTransaction && catalogItem?.unit ? ` ${catalogItem.unit}` : ''}
                               </span>
                             )}
-                            <p className="text-[10px] text-[var(--color-idea-muted)] truncate mt-0.5">
-                              {movement}
-                            </p>
+                            <p className="text-[10px] text-[var(--color-idea-muted)] truncate mt-0.5">{movement}</p>
                           </div>
                         </div>
 
@@ -357,8 +316,9 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
                       <div className="md:hidden space-y-2">
                         <div className="flex items-start justify-between gap-3">
                           <span
-                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${config?.badge ?? 'bg-gray-50 text-gray-500 border-gray-100'
-                              }`}
+                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg border text-[9px] font-bold uppercase tracking-wide whitespace-nowrap ${
+                              config?.badge ?? 'bg-gray-50 text-gray-500 border-gray-100'
+                            }`}
                           >
                             {config?.icon}
                             {config?.label ?? tx.transaction_type}
@@ -368,18 +328,14 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
                           </span>
                         </div>
 
-                        <p className="text-sm font-semibold text-[var(--color-idea-text)]">
-                          {displayName}
-                        </p>
+                        <p className="text-sm font-semibold text-[var(--color-idea-text)]">{displayName}</p>
 
                         <div className="flex items-center justify-between text-xs text-[var(--color-idea-muted)]">
                           <span>{movement}</span>
                           {qty !== null && <span className="font-mono">×{qty}</span>}
                         </div>
 
-                        <div className="text-[11px] text-[var(--color-idea-text)]">
-                          {performer?.name || '—'}
-                        </div>
+                        <div className="text-[11px] text-[var(--color-idea-text)]">{performer?.name || '—'}</div>
                         {tx.remarks && (
                           <div className="text-[11px] text-[var(--color-idea-muted)] italic">{tx.remarks}</div>
                         )}
@@ -393,8 +349,7 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
             {/* Footer */}
             <div className="px-5 py-3 border-t border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1.5">
               <p className="text-[10px] text-[var(--color-idea-muted)]">
-                Showing{' '}
-                <span className="font-bold text-[var(--color-idea-text)]">{filteredTxs.length}</span> of{' '}
+                Showing <span className="font-bold text-[var(--color-idea-text)]">{filteredTxs.length}</span> of{' '}
                 <span className="font-bold text-[var(--color-idea-text)]">{transactions.length}</span> entries
               </p>
               <p className="text-[9px] text-[var(--color-idea-muted)]">Append-only ledger</p>

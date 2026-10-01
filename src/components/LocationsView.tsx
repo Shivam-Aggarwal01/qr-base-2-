@@ -53,7 +53,13 @@ const LocationPathBreadcrumb: React.FC<{ path?: string | null }> = ({ path }) =>
       {steps.map((step, index) => (
         <React.Fragment key={index}>
           {index > 0 && <ChevronRight className="w-3 h-3 text-[var(--color-idea-muted)] shrink-0" />}
-          <span className={index === steps.length - 1 ? 'font-semibold text-[var(--color-idea-text)]' : 'text-[var(--color-idea-muted)]'}>
+          <span
+            className={
+              index === steps.length - 1
+                ? 'font-semibold text-[var(--color-idea-text)]'
+                : 'text-[var(--color-idea-muted)]'
+            }
+          >
             {step}
           </span>
         </React.Fragment>

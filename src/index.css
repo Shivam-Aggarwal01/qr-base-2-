@@ -70,7 +70,9 @@
   border: 1px solid var(--color-idea-border);
   border-radius: 10px;
   color: var(--color-idea-text);
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 .idea-input::placeholder {
   color: #94a3b8;
@@ -90,7 +92,9 @@
   color: #ffffff;
   border: none;
   border-radius: 10px;
-  transition: background-color 0.15s ease, opacity 0.15s ease;
+  transition:
+    background-color 0.15s ease,
+    opacity 0.15s ease;
 }
 .idea-button:hover {
   background: #0077ed;

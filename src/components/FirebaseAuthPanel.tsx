@@ -174,11 +174,7 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
           <div className="p-7 sm:p-9">
             {/* Logo and Brand */}
             <div className="text-center">
-              <img
-                src="/logo.png"
-                alt="AICTE IDEA Lab"
-                className="h-20 sm:h-24 w-auto mx-auto object-contain"
-              />
+              <img src="/logo.png" alt="AICTE IDEA Lab" className="h-20 sm:h-24 w-auto mx-auto object-contain" />
 
               <div className="mt-5">
                 <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
@@ -325,7 +321,8 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
 
               {!needsNameUser && (
                 <p className="mt-4 text-center text-[11px] text-[var(--color-idea-muted)] leading-relaxed">
-                  First time? Sign in with your Google account and you will be prompted for your name to set up your profile.
+                  First time? Sign in with your Google account and you will be prompted for your name to set up your
+                  profile.
                 </p>
               )}
             </div>
@@ -339,11 +336,17 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
 
         <p className="mt-2 text-center text-[11px] leading-5 text-[var(--color-idea-muted)]">
           By signing in, you agree to the{' '}
-          <Link to="/terms" className="font-semibold text-[var(--color-idea-deep-blue)] hover:text-[var(--color-idea-blue)]">
+          <Link
+            to="/terms"
+            className="font-semibold text-[var(--color-idea-deep-blue)] hover:text-[var(--color-idea-blue)]"
+          >
             Terms of Service
           </Link>{' '}
           and{' '}
-          <Link to="/privacy" className="font-semibold text-[var(--color-idea-deep-blue)] hover:text-[var(--color-idea-blue)]">
+          <Link
+            to="/privacy"
+            className="font-semibold text-[var(--color-idea-deep-blue)] hover:text-[var(--color-idea-blue)]"
+          >
             Privacy Policy
           </Link>
           .

@@ -2,13 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAnalytics } from 'firebase/analytics';
 import { getFirestore } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
-import {
-  browserLocalPersistence,
-  browserPopupRedirectResolver,
-  getAuth,
-  indexedDBLocalPersistence,
-  initializeAuth,
-} from 'firebase/auth';
+import { browserLocalPersistence, browserPopupRedirectResolver, getAuth, initializeAuth } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: 'AIzaSyDvZc4N7LpYXsTtZZu9xQNzp8mJcXHWS6s',
@@ -32,7 +26,7 @@ export const analytics = (() => {
 export const auth = (() => {
   try {
     return initializeAuth(app, {
-      persistence: [indexedDBLocalPersistence, browserLocalPersistence],
+      persistence: [browserLocalPersistence],
       popupRedirectResolver: browserPopupRedirectResolver,
     });
   } catch {
