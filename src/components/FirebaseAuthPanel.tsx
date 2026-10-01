@@ -11,7 +11,7 @@ import type { AccountRequestStatus } from '../types/inventory';
 import { Link } from 'react-router-dom';
 import { signOut, type User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../firebase';
-import { UserCheck, ArrowRight, X } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 interface FirebaseAuthPanelProps {
   accessNotice?: {
@@ -165,56 +165,54 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
     }
   };
 
+  // The status card already says "submitted / waiting", so a second banner would repeat it.
+  const showSuccess = Boolean(success) && !currentNotice;
+
   return (
-    <div className="min-h-screen w-full idea-bg flex items-center justify-center px-4 py-8 sm:py-12">
-      <div className="w-full max-w-[420px]">
-        <div className="idea-card bg-white border border-[var(--color-idea-border)] rounded-2xl shadow-xl overflow-hidden">
+    <div className="min-h-screen min-h-[100dvh] w-full idea-bg flex items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
+      <div className="w-full max-w-[440px]">
+        <div className="idea-card bg-white border border-[var(--color-idea-border)] rounded-3xl shadow-[0_20px_60px_-20px_rgba(15,40,60,0.25)] overflow-hidden">
           <div className="idea-accent-bar" />
 
-          <div className="p-7 sm:p-9">
-            {/* Logo and Brand */}
+          <div className="px-6 pt-8 pb-7 sm:px-10 sm:pt-10 sm:pb-9">
+            {/* Brand and heading */}
             <div className="text-center">
-              <img src="/logo.png" alt="AICTE IDEA Lab" className="h-20 sm:h-24 w-auto mx-auto object-contain" />
+              <img src="/logo.png" alt="AICTE IDEA Lab" className="mx-auto h-16 w-auto object-contain sm:h-20" />
 
-              <div className="mt-5">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
-                  AICTE IDEA LAB
-                </span>
-                <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-idea-text)]">
-                  {needsNameUser ? 'Confirm Your Name' : 'Portal Login'}
-                </h1>
+              <h1 className="mt-6 text-[26px] font-semibold leading-tight tracking-tight text-[var(--color-idea-text)] sm:text-[28px]">
+                {needsNameUser ? 'What should we call you?' : 'Sign in'}
+              </h1>
 
-                <p className="mt-1.5 text-xs text-[var(--color-idea-muted)] leading-relaxed">
-                  {needsNameUser
-                    ? 'We noticed this is your first time signing in. Please enter your name to complete registration.'
-                    : 'Sign in with your Google account to access laboratory inventory and equipment.'}
-                </p>
-              </div>
+              <p className="mx-auto mt-2 max-w-[32ch] text-[15px] leading-relaxed text-[var(--color-idea-muted)]">
+                {needsNameUser
+                  ? 'Add your name to finish setting up your account.'
+                  : 'Use your Google account to open the lab inventory.'}
+              </p>
             </div>
 
-            {/* Error Message */}
+            {/* Error */}
             {error && (
               <div
                 role="alert"
                 aria-live="assertive"
-                className="mt-5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2.5 text-xs text-red-700 font-medium leading-relaxed"
+                className="mt-6 rounded-2xl bg-red-50 px-4 py-3 text-left text-[14px] font-medium leading-relaxed text-red-800 ring-1 ring-inset ring-red-200/80"
               >
                 {error}
               </div>
             )}
 
-            {/* Success Message */}
-            {success && (
+            {/* Success */}
+            {showSuccess && (
               <div
                 role="status"
                 aria-live="polite"
-                className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 text-xs text-emerald-800 font-medium leading-relaxed"
+                className="mt-6 rounded-2xl bg-emerald-50 px-4 py-3 text-left text-[14px] font-medium leading-relaxed text-emerald-900 ring-1 ring-inset ring-emerald-200/80"
               >
                 {success}
               </div>
             )}
 
-            {/* Status Notice (e.g. pending approval or rejected) */}
+            {/* Pending / declined */}
             {currentNotice && (
               <StudentLoginRequest
                 status={currentNotice.status}
@@ -223,16 +221,14 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
               />
             )}
 
-            {/* Form Section */}
-            <div className="mt-7">
+            {/* Actions */}
+            <div className="mt-8">
               {needsNameUser ? (
-                /* Step: Ask for Name if user is not in the db */
-                <form onSubmit={handleNameSubmit} className="space-y-4">
-                  <div className="rounded-xl bg-[var(--color-idea-light-grey)]/80 border border-[var(--color-idea-border)] p-3 text-left">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
-                      Google Account
-                    </p>
-                    <p className="text-xs font-bold text-[var(--color-idea-text)] truncate mt-0.5">
+                <form onSubmit={handleNameSubmit} className="space-y-5" noValidate>
+                  {/* Signed-in account */}
+                  <div className="rounded-2xl bg-[var(--color-idea-light-grey)]/70 px-4 py-3 text-left">
+                    <p className="text-[13px] text-[var(--color-idea-muted)]">Signed in as</p>
+                    <p className="mt-0.5 truncate text-[15px] font-medium text-[var(--color-idea-text)]">
                       {needsNameUser.email}
                     </p>
                   </div>
@@ -240,9 +236,9 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
                   <div className="text-left">
                     <label
                       htmlFor="student-full-name"
-                      className="block text-xs font-bold text-[var(--color-idea-text)] mb-1.5"
+                      className="mb-2 block text-[14px] font-medium text-[var(--color-idea-text)]"
                     >
-                      Your Full Name <span className="text-red-500">*</span>
+                      Full name
                     </label>
 
                     <input
@@ -251,23 +247,29 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
                       autoFocus
                       value={fullName}
                       onChange={(e) => setFullName(e.target.value)}
-                      placeholder="e.g. Rahul Sharma"
+                      placeholder="Rahul Sharma"
                       autoComplete="name"
+                      autoCapitalize="words"
+                      enterKeyHint="go"
                       disabled={loading}
                       required
-                      className="idea-input w-full px-3.5 py-2.5 text-xs sm:text-sm"
+                      aria-describedby="student-full-name-hint"
+                      className="idea-input h-12 w-full px-4 !text-[16px]"
                     />
-                    <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
-                      This name will be displayed on your equipment requests and custody records.
+                    <p
+                      id="student-full-name-hint"
+                      className="mt-2 text-[13px] leading-relaxed text-[var(--color-idea-muted)]"
+                    >
+                      Shown on your equipment requests and custody records.
                     </p>
                   </div>
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex flex-col-reverse gap-3 pt-1 sm:flex-row">
                     <button
                       type="button"
                       onClick={handleCancelNamePrompt}
                       disabled={loading}
-                      className="flex-1 py-2.5 px-3 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
+                      className="h-12 flex-1 cursor-pointer rounded-xl border border-[var(--color-idea-border)] bg-white px-4 text-[15px] font-medium text-[var(--color-idea-text)] transition active:scale-[0.99] hover:bg-[var(--color-idea-light-grey)] disabled:cursor-not-allowed disabled:opacity-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-idea-blue)]"
                     >
                       Cancel
                     </button>
@@ -275,82 +277,84 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
                     <button
                       type="submit"
                       disabled={loading || !fullName.trim()}
-                      className="flex-1 py-2.5 px-3 idea-button flex items-center justify-center gap-2 text-xs font-semibold rounded-xl shadow-sm cursor-pointer disabled:opacity-50"
+                      className="idea-button flex h-12 flex-1 cursor-pointer items-center justify-center gap-2 rounded-xl px-4 text-[15px] font-semibold transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {loading ? (
                         <span>Saving…</span>
                       ) : (
                         <>
                           <span>Continue</span>
-                          <ArrowRight className="w-3.5 h-3.5" />
+                          <ArrowRight className="h-4 w-4" aria-hidden="true" />
                         </>
                       )}
                     </button>
                   </div>
                 </form>
               ) : (
-                /* Primary Login Button: Continue with Google */
-                <button
-                  type="button"
-                  onClick={handleGoogleLogin}
-                  disabled={loading}
-                  className="w-full h-12 rounded-xl border border-[var(--color-idea-border)] bg-white text-[var(--color-idea-text)] text-xs sm:text-sm font-semibold transition-all hover:bg-[var(--color-idea-light-grey)] hover:border-[#b9c9d1] shadow-xs disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center gap-3 cursor-pointer"
-                >
-                  <svg className={`w-5 h-5 shrink-0 ${loading ? 'animate-pulse' : ''}`} viewBox="0 0 24 24">
-                    <path
-                      fill="#4285F4"
-                      d="M21.35 12.23c0-.79-.07-1.55-.23-2.23H12v4.22h5.25a4.49 4.49 0 01-1.95 2.95v2.45h3.15c1.84-1.7 2.9-4.2 2.9-7.39z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 21.5c2.63 0 4.84-.87 6.45-2.35l-3.15-2.45c-.87.58-1.98.93-3.3.93-2.54 0-4.69-1.72-5.46-4.03H3.28v2.53A9.74 9.74 0 0012 21.5z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M6.54 13.6A5.86 5.86 0 016.23 12c0-.56.11-1.1.31-1.6V7.87H3.28A9.74 9.74 0 002.5 12c0 1.57.38 3.06 1.05 4.13l2.99-2.53z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 6.37c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.46 14.63 2.5 12 2.5a9.74 9.74 0 00-8.72 5.37l3.26 2.53C7.31 8.09 9.46 6.37 12 6.37z"
-                    />
-                  </svg>
+                <>
+                  <button
+                    type="button"
+                    onClick={handleGoogleLogin}
+                    disabled={loading}
+                    aria-busy={loading}
+                    className="flex h-12 w-full cursor-pointer items-center justify-center gap-3 rounded-xl border border-[var(--color-idea-border)] bg-white px-4 text-[15px] font-medium text-[var(--color-idea-text)] shadow-sm transition active:scale-[0.99] hover:bg-[var(--color-idea-light-grey)] disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--color-idea-blue)]"
+                  >
+                    <svg
+                      className={`h-5 w-5 shrink-0 ${loading ? 'animate-pulse' : ''}`}
+                      viewBox="0 0 24 24"
+                      aria-hidden="true"
+                    >
+                      <path
+                        fill="#4285F4"
+                        d="M21.35 12.23c0-.79-.07-1.55-.23-2.23H12v4.22h5.25a4.49 4.49 0 01-1.95 2.95v2.45h3.15c1.84-1.7 2.9-4.2 2.9-7.39z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 21.5c2.63 0 4.84-.87 6.45-2.35l-3.15-2.45c-.87.58-1.98.93-3.3.93-2.54 0-4.69-1.72-5.46-4.03H3.28v2.53A9.74 9.74 0 0012 21.5z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M6.54 13.6A5.86 5.86 0 016.23 12c0-.56.11-1.1.31-1.6V7.87H3.28A9.74 9.74 0 002.5 12c0 1.57.38 3.06 1.05 4.13l2.99-2.53z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 6.37c1.43 0 2.71.49 3.72 1.45l2.79-2.79C16.84 3.46 14.63 2.5 12 2.5a9.74 9.74 0 00-8.72 5.37l3.26 2.53C7.31 8.09 9.46 6.37 12 6.37z"
+                      />
+                    </svg>
 
-                  <span>{loading ? 'Authenticating with Google…' : 'Log in with Google'}</span>
-                </button>
-              )}
+                    <span>{loading ? 'Signing in…' : 'Continue with Google'}</span>
+                  </button>
 
-              {!needsNameUser && (
-                <p className="mt-4 text-center text-[11px] text-[var(--color-idea-muted)] leading-relaxed">
-                  First time? Sign in with your Google account and you will be prompted for your name to set up your
-                  profile.
-                </p>
+                  <p className="mt-4 text-center text-[13px] leading-relaxed text-[var(--color-idea-muted)]">
+                    New here? We will ask for your name after you sign in.
+                  </p>
+                </>
               )}
             </div>
           </div>
         </div>
 
-        {/* Unified Legal and Institutional Footer */}
-        <p className="mt-5 text-center text-xs text-[var(--color-idea-muted)]">
-          AICTE IDEA Lab Inventory Management System
-        </p>
-
-        <p className="mt-2 text-center text-[11px] leading-5 text-[var(--color-idea-muted)]">
-          By signing in, you agree to the{' '}
-          <Link
-            to="/terms"
-            className="font-semibold text-[var(--color-idea-deep-blue)] hover:text-[var(--color-idea-blue)]"
-          >
-            Terms of Service
-          </Link>{' '}
-          and{' '}
-          <Link
-            to="/privacy"
-            className="font-semibold text-[var(--color-idea-deep-blue)] hover:text-[var(--color-idea-blue)]"
-          >
-            Privacy Policy
-          </Link>
-          .
-        </p>
+        {/* Footer */}
+        <div className="mt-6 px-2 text-center">
+          <p className="text-[13px] text-[var(--color-idea-muted)]">AICTE IDEA Lab Inventory Management System</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-[var(--color-idea-muted)]">
+            By signing in, you agree to the{' '}
+            <Link
+              to="/terms"
+              className="font-medium text-[var(--color-idea-deep-blue)] underline-offset-2 hover:text-[var(--color-idea-blue)] hover:underline"
+            >
+              Terms of Service
+            </Link>{' '}
+            and{' '}
+            <Link
+              to="/privacy"
+              className="font-medium text-[var(--color-idea-deep-blue)] underline-offset-2 hover:text-[var(--color-idea-blue)] hover:underline"
+            >
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        </div>
       </div>
     </div>
   );
