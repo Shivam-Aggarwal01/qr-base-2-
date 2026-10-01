@@ -18,8 +18,8 @@ service cloud.firestore {
     function role() {
       return signedIn()
         ? (
-            request.auth.token.get('role', null) != null
-              ? request.auth.token.get('role', null)
+            'role' in request.auth.token
+              ? request.auth.token.role
               : (
                   exists(userDocPath())
                     ? get(userDocPath()).data.role
@@ -84,15 +84,14 @@ service cloud.firestore {
       // Admin can update any user.
       //
       // Non-admin users can update only their own profile.
-      // They cannot change role, email, or status.
+      // They cannot change role, email.
       allow update: if isAdmin() ||
         (
           signedIn() &&
           request.auth.uid == userId &&
 
           request.resource.data.role == resource.data.role &&
-          request.resource.data.email == resource.data.email &&
-          request.resource.data.status == resource.data.status
+          request.resource.data.email == resource.data.email
         );
 
       // Only admins can delete users.

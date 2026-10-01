@@ -9,6 +9,7 @@ import {
   COLLECTIONS,
   completeGoogleRedirect,
   deleteFirestoreDocument,
+  updateFirestoreDocument,
   ensureUserProfile,
   getUserProfile,
   reviewAccountRequest,
@@ -448,8 +449,7 @@ export default function App() {
   // ---------------------------------------------------------------------------
   const handleUpdateUserRole = async (userId: string, newRole: User['role']) => {
     try {
-      const updateUserRoleFn = httpsCallable(functions, 'updateUserRole');
-      await updateUserRoleFn({ userId, newRole });
+      await updateFirestoreDocument(COLLECTIONS.USERS, userId, { role: newRole });
       await refreshAllData();
     } catch (error) {
       console.error('Failed to update user role:', error);
@@ -533,7 +533,7 @@ export default function App() {
         onResetData={handleResetData}
         onLogout={handleLogout}
       />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-col-reverse md:flex-row flex-1 overflow-hidden">
         <Sidebar
           currentView={currentView}
           onSelectView={setCurrentView}
@@ -575,7 +575,6 @@ export default function App() {
                 catalogItems={catalogItems}
                 stockLevels={stockLevels}
                 locations={locations}
-                assets={assets}
                 userRole={effectiveRole ?? currentUser.role}
                 onOpenQRGenerator={handleOpenQRGenerator}
                 onRefreshData={refreshAllData}

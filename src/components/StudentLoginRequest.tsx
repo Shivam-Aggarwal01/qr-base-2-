@@ -30,8 +30,8 @@ export const StudentLoginRequest: React.FC<StudentLoginRequestProps> = ({ status
       )}
       <p className="mt-3 text-xs text-idea-muted">
         {isRejected
-          ? 'You cannot access the lab until an admin approves a new request.'
-          : 'You can sign in again after an admin approves your account in User Directory.'}
+          ? 'You cannot access the lab until an admin approves your request.'
+          : 'You can sign in again after an admin approves your account.'}
       </p>
     </div>
   );
