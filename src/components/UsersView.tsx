@@ -258,19 +258,19 @@ export const UsersView: React.FC<UsersViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Unified Standard Page Header */}
+        {/* Standard Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
-                AICTE IDEA LAB · MEMBERS & ACCESS
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-blue)]">
+                IDEA Lab · Directory
               </span>
             </div>
             <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
-              User Directory & Access Control
+              Members
             </h1>
-            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
-              Manage laboratory members, assigned roles, permissions, and approve pending student registrations.
+            <p className="mt-1 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Manage member roles, permissions, and pending approvals.
             </p>
           </div>
 
@@ -280,8 +280,8 @@ export const UsersView: React.FC<UsersViewProps> = ({
               type="text"
               value={searchFilter}
               onChange={(event) => setSearchFilter(event.target.value)}
-              placeholder="Search members by name, email..."
-              className="idea-input w-full pl-9 pr-4 py-2.5 text-xs sm:text-sm"
+              placeholder="Search members by name or email…"
+              className="idea-input w-full pl-9 pr-4 py-2 text-xs sm:text-sm"
             />
           </div>
         </div>

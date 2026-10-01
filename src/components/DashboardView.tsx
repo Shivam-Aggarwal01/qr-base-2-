@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   Package,
   Boxes,
@@ -11,17 +11,6 @@ import {
   Users,
   Plus,
 } from 'lucide-react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  Tooltip,
-} from 'recharts';
 
 import {
   Asset,
@@ -66,26 +55,33 @@ const STATUS_BADGE: Record<string, string> = {
 
 const getStatusBadge = (status: string) =>
   STATUS_BADGE[status] ??
-  'bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] border border-[var(--color-idea-border)]';
+  'bg-slate-100 text-slate-600 border border-slate-200';
 
-const formatStatus = (status: string) => status.replace(/_/g, ' ');
+const formatStatus = (status: string) => {
+  switch (status) {
+    case 'PENDING':
+      return 'Pending';
+    case 'APPROVED':
+      return 'Approved';
+    case 'HANDED_OVER':
+      return 'Checked Out';
+    case 'COMPLETED':
+      return 'Completed';
+    case 'REJECTED':
+      return 'Declined';
+    case 'CANCELLED':
+      return 'Cancelled';
+    default:
+      return status.replace(/_/g, ' ');
+  }
+};
 
 const getTimeAgo = (dateString: string) => {
-  const diff =
-    (Date.now() - new Date(dateString).getTime()) / 1000;
-
+  const diff = (Date.now() - new Date(dateString).getTime()) / 1000;
   if (diff < 60) return 'Just now';
   if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-
   return `${Math.floor(diff / 86400)}d ago`;
-};
-
-const CHART_COLORS = {
-  available: 'var(--color-idea-green)',
-  issued: 'var(--color-idea-blue)',
-  damaged: 'var(--color-idea-red)',
-  repair: 'var(--color-idea-yellow)',
 };
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -98,108 +94,60 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   stockLevels,
   currentUser,
   onSelectView,
-  onOpenQRGenerator: _onOpenQRGenerator,
-  onRefreshData: _onRefreshData,
   onOpenNewRequest,
 }) => {
   const studentMode = isStudent(currentUser?.role);
 
-  /*
-   * catalog_item_id must always reference CatalogItem.id.
-   *
-   * item_code is only a human-readable/searchable code.
-   * It must not be used as a foreign key.
-   */
-  const findCatalogItem = (catalogItemId?: string) => {
-    if (!catalogItemId) {
-      return undefined;
-    }
-
-    return catalogItems.find(
-      (item) => item.id === catalogItemId
-    );
-  };
-
-  /*
-   * STUDENT DASHBOARD
-   */
+  // ---------------------------------------------------------------------------
+  // STUDENT VIEW
+  // ---------------------------------------------------------------------------
   if (studentMode && currentUser) {
-    const myRequests = requests.filter(
-      (request) => request.user_id === currentUser.id
-    );
+    const myRequests = requests
+      .filter((request) => request.user_id === currentUser.id)
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
-    const pendingRequests = myRequests.filter(
-      (request) => request.status === 'PENDING'
-    );
-
-    const approvedRequests = myRequests.filter(
-      (request) => request.status === 'APPROVED'
-    );
-
-    const completedRequests = myRequests.filter(
-      (request) =>
-        request.status === 'HANDED_OVER' ||
-        request.status === 'COMPLETED'
-    );
-
-    const visibleRequests = myRequests.filter((request) =>
-      [
-        'PENDING',
-        'APPROVED',
-        'HANDED_OVER',
-        'COMPLETED',
-      ].includes(request.status)
+    const pendingRequests = myRequests.filter((r) => r.status === 'PENDING');
+    const approvedRequests = myRequests.filter((r) => r.status === 'APPROVED');
+    const completedRequests = myRequests.filter((r) => r.status === 'HANDED_OVER' || r.status === 'COMPLETED');
+    const visibleRequests = myRequests.filter((r) =>
+      ['PENDING', 'APPROVED', 'HANDED_OVER', 'COMPLETED'].includes(r.status)
     );
 
     const issuedAssets = assets.filter(
-      (asset) =>
-        asset.assigned_to_user_id === currentUser.id &&
-        asset.status === 'ISSUED'
+      (asset) => asset.assigned_to_user_id === currentUser.id && asset.status === 'ISSUED'
     );
 
     const reusableItems = myRequests
       .filter((request) => request.status === 'HANDED_OVER')
       .flatMap((request) =>
         (request.items ?? [])
-          .filter(
-            (item) =>
-              !item.asset_id &&
-              item.usage === 'REUSABLE'
-          )
+          .filter((item) => !item.asset_id && item.usage === 'REUSABLE')
           .map((item) => ({
             id: `${request.id}-${item.id}`,
             catalogItemId: item.catalog_item_id || '',
             quantity: Number(item.requested_qty) || 0,
           }))
       )
-      .filter(
-        (item) =>
-          item.catalogItemId &&
-          item.quantity > 0
-      );
+      .filter((item) => item.catalogItemId && item.quantity > 0);
 
     const currentlyHeldCount =
       issuedAssets.length +
-      reusableItems.reduce(
-        (total, item) => total + item.quantity,
-        0
-      );
+      reusableItems.reduce((total, item) => total + item.quantity, 0);
 
     return (
       <div className="flex-1 overflow-y-auto idea-bg">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
-                  AICTE IDEA LAB · STUDENT PORTAL
-                </span>
-              </div>
-              <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
-                My Inventory Activity
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[#0071e3]">
+                IDEA Lab · Student Desk
+              </span>
+              <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+                My Activity
               </h1>
-              <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
-                Track your active material requests, approval milestones, and items currently issued to you.
+              <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-2xl">
+                Track your active requests, approvals, and borrowed equipment.
               </p>
             </div>
 
@@ -207,7 +155,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 type="button"
                 onClick={onOpenNewRequest}
-                className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl shadow-sm cursor-pointer shrink-0"
+                className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl cursor-pointer shrink-0"
               >
                 <Plus className="w-4 h-4" />
                 <span>New Request</span>
@@ -215,252 +163,101 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
             {[
               {
-                label: 'Pending Requests',
+                label: 'Pending',
                 value: pendingRequests.length,
-                sub: 'Waiting for approval',
-                bar: 'bg-[var(--color-idea-yellow)]',
+                sub: 'Awaiting review',
+                accent: '#ff9500',
               },
               {
-                label: 'Approved Requests',
+                label: 'Approved',
                 value: approvedRequests.length,
-                sub: 'Awaiting handover',
-                bar: 'bg-[var(--color-idea-blue)]',
+                sub: 'Ready for pickup',
+                accent: '#0071e3',
               },
               {
-                label: 'Currently Issued',
+                label: 'Checked Out',
                 value: currentlyHeldCount,
-                sub: 'Items and assets with you',
-                bar: 'bg-[var(--color-idea-green)]',
+                sub: 'In your custody',
+                accent: '#34c759',
               },
               {
-                label: 'Completed Requests',
+                label: 'Completed',
                 value: completedRequests.length,
-                sub: 'Successfully handed over',
-                bar: 'bg-[var(--color-idea-deep-blue)]',
+                sub: 'Returned or consumed',
+                accent: '#0b3b60',
               },
             ].map((metric) => (
-              <div
-                key={metric.label}
-                className="idea-card relative overflow-hidden p-5"
-              >
+              <div key={metric.label} className="idea-card relative overflow-hidden p-4 sm:p-5">
                 <div
-                  className={`absolute left-0 top-0 h-1 w-full ${metric.bar}`}
+                  className="absolute left-0 top-0 h-1 w-full"
+                  style={{ backgroundColor: metric.accent }}
                 />
-
-                <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
-                  {metric.label}
-                </p>
-
-                <p className="mt-2 text-4xl font-bold text-[var(--color-idea-text)]">
+                <p className="text-xs font-medium text-slate-500">{metric.label}</p>
+                <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                   {metric.value}
                 </p>
-
-                <p className="mt-2 text-[10px] text-[var(--color-idea-muted)]">
-                  {metric.sub}
-                </p>
+                <p className="mt-1 text-[11px] text-slate-400">{metric.sub}</p>
               </div>
             ))}
           </div>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-            <div className="idea-card overflow-hidden lg:col-span-8">
-              <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-5 py-4">
-                <div>
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
-                    Requests
-                  </p>
-
-                  <h2 className="mt-0.5 text-base font-bold text-[var(--color-idea-text)]">
-                    Recent Requests
-                  </h2>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() => onSelectView('requests')}
-                  className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-[var(--color-idea-blue)] hover:opacity-80"
-                >
-                  View all
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </button>
+          {/* Active Requests List */}
+          <div className="idea-card overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-200/80 px-5 py-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">Recent Requests</h2>
+                <p className="text-[11px] text-slate-500">Your recent checkout and reservation records</p>
               </div>
-
-              {visibleRequests.length === 0 ? (
-                <div className="p-8 text-center">
-                  <ClipboardList className="mx-auto h-7 w-7 text-[var(--color-idea-blue)]" />
-
-                  <p className="mt-3 text-sm font-semibold text-[var(--color-idea-text)]">
-                    No requests yet
-                  </p>
-
-                  <p className="mt-1 text-xs text-[var(--color-idea-muted)]">
-                    Create a request when you need an item or
-                    specific asset.
-                  </p>
-                </div>
-              ) : (
-                <div className="max-h-96 divide-y divide-[var(--color-idea-border)] overflow-y-auto">
-                  {visibleRequests.map((request) => (
-                    <div
-                      key={request.id}
-                      className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-[var(--color-idea-light-grey)]/60"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[10px] font-bold text-[var(--color-idea-blue)]">
-                            {request.request_number}
-                          </span>
-
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider ${getStatusBadge(
-                              request.status
-                            )}`}
-                          >
-                            {formatStatus(request.status)}
-                          </span>
-                        </div>
-
-                        <p className="mt-1 truncate text-xs font-semibold text-[var(--color-idea-text)]">
-                          {request.purpose}
-                        </p>
-
-                        <p className="mt-1 truncate text-[10px] text-[var(--color-idea-muted)]">
-                          {(request.items ?? [])
-                            .map((item) => {
-                              if (item.asset_id) {
-                                const asset = assets.find(
-                                  (assetItem) =>
-                                    assetItem.id ===
-                                    item.asset_id
-                                );
-
-                                return (
-                                  asset?.asset_code ||
-                                  'Asset'
-                                );
-                              }
-
-                              /*
-                               * RequestLine.catalog_item_id
-                               * references CatalogItem.id.
-                               */
-                              const catalogItem =
-                                findCatalogItem(
-                                  item.catalog_item_id
-                                );
-
-                              return `${item.requested_qty} × ${catalogItem?.name || 'Item'
-                                }`;
-                            })
-                            .join(' · ') || 'No line items'}
-                        </p>
-                      </div>
-
-                      <span className="shrink-0 font-mono text-[9px] text-[var(--color-idea-muted)]">
-                        {new Date(
-                          request.created_at
-                        ).toLocaleDateString('en-IN')}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={() => onSelectView('requests')}
+                className="flex items-center gap-1 text-xs font-semibold text-[#0071e3] hover:opacity-80"
+              >
+                <span>View all</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
 
-            <div className="idea-card overflow-hidden lg:col-span-4">
-              <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-5 py-4">
-                <div>
-                  <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
-                    Current State
-                  </p>
-
-                  <h2 className="mt-0.5 text-base font-bold text-[var(--color-idea-text)]">
-                    Items With Me
-                  </h2>
-                </div>
-
-                <Package className="h-4 w-4 text-[var(--color-idea-blue)]" />
-              </div>
-
-              {currentlyHeldCount === 0 ? (
-                <div className="p-6 text-center">
-                  <CheckCircle2 className="mx-auto h-6 w-6 text-[var(--color-idea-green)]" />
-
-                  <p className="mt-2 text-xs font-semibold text-[var(--color-idea-text)]">
-                    Nothing currently issued
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-                    Your issued items and assets will appear
-                    here.
+            <div className="divide-y divide-slate-100">
+              {visibleRequests.length === 0 ? (
+                <div className="py-12 text-center">
+                  <ClipboardList className="mx-auto h-8 w-8 text-slate-300" />
+                  <p className="mt-2 text-xs font-semibold text-slate-700">No requests yet</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">
+                    Submit a new request when you need lab tools or consumables.
                   </p>
                 </div>
               ) : (
-                <div className="max-h-96 space-y-2.5 overflow-y-auto p-4">
-                  {issuedAssets.map((asset) => {
-                    /*
-                     * Asset.catalog_item_id
-                     * references CatalogItem.id.
-                     */
-                    const catalogItem =
-                      findCatalogItem(
-                        asset.catalog_item_id
-                      );
-
-                    return (
-                      <div
-                        key={asset.id}
-                        className="rounded-xl border border-[var(--color-idea-blue)]/20 bg-[var(--color-idea-light-grey)] p-3"
-                      >
-                        <p className="text-xs font-semibold text-[var(--color-idea-text)]">
-                          {catalogItem?.name || 'Asset'}
-                        </p>
-
-                        <p className="mt-1 font-mono text-[9px] text-[var(--color-idea-blue)]">
-                          {asset.asset_code}
-                        </p>
-
-                        <span className="idea-info mt-2 inline-flex rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide">
-                          Issued
+                visibleRequests.slice(0, 5).map((request) => (
+                  <div
+                    key={request.id}
+                    onClick={() => onSelectView('requests')}
+                    className="flex items-center justify-between gap-4 px-5 py-3.5 hover:bg-slate-50 transition-colors cursor-pointer"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-slate-900">
+                          {request.request_number}
+                        </span>
+                        <span
+                          className={`inline-flex rounded-md px-2 py-0.5 text-[10px] font-semibold border ${getStatusBadge(
+                            request.status
+                          )}`}
+                        >
+                          {formatStatus(request.status)}
                         </span>
                       </div>
-                    );
-                  })}
-
-                  {reusableItems.map((item) => {
-                    /*
-                     * Reusable request items also use
-                     * CatalogItem.id.
-                     */
-                    const catalogItem =
-                      findCatalogItem(
-                        item.catalogItemId
-                      );
-
-                    return (
-                      <div
-                        key={item.id}
-                        className="rounded-xl border border-[var(--color-idea-blue)]/20 bg-[var(--color-idea-light-grey)] p-3"
-                      >
-                        <p className="text-xs font-semibold text-[var(--color-idea-text)]">
-                          {catalogItem?.name || 'Item'}
-                        </p>
-
-                        <p className="mt-1 font-mono text-[9px] text-[var(--color-idea-blue)]">
-                          {item.quantity}{' '}
-                          {catalogItem?.unit || 'units'}
-                        </p>
-
-                        <span className="idea-info mt-2 inline-flex rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide">
-                          Issued
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                      <p className="mt-0.5 text-xs text-slate-600 truncate">{request.purpose}</p>
+                    </div>
+                    <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                      {getTimeAgo(request.created_at)}
+                    </span>
+                  </div>
+                ))
               )}
             </div>
           </div>
@@ -469,684 +266,379 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     );
   }
 
-  /*
-   * STAFF / ADMIN DASHBOARD
-   */
-
-  const totalStock = stockLevels.reduce(
-    (total, stock) =>
-      total + Number(stock.quantity || 0),
-    0
+  // ---------------------------------------------------------------------------
+  // STAFF / ADMIN DASHBOARD
+  // ---------------------------------------------------------------------------
+  const totalStock = useMemo(
+    () => stockLevels.reduce((total, stock) => total + Number(stock.quantity || 0), 0),
+    [stockLevels]
   );
 
-  const issuedAssets = assets.filter(
-    (asset) => asset.status === 'ISSUED'
+  const issuedAssets = useMemo(() => assets.filter((asset) => asset.status === 'ISSUED'), [assets]);
+  const availableAssets = useMemo(() => assets.filter((asset) => asset.status === 'AVAILABLE'), [assets]);
+  const damagedAssets = useMemo(() => assets.filter((asset) => asset.status === 'DAMAGED'), [assets]);
+  const repairAssets = useMemo(() => assets.filter((asset) => asset.status === 'UNDER_REPAIR'), [assets]);
+  const pendingRequests = useMemo(() => requests.filter((r) => r.status === 'PENDING'), [requests]);
+
+  const lowStockItems = useMemo(
+    () =>
+      catalogItems
+        .map((item) => {
+          const quantity = stockLevels
+            .filter((stock) => stock.catalog_item_id === item.id)
+            .reduce((total, stock) => total + Number(stock.quantity || 0), 0);
+          return { item, quantity, threshold: item.min_stock_alert ?? 10 };
+        })
+        .filter(({ threshold, quantity }) => quantity <= threshold),
+    [catalogItems, stockLevels]
   );
 
-  const availableAssets = assets.filter(
-    (asset) => asset.status === 'AVAILABLE'
+  const stockByLocation = useMemo(
+    () =>
+      locations
+        .map((location) => ({
+          name: location.name,
+          qty: stockLevels
+            .filter((stock) => stock.location_id === location.id)
+            .reduce((total, stock) => total + Number(stock.quantity || 0), 0),
+        }))
+        .filter((l) => l.qty > 0)
+        .sort((a, b) => b.qty - a.qty)
+        .slice(0, 5),
+    [locations, stockLevels]
   );
 
-  const damagedAssets = assets.filter(
-    (asset) => asset.status === 'DAMAGED'
+  const maxLocationQty = useMemo(
+    () => Math.max(1, ...stockByLocation.map((l) => l.qty)),
+    [stockByLocation]
   );
 
-  const repairAssets = assets.filter(
-    (asset) => asset.status === 'UNDER_REPAIR'
-  );
-
-  const pendingRequests = requests.filter(
-    (request) => request.status === 'PENDING'
-  );
-
-  /*
-   * StockLevel.catalog_item_id must equal CatalogItem.id.
-   *
-   * Do NOT compare it with item.item_code here.
-   */
-  const lowStockItems = catalogItems
-    .map((item) => {
-      const quantity = stockLevels
-        .filter(
-          (stock) =>
-            stock.catalog_item_id === item.id
-        )
-        .reduce(
-          (total, stock) =>
-            total + Number(stock.quantity || 0),
-          0
-        );
-
-      return {
-        item,
-        quantity,
-        threshold: item.min_stock_alert,
-      };
-    })
-    .filter(
-      ({ threshold, quantity }) =>
-        threshold !== undefined &&
-        threshold !== null &&
-        quantity <= threshold
-    );
-
-  const getTransactionLabel = (type: string) => {
-    switch (type) {
-      case 'RECEIVE':
-        return 'Stock Added';
-      case 'ISSUE':
-        return 'Issued';
-      case 'RETURN':
-        return 'Returned';
-      case 'MOVE':
-        return 'Moved';
-      case 'DAMAGE':
-        return 'Damaged';
-      case 'ADJUSTMENT':
-        return 'Adjusted';
-      case 'DISPOSAL':
-        return 'Disposed';
-      default:
-        return formatStatus(type);
-    }
-  };
-
-  const assetStatusData = [
-    {
-      name: 'Available',
-      value: availableAssets.length,
-      color: CHART_COLORS.available,
-    },
-    {
-      name: 'Issued',
-      value: issuedAssets.length,
-      color: CHART_COLORS.issued,
-    },
-    {
-      name: 'Damaged',
-      value: damagedAssets.length,
-      color: CHART_COLORS.damaged,
-    },
-    {
-      name: 'Under Repair',
-      value: repairAssets.length,
-      color: CHART_COLORS.repair,
-    },
-  ].filter((data) => data.value > 0);
-
-  const stockByLocation = locations
-    .map((location) => {
-      const quantity = stockLevels
-        .filter(
-          (stock) =>
-            stock.location_id === location.id
-        )
-        .reduce(
-          (total, stock) =>
-            total + Number(stock.quantity || 0),
-          0
-        );
-
-      return {
-        name: location.name,
-        qty: quantity,
-      };
-    })
-    .filter((location) => location.qty > 0)
-    .sort((a, b) => b.qty - a.qty)
-    .slice(0, 6);
+  const totalTrackedAssets = assets.length;
 
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Unified Standard Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
           <div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
-                AICTE IDEA LAB · OVERVIEW
-              </span>
-            </div>
-            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
-              Inventory Dashboard
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-[#0071e3]">
+              IDEA Lab · Overview
+            </span>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-slate-900">
+              Overview
             </h1>
-            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
-              Real-time monitoring of laboratory stock, equipment utilization, pending approvals, and transaction flow.
+            <p className="mt-1 text-xs sm:text-sm text-slate-500 max-w-2xl">
+              A live look at equipment, stock, and current requests.
             </p>
           </div>
         </div>
 
-        {/* Main Metrics */}
-        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {/* 4 Main Metrics */}
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
           {[
             {
               label: 'Members',
               value: users.length,
-              sub: 'Registered lab members',
+              sub: 'Registered accounts',
               icon: Users,
-              color: 'var(--color-idea-blue)',
+              accent: '#0071e3',
               view: 'users' as ViewMode,
             },
             {
               label: 'Total Stock',
               value: totalStock,
-              sub: 'Across all storage locations',
+              sub: 'Units across lab',
               icon: Boxes,
-              color: 'var(--color-idea-deep-blue)',
+              accent: '#0b3b60',
               view: 'inventory' as ViewMode,
             },
             {
-              label: 'Assets',
+              label: 'Equipment',
               value: assets.length,
-              sub: 'Individually tracked equipment',
+              sub: 'Tracked tools & instruments',
               icon: Wrench,
-              color: 'var(--color-idea-green)',
+              accent: '#34c759',
               view: 'assets' as ViewMode,
             },
             {
               label: 'Locations',
               value: locations.length,
-              sub: 'QR-enabled storage units',
+              sub: 'Workbenches & racks',
               icon: MapPin,
-              color: 'var(--color-idea-yellow)',
+              accent: '#ff9500',
               view: 'locations' as ViewMode,
             },
           ].map((metric) => {
             const Icon = metric.icon;
-
             return (
               <button
                 key={metric.label}
                 type="button"
-                onClick={() =>
-                  onSelectView(metric.view)
-                }
-                className="idea-card relative cursor-pointer overflow-hidden p-5 text-left transition-colors hover:border-[var(--color-idea-blue)]/40"
+                onClick={() => onSelectView(metric.view)}
+                className="idea-card relative cursor-pointer overflow-hidden p-4 sm:p-5 text-left transition-colors hover:border-slate-300"
               >
                 <div
                   className="absolute left-0 top-0 h-1 w-full"
-                  style={{ background: metric.color }}
+                  style={{ backgroundColor: metric.accent }}
                 />
-
                 <div className="flex items-center justify-between">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-idea-muted)]">
-                    {metric.label}
-                  </p>
-
-                  <Icon
-                    className="h-4 w-4"
-                    style={{ color: metric.color }}
-                  />
+                  <span className="text-xs font-medium text-slate-500">{metric.label}</span>
+                  <Icon className="h-4 w-4 text-slate-400" />
                 </div>
-
-                <p className="mt-3 text-4xl font-bold text-[var(--color-idea-text)]">
+                <p className="mt-2 text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
                   {metric.value}
                 </p>
-
-                <p className="mt-2 text-[10px] text-[var(--color-idea-muted)]">
-                  {metric.sub}
-                </p>
+                <p className="mt-1 text-[11px] text-slate-400 truncate">{metric.sub}</p>
               </button>
             );
           })}
         </div>
 
-        {/* Asset Status + Stock Distribution */}
+        {/* Equipment Status Donut & Location Distribution */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="idea-card overflow-hidden lg:col-span-6">
-            <div className="border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-5 py-4">
-              <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
-                Asset Status
-              </p>
-
-              <h2 className="mt-0.5 text-base font-bold text-[var(--color-idea-text)]">
-                Current Equipment State
-              </h2>
+          {/* Lightweight Native Donut Chart */}
+          <div className="idea-card overflow-hidden lg:col-span-6 flex flex-col justify-between">
+            <div className="border-b border-slate-200/80 px-5 py-4">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900">Equipment Status</h2>
+              <p className="text-[11px] text-slate-500">Live operational condition of tracked tools</p>
             </div>
 
-            <div className="flex min-h-[250px] flex-col p-5">
-              {assetStatusData.length === 0 ? (
-                <div className="flex flex-1 flex-col items-center justify-center py-8 text-center">
-                  <Wrench className="h-7 w-7 text-[var(--color-idea-muted)]" />
-
-                  <p className="mt-3 text-xs font-semibold text-[var(--color-idea-text)]">
-                    No assets tracked yet
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-                    Individually tracked equipment will appear
-                    here.
-                  </p>
+            <div className="p-5 flex-1 flex flex-col justify-center">
+              {totalTrackedAssets === 0 ? (
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  No equipment tracked yet.
                 </div>
               ) : (
-                <div className="flex flex-1 items-center gap-6">
-                  <div className="h-36 w-36 shrink-0">
-                    <ResponsiveContainer
-                      width="100%"
-                      height="100%"
-                    >
-                      <PieChart>
-                        <Pie
-                          data={assetStatusData}
-                          dataKey="value"
-                          nameKey="name"
-                          innerRadius={38}
-                          outerRadius={62}
-                          paddingAngle={2}
-                        >
-                          {assetStatusData.map((entry) => (
-                            <Cell
-                              key={entry.name}
-                              fill={entry.color}
-                            />
-                          ))}
-                        </Pie>
-
-                        <Tooltip
-                          contentStyle={{
-                            fontSize: '11px',
-                            borderRadius: '8px',
-                          }}
-                        />
-                      </PieChart>
-                    </ResponsiveContainer>
+                <div className="flex flex-col sm:flex-row items-center gap-6">
+                  {/* Clean Vector Donut */}
+                  <div className="relative w-32 h-32 shrink-0 flex items-center justify-center">
+                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                      <circle cx="50" cy="50" r="40" fill="transparent" stroke="#f1f5f9" strokeWidth="12" />
+                      {/* Available segment */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke="#34c759"
+                        strokeWidth="12"
+                        strokeDasharray={`${(availableAssets.length / totalTrackedAssets) * 251.2} 251.2`}
+                        strokeDashoffset="0"
+                      />
+                      {/* Issued segment */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke="#0071e3"
+                        strokeWidth="12"
+                        strokeDasharray={`${(issuedAssets.length / totalTrackedAssets) * 251.2} 251.2`}
+                        strokeDashoffset={`-${(availableAssets.length / totalTrackedAssets) * 251.2}`}
+                      />
+                      {/* Under Repair segment */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke="#ff9500"
+                        strokeWidth="12"
+                        strokeDasharray={`${(repairAssets.length / totalTrackedAssets) * 251.2} 251.2`}
+                        strokeDashoffset={`-${((availableAssets.length + issuedAssets.length) / totalTrackedAssets) * 251.2}`}
+                      />
+                      {/* Damaged segment */}
+                      <circle
+                        cx="50"
+                        cy="50"
+                        r="40"
+                        fill="transparent"
+                        stroke="#ff3b30"
+                        strokeWidth="12"
+                        strokeDasharray={`${(damagedAssets.length / totalTrackedAssets) * 251.2} 251.2`}
+                        strokeDashoffset={`-${((availableAssets.length + issuedAssets.length + repairAssets.length) / totalTrackedAssets) * 251.2}`}
+                      />
+                    </svg>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-xl font-bold text-slate-900">{totalTrackedAssets}</span>
+                      <span className="text-[9px] font-semibold text-slate-400 uppercase tracking-wider">Total</span>
+                    </div>
                   </div>
 
-                  <div className="flex-1 space-y-2.5">
-                    {assetStatusData.map((entry) => (
-                      <div
-                        key={entry.name}
-                        className="flex items-center justify-between text-xs"
-                      >
-                        <span className="flex items-center gap-2 text-[var(--color-idea-muted)]">
+                  {/* Legend */}
+                  <div className="flex-1 w-full space-y-2">
+                    {[
+                      { label: 'Available', count: availableAssets.length, color: '#34c759' },
+                      { label: 'Checked Out', count: issuedAssets.length, color: '#0071e3' },
+                      { label: 'Under Repair', count: repairAssets.length, color: '#ff9500' },
+                      { label: 'Damaged / Missing', count: damagedAssets.length, color: '#ff3b30' },
+                    ].map((entry) => (
+                      <div key={entry.label} className="flex items-center justify-between text-xs">
+                        <span className="flex items-center gap-2 text-slate-600">
                           <span
-                            className="h-2.5 w-2.5 shrink-0 rounded-full"
-                            style={{
-                              background: entry.color,
-                            }}
+                            className="h-2.5 w-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: entry.color }}
                           />
-
-                          {entry.name}
+                          <span>{entry.label}</span>
                         </span>
-
-                        <span className="font-bold text-[var(--color-idea-text)]">
-                          {entry.value}
-                        </span>
+                        <span className="font-bold text-slate-900">{entry.count}</span>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+            </div>
 
+            <div className="p-4 pt-0">
               <button
                 type="button"
                 onClick={() => onSelectView('assets')}
-                className="mt-4 w-full cursor-pointer rounded-xl border border-[var(--color-idea-border)] py-2.5 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
+                className="w-full py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
               >
-                View Assets
+                View Equipment
               </button>
             </div>
           </div>
 
-          <div className="idea-card overflow-hidden lg:col-span-6">
-            <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-5 py-4">
+          {/* Stock by Location Breakdown */}
+          <div className="idea-card overflow-hidden lg:col-span-6 flex flex-col justify-between">
+            <div className="flex items-center justify-between border-b border-slate-200/80 px-5 py-4">
               <div>
-                <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
-                  Distribution
-                </p>
-
-                <h2 className="mt-0.5 text-base font-bold text-[var(--color-idea-text)]">
-                  Stock by Location
-                </h2>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">Stock by Location</h2>
+                <p className="text-[11px] text-slate-500">Distribution across active storage areas</p>
               </div>
-
               <button
                 type="button"
                 onClick={() => onSelectView('locations')}
-                className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-[var(--color-idea-blue)] hover:opacity-80"
+                className="flex items-center gap-1 text-xs font-semibold text-[#0071e3] hover:opacity-80"
               >
-                View all
+                <span>View all</span>
                 <ArrowRight className="h-3.5 w-3.5" />
               </button>
             </div>
 
-            <div className="flex min-h-[250px] items-center p-5">
+            <div className="p-5 flex-1 flex flex-col justify-center space-y-3.5">
               {stockByLocation.length === 0 ? (
-                <div className="w-full text-center">
-                  <Boxes className="mx-auto h-7 w-7 text-[var(--color-idea-muted)]" />
-
-                  <p className="mt-3 text-xs font-semibold text-[var(--color-idea-text)]">
-                    No stock recorded yet
-                  </p>
-
-                  <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-                    Stock distribution will appear here once
-                    inventory is added.
-                  </p>
+                <div className="py-8 text-center text-slate-400 text-xs">
+                  No inventory locations recorded yet.
                 </div>
               ) : (
-                <div className="h-52 w-full">
-                  <ResponsiveContainer
-                    width="100%"
-                    height="100%"
-                  >
-                    <BarChart
-                      data={stockByLocation}
-                      layout="vertical"
-                      margin={{
-                        left: 8,
-                        right: 16,
-                      }}
-                    >
-                      <XAxis
-                        type="number"
-                        tick={{ fontSize: 10 }}
-                        stroke="var(--color-idea-muted)"
-                      />
-
-                      <YAxis
-                        type="category"
-                        dataKey="name"
-                        tick={{ fontSize: 10 }}
-                        width={100}
-                        stroke="var(--color-idea-muted)"
-                      />
-
-                      <Tooltip
-                        contentStyle={{
-                          fontSize: '11px',
-                          borderRadius: '8px',
-                        }}
-                      />
-
-                      <Bar
-                        dataKey="qty"
-                        fill="var(--color-idea-blue)"
-                        radius={[0, 4, 4, 0]}
-                      />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Pending Requests + Low Stock */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
-          <div className="idea-card overflow-hidden lg:col-span-6">
-            <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-5 py-4">
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
-                  Requires Attention
-                </p>
-
-                <h2 className="mt-0.5 text-base font-bold text-[var(--color-idea-text)]">
-                  Pending Requests
-
-                  {pendingRequests.length > 0 && (
-                    <span className="idea-warning ml-2 rounded-full px-2 py-0.5 align-middle text-[10px] font-bold">
-                      {pendingRequests.length}
-                    </span>
-                  )}
-                </h2>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => onSelectView('requests')}
-                className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-[var(--color-idea-blue)] hover:opacity-80"
-              >
-                View all
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {pendingRequests.length === 0 ? (
-              <div className="flex min-h-[190px] flex-col items-center justify-center px-6 py-8 text-center">
-                <CheckCircle2 className="h-7 w-7 text-[var(--color-idea-green)]" />
-
-                <p className="mt-3 text-xs font-semibold text-[var(--color-idea-text)]">
-                  No pending requests
-                </p>
-
-                <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-                  All current requests have been reviewed.
-                </p>
-              </div>
-            ) : (
-              <div className="max-h-80 divide-y divide-[var(--color-idea-border)] overflow-y-auto">
-                {pendingRequests.map((request) => {
-                  const requester = users.find(
-                    (user) => user.id === request.user_id
-                  );
-
+                stockByLocation.map((loc) => {
+                  const pct = Math.round((loc.qty / maxLocationQty) * 100);
                   return (
-                    <div
-                      key={request.id}
-                      className="flex items-center justify-between gap-4 px-5 py-4 transition-colors hover:bg-[var(--color-idea-light-grey)]/60"
-                    >
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-mono text-[10px] font-bold text-[var(--color-idea-blue)]">
-                            {request.request_number}
-                          </span>
-
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wider ${getStatusBadge(
-                              request.status
-                            )}`}
-                          >
-                            Pending
-                          </span>
-                        </div>
-
-                        <p className="mt-1 truncate text-xs font-semibold text-[var(--color-idea-text)]">
-                          {requester?.name ||
-                            'Unknown user'}
-                        </p>
-
-                        <p className="mt-1 truncate text-[10px] text-[var(--color-idea-muted)]">
-                          {request.purpose}
-                        </p>
+                    <div key={loc.name} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs font-medium">
+                        <span className="text-slate-700 truncate">{loc.name}</span>
+                        <span className="text-slate-900 font-semibold">{loc.qty} units</span>
                       </div>
-
-                      <div className="shrink-0 text-right">
-                        <p className="font-mono text-[9px] text-[var(--color-idea-muted)]">
-                          {new Date(
-                            request.created_at
-                          ).toLocaleDateString('en-IN')}
-                        </p>
-
-                        <span className="text-[9px] font-semibold text-[var(--color-idea-blue)]">
-                          Review
-                        </span>
+                      <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#0071e3] rounded-full transition-all duration-300"
+                          style={{ width: `${pct}%` }}
+                        />
                       </div>
                     </div>
                   );
-                })}
-              </div>
-            )}
-          </div>
+                })
+              )}
+            </div>
 
-          <div className="idea-card overflow-hidden lg:col-span-6">
-            <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-5 py-4">
-              <div>
-                <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
-                  Inventory Attention
-                </p>
-
-                <h2 className="mt-0.5 text-base font-bold text-[var(--color-idea-text)]">
-                  Low Stock Items
-
-                  {lowStockItems.length > 0 && (
-                    <span className="idea-error ml-2 rounded-full px-2 py-0.5 align-middle text-[10px] font-bold">
-                      {lowStockItems.length}
-                    </span>
-                  )}
-                </h2>
-              </div>
-
+            <div className="p-4 pt-0">
               <button
                 type="button"
                 onClick={() => onSelectView('inventory')}
-                className="cursor-pointer text-xs font-semibold text-[var(--color-idea-blue)] hover:opacity-80"
+                className="w-full py-2 border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
               >
-                View inventory
+                Manage Inventory
               </button>
             </div>
-
-            {lowStockItems.length === 0 ? (
-              <div className="flex min-h-[190px] flex-col items-center justify-center px-6 py-8 text-center">
-                <CheckCircle2 className="h-7 w-7 text-[var(--color-idea-green)]" />
-
-                <p className="mt-3 text-xs font-semibold text-[var(--color-idea-text)]">
-                  Stock levels are healthy
-                </p>
-
-                <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-                  No items are currently below their alert
-                  threshold.
-                </p>
-              </div>
-            ) : (
-              <div className="max-h-80 divide-y divide-[var(--color-idea-border)] overflow-y-auto">
-                {lowStockItems.map(
-                  ({ item, quantity, threshold }) => (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between gap-4 px-5 py-3.5"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate text-xs font-semibold text-[var(--color-idea-text)]">
-                          {item.name}
-                        </p>
-
-                        <p className="mt-0.5 font-mono text-[9px] text-[var(--color-idea-muted)]">
-                          {item.item_code}
-                        </p>
-                      </div>
-
-                      <div className="shrink-0 text-right">
-                        <p className="text-xs font-bold text-[var(--color-idea-red)]">
-                          {quantity} {item.unit}
-                        </p>
-
-                        <p className="text-[9px] text-[var(--color-idea-muted)]">
-                          Alert at {threshold}
-                        </p>
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Recent Ledger */}
-        <div className="idea-card overflow-hidden">
-          <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-5 py-4">
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-[0.18em] text-[var(--color-idea-muted)]">
-                Historical Activity
-              </p>
-
-              <h2 className="mt-0.5 text-base font-bold text-[var(--color-idea-text)]">
-                Recent Ledger Entries
-              </h2>
+        {/* Low Stock Alerts + Recent Transactions */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
+          {/* Low Stock Alert */}
+          <div className="idea-card overflow-hidden lg:col-span-6">
+            <div className="flex items-center justify-between border-b border-slate-200/80 px-5 py-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">Low Stock Alerts</h2>
+                <p className="text-[11px] text-slate-500">Items at or below reorder threshold</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSelectView('inventory')}
+                className="flex items-center gap-1 text-xs font-semibold text-[#0071e3] hover:opacity-80"
+              >
+                <span>Inventory</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onSelectView('activity')}
-              className="flex cursor-pointer items-center gap-1 text-xs font-semibold text-[var(--color-idea-blue)] hover:opacity-80"
-            >
-              View ledger
-              <ArrowRight className="h-3.5 w-3.5" />
-            </button>
+            <div className="divide-y divide-slate-100">
+              {lowStockItems.length === 0 ? (
+                <div className="py-10 text-center">
+                  <CheckCircle2 className="mx-auto h-7 w-7 text-emerald-500" />
+                  <p className="mt-2 text-xs font-semibold text-slate-700">Healthy stock levels</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">All catalog items are adequately stocked.</p>
+                </div>
+              ) : (
+                lowStockItems.slice(0, 5).map(({ item, quantity, threshold }) => (
+                  <div key={item.id} className="flex items-center justify-between px-5 py-3 text-xs">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-slate-900 truncate">{item.name}</p>
+                      <p className="text-[11px] text-slate-400 font-mono">Code: {item.item_code}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <span className="font-bold text-red-600">{quantity}</span>
+                      <span className="text-slate-400"> / {threshold} {item.unit}</span>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
 
-          {transactions.length === 0 ? (
-            <div className="flex min-h-[170px] flex-col items-center justify-center px-6 py-8 text-center">
-              <ScrollText className="h-7 w-7 text-[var(--color-idea-muted)]" />
-
-              <p className="mt-3 text-xs font-semibold text-[var(--color-idea-text)]">
-                No ledger entries yet
-              </p>
-
-              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
-                Meaningful inventory events will appear here.
-              </p>
+          {/* Recent Activity */}
+          <div className="idea-card overflow-hidden lg:col-span-6">
+            <div className="flex items-center justify-between border-b border-slate-200/80 px-5 py-4">
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-slate-900">Recent Activity</h2>
+                <p className="text-[11px] text-slate-500">Latest recorded transactions</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => onSelectView('activity')}
+                className="flex items-center gap-1 text-xs font-semibold text-[#0071e3] hover:opacity-80"
+              >
+                <span>Ledger</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
             </div>
-          ) : (
-            <div className="max-h-80 divide-y divide-[var(--color-idea-border)] overflow-y-auto">
-              {transactions.map((transaction) => {
-                const asset = assets.find(
-                  (assetItem) =>
-                    assetItem.id ===
-                    transaction.asset_id
-                );
 
-                /*
-                 * InventoryTransaction.catalog_item_id
-                 * references CatalogItem.id.
-                 *
-                 * If the transaction is asset-based, the
-                 * asset's catalog_item_id is used as fallback.
-                 */
-                const catalogItemId =
-                  transaction.catalog_item_id ||
-                  asset?.catalog_item_id;
-
-                const catalogItem =
-                  findCatalogItem(catalogItemId);
-
-                const performer = users.find(
-                  (user) =>
-                    user.id ===
-                    transaction.processed_by_user_id
-                );
-
-                return (
-                  <div
-                    key={transaction.id}
-                    className="flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-[var(--color-idea-light-grey)]/60"
-                  >
+            <div className="divide-y divide-slate-100">
+              {transactions.length === 0 ? (
+                <div className="py-10 text-center">
+                  <ScrollText className="mx-auto h-7 w-7 text-slate-300" />
+                  <p className="mt-2 text-xs font-semibold text-slate-700">No activity yet</p>
+                  <p className="mt-0.5 text-[11px] text-slate-400">Inventory transactions will appear here.</p>
+                </div>
+              ) : (
+                transactions.slice(0, 5).map((tx) => (
+                  <div key={tx.id} className="flex items-center justify-between gap-3 px-5 py-3 text-xs">
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="truncate text-xs font-semibold text-[var(--color-idea-text)]">
-                          {catalogItem?.name ||
-                            asset?.asset_code ||
-                            'Unknown entity'}
-                        </span>
-
-                        <span className="idea-info shrink-0 rounded-full px-2 py-0.5 text-[8px] font-bold uppercase tracking-wide">
-                          {getTransactionLabel(
-                            transaction.transaction_type
-                          )}
-                        </span>
-                      </div>
-
-                      <p className="mt-1 truncate text-[9px] text-[var(--color-idea-muted)]">
-                        {performer?.name || 'System'}
-
-                        {transaction.remarks
-                          ? ` · ${transaction.remarks}`
-                          : ''}
+                      <p className="font-semibold text-slate-900 truncate">
+                        {tx.type} · {tx.quantity} units
                       </p>
+                      <p className="text-[11px] text-slate-400 truncate">{tx.remarks || 'Standard update'}</p>
                     </div>
-
-                    <span className="shrink-0 font-mono text-[9px] text-[var(--color-idea-muted)]">
-                      {getTimeAgo(
-                        transaction.created_at
-                      )}
+                    <span className="text-[11px] text-slate-400 shrink-0 font-medium">
+                      {getTimeAgo(tx.created_at)}
                     </span>
                   </div>
-                );
-              })}
+                ))
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

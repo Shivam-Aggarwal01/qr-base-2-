@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { Helmet } from 'react-helmet-async';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { auth, functions } from './firebase';
-import { httpsCallable } from 'firebase/functions';
+import { auth } from './firebase';
 import { InventoryStorage, parseQRCodeFromEntities } from './services/storage';
 import {
   COLLECTIONS,
@@ -14,7 +13,6 @@ import {
   getUserProfile,
   getAccountRequest,
   reviewAccountRequest,
-  submitAccountRequest,
   STUDENT_SIGNUP_NAME_KEY,
 } from './services/firebaseInventory';
 import { readFirestoreState } from './services/firebaseCollections';
@@ -91,35 +89,35 @@ const legalPaths = ['/privacy', '/terms', '/legal'];
 
 const viewMetadata: Record<ViewMode, { title: string; description: string }> = {
   dashboard: {
-    title: 'Dashboard',
-    description: 'Overview of inventory, equipment, requests, storage locations, and recent activity.',
+    title: 'Overview',
+    description: 'A live look at lab equipment, stock, and current requests.',
   },
   inventory: {
     title: 'Inventory',
-    description: 'Manage catalog items, stock quantities, and inventory records.',
+    description: 'Track stock quantities, units, and inventory records.',
   },
   assets: {
-    title: 'Assets',
-    description: 'Track individual equipment, asset status, locations, and assignments.',
+    title: 'Equipment',
+    description: 'Manage individual equipment, operational status, and assignments.',
   },
   requests: {
     title: 'Requests',
-    description: 'Create, review, approve, and track inventory requests.',
+    description: 'Review, approve, and track material requests and returns.',
   },
   locations: {
     title: 'Locations',
-    description: 'Manage storage locations and inventory stored at each location.',
+    description: 'Manage workbenches, storage racks, and component bins.',
   },
   activity: {
-    title: 'Ledger',
-    description: 'Review historical inventory transactions and activity.',
+    title: 'Activity',
+    description: 'A clear history of every checkout, return, and transfer.',
   },
   users: {
-    title: 'Users',
-    description: 'Manage lab users, access roles, and account approval requests.',
+    title: 'Directory',
+    description: 'Manage lab members, roles, and pending approvals.',
   },
   legal: {
-    title: 'Legal & Policies',
+    title: 'Policies',
     description: 'Privacy policy, terms of service, and lab governance guidelines.',
   },
 };
@@ -130,7 +128,7 @@ export default function App() {
   const currentView = pathViews[location.pathname] ?? 'dashboard';
   const setCurrentView = (view: ViewMode) => navigate(viewPaths[view]);
   const pageMetadata = viewMetadata[currentView];
-  const pageTitle = `${pageMetadata.title} | IDEA LAB Inventory Management`;
+  const pageTitle = `${pageMetadata.title} · IDEA Lab`;
   const pageDescription = pageMetadata.description;
   const pageUrl = `${window.location.origin}${location.pathname}`;
   const socialImage = `${window.location.origin}/social-preview.png`;
@@ -212,13 +210,20 @@ export default function App() {
   // The Firebase Auth custom claim is the source of truth for authorization.
   const effectiveRole = authRole ?? currentUser?.role;
   const isStudentUser = isStudent(effectiveRole);
-  const pendingAccountCount = accountRequests.filter((request) => request.status === 'PENDING').length;
-  const pendingRequestsCount = isStudentUser
-    ? requests.filter(
-        (request) =>
-          (request.status === 'PENDING' || request.status === 'APPROVED') && request.user_id === currentUser?.id
-      ).length
-    : requests.filter((request) => request.status === 'PENDING' || request.status === 'APPROVED').length;
+  const pendingAccountCount = useMemo(
+    () => accountRequests.filter((request) => request.status === 'PENDING').length,
+    [accountRequests]
+  );
+  const pendingRequestsCount = useMemo(
+    () =>
+      isStudentUser
+        ? requests.filter(
+            (request) =>
+              (request.status === 'PENDING' || request.status === 'APPROVED') && request.user_id === currentUser?.id
+          ).length
+        : requests.filter((request) => request.status === 'PENDING' || request.status === 'APPROVED').length,
+    [isStudentUser, requests, currentUser?.id]
+  );
 
   // ---------------------------------------------------------------------------
   // Firestore data

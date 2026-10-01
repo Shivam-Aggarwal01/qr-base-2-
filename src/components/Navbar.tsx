@@ -93,7 +93,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             type="text"
             value={searchVal}
             onChange={handleSearchChange}
-            placeholder="Search assets, catalog items, codes, QR..."
+            placeholder="Search equipment, inventory, codes, or tags…"
             aria-label="Search inventory"
             className="idea-input w-full pl-9 pr-4 py-2 text-xs"
           />

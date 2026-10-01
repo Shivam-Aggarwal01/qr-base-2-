@@ -1243,12 +1243,12 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               <AlertTriangle className="mx-auto h-12 w-12 text-[var(--color-idea-blue)]" />
 
               <div>
-                <h4 className="text-xl font-bold text-[var(--color-idea-text)]">
-                  QR Not Recognized
+                <h4 className="text-lg font-bold text-[var(--color-idea-text)]">
+                  Code Not Found
                 </h4>
 
-                <p className="mx-auto mt-2 max-w-sm text-xs leading-relaxed text-[var(--color-idea-muted)]">
-                  No matching Item, Asset or Location was found for this QR identifier.
+                <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-[var(--color-idea-muted)]">
+                  No matching item, equipment, or location was found for this code.
                 </p>
 
                 <p className="mt-3 break-all rounded-lg bg-[var(--color-idea-light-grey)] px-3 py-2 font-mono text-xs font-semibold text-[var(--color-idea-text)]">

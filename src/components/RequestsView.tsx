@@ -468,25 +468,25 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Unified Standard Page Header */}
+        {/* Standard Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
-                AICTE IDEA LAB · MATERIAL REQUESTS
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-blue)]">
+                IDEA Lab · Requests
               </span>
             </div>
             <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
-              Material Requests & Approvals
+              Requests
             </h1>
-            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
-              Create, review, approve, handover, and track inventory checkout requests and returns.
+            <p className="mt-1 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Review, approve, checkout, and return lab supplies and tools.
             </p>
           </div>
 
           <button
             onClick={onOpenNewRequest}
-            className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl shadow-sm cursor-pointer shrink-0"
+            className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>New Request</span>

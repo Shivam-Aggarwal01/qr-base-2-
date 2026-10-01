@@ -40,7 +40,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const studentMenuItems = [
     {
       id: 'inventory' as ViewMode,
-      label: 'Items',
+      label: 'Inventory',
       icon: Box,
     },
     {
@@ -51,12 +51,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'dashboard' as ViewMode,
-      label: 'Dashboard',
+      label: 'Overview',
       icon: LayoutDashboard,
     },
     {
       id: 'legal' as ViewMode,
-      label: 'Legal & Policies',
+      label: 'Policies',
       icon: ShieldCheck,
     },
   ];
@@ -64,17 +64,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const staffMenuItems = [
     {
       id: 'dashboard' as ViewMode,
-      label: 'Dashboard',
+      label: 'Overview',
       icon: LayoutDashboard,
     },
     {
       id: 'inventory' as ViewMode,
-      label: 'Items',
+      label: 'Inventory',
       icon: Box,
     },
     {
       id: 'assets' as ViewMode,
-      label: 'Assets',
+      label: 'Equipment',
       icon: Layers,
     },
     {
@@ -90,18 +90,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
     },
     {
       id: 'activity' as ViewMode,
-      label: 'Ledger',
+      label: 'Activity',
       icon: History,
     },
     {
       id: 'users' as ViewMode,
-      label: 'User Directory',
+      label: 'Directory',
       icon: Users,
       badge: pendingAccountCount > 0 ? pendingAccountCount : undefined,
     },
     {
       id: 'legal' as ViewMode,
-      label: 'Legal & Policies',
+      label: 'Policies',
       icon: ShieldCheck,
     },
   ];

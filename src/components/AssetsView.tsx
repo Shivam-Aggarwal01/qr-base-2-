@@ -123,8 +123,22 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   };
 
   const getStatusLabel = (status: AssetStatus | 'ALL') => {
-    if (status === 'ALL') return 'All Assets';
-    return status === 'LOST' ? 'MISSING' : status.replace('_', ' ');
+    switch (status) {
+      case 'ALL':
+        return 'All Equipment';
+      case 'AVAILABLE':
+        return 'Available';
+      case 'ISSUED':
+        return 'Checked Out';
+      case 'UNDER_REPAIR':
+        return 'In Repair';
+      case 'DAMAGED':
+        return 'Damaged';
+      case 'LOST':
+        return 'Missing';
+      default:
+        return String(status).replace('_', ' ');
+    }
   };
 
   const openEditAssetModal = (asset: Asset) => {
@@ -223,19 +237,19 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
       <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
-        {/* Unified Standard Page Header */}
+        {/* Standard Page Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
-                AICTE IDEA LAB · ASSET REGISTRY
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-blue)]">
+                IDEA Lab · Equipment
               </span>
             </div>
             <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
-              Assets & Equipment Tracking
+              Equipment
             </h1>
-            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
-              Track individual machines, testing instruments, bench tools, operational statuses, and assignments.
+            <p className="mt-1 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Manage individual tools, machines, instruments, and assignments.
             </p>
           </div>
 
@@ -248,16 +262,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 title="Print batch QR label stickers"
               >
                 <QrCode className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                <span className="hidden sm:inline">QR Sticker Sheets</span>
+                <span className="hidden sm:inline">Print Labels</span>
               </button>
             )}
 
             <button
               onClick={() => setShowAddModal(true)}
-              className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl shadow-sm cursor-pointer shrink-0 min-h-[42px]"
+              className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl cursor-pointer shrink-0 min-h-[42px]"
             >
               <Plus className="w-4 h-4" />
-              <span>Add Asset</span>
+              <span>Add Equipment</span>
             </button>
           </div>
         </div>
@@ -287,8 +301,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
-              placeholder="Search assets by code, name, serial..."
-              className="idea-input pl-9 pr-4 py-2.5 text-xs sm:text-sm w-full"
+              placeholder="Search equipment by code, name, or serial…"
+              className="idea-input pl-9 pr-4 py-2 text-xs sm:text-sm w-full"
             />
           </div>
         </div>
