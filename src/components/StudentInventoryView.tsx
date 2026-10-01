@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CalendarClock, Package, Search } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Package, Search, Plus } from 'lucide-react';
 import {
   Asset,
   CatalogItem,
@@ -151,35 +151,32 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
-      <div className="mx-auto w-full max-w-7xl space-y-6 p-4 sm:p-6 lg:p-8">
-        {/* Header */}
-        <header className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Unified Standard Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
           <div>
-            <span className="text-[10px] font-medium uppercase tracking-[0.25em] text-[var(--color-idea-muted)]">
-              STUDENT INVENTORY DESK
-            </span>
-
-            <h2 className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-idea-text)]">
-              Lab inventory{' '}
-              <span className="text-[var(--color-idea-blue)]">
-                availability
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB · STUDENT INVENTORY DESK
               </span>
-            </h2>
-
-            <p className="mt-1 text-xs text-[var(--color-idea-muted)]">
-              Check stock, tracked assets, and current borrowers
-              before requesting equipment.
+            </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
+              Lab Inventory Availability
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Check real-time stock levels, available tracked assets, and active loans before submitting equipment requests.
             </p>
           </div>
 
           <button
             type="button"
             onClick={onOpenNewRequest}
-            className="idea-button shrink-0 cursor-pointer px-4 py-2.5 text-xs font-semibold"
+            className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl shadow-sm cursor-pointer shrink-0"
           >
-            Request an item
+            <Plus className="w-4 h-4" />
+            <span>New Request</span>
           </button>
-        </header>
+        </div>
 
         {/* Return Deadlines */}
         {myOpenDeadlines.length > 0 && (
@@ -219,15 +216,16 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
         )}
 
         {/* Search */}
-        <div className="relative max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-idea-muted)]" />
-
-          <input
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search inventory or asset code..."
-            className="idea-input w-full py-2.5 pl-9 pr-4 text-xs"
-          />
+        <div className="idea-card p-3 sm:p-4">
+          <div className="relative w-full max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-idea-muted)]" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search inventory by item name, code..."
+              className="idea-input w-full pl-9 pr-4 py-2.5 text-xs sm:text-sm"
+            />
+          </div>
         </div>
 
         {/* Consumable Inventory */}

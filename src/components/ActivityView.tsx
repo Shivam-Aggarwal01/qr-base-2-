@@ -183,22 +183,27 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
-      <div className="max-w-6xl mx-auto px-6 py-7 space-y-6">
-        {/* Page Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Unified Standard Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
           <div>
-            <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
-              Activity Ledger
-            </span>
-            <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-              Transaction <span className="text-[var(--color-idea-blue)]">Records</span>
-            </h2>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB · AUDIT LEDGER
+              </span>
+            </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
+              Transaction History & Records
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Review immutable chronological records of issues, returns, check-outs, and inventory transfers.
+            </p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="idea-card p-3">
-          <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+        <div className="idea-card p-3 sm:p-4">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-3 sm:gap-4">
             <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 flex-1 min-w-0">
               {FILTER_TABS.map((type) => {
                 const active = typeFilter === type;
@@ -211,7 +216,7 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
                     type="button"
                     aria-pressed={active}
                     onClick={() => setTypeFilter(type)}
-                    className={`inline-flex items-center gap-1.5 shrink-0 px-3 py-2 rounded-lg border text-[10px] font-semibold transition-colors cursor-pointer whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)] ${active
+                    className={`inline-flex items-center gap-1.5 shrink-0 px-3 py-2 rounded-lg border text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)] ${active
                         ? 'bg-[var(--color-idea-blue)] text-white border-[var(--color-idea-blue)]'
                         : 'bg-white text-[var(--color-idea-muted)] border-[var(--color-idea-border)] hover:text-[var(--color-idea-text)] hover:border-[var(--color-idea-blue)]/40'
                       }`}
@@ -231,15 +236,15 @@ export const ActivityView: React.FC<ActivityViewProps> = ({
               })}
             </div>
 
-            <div className="relative w-full lg:w-64 shrink-0">
+            <div className="relative w-full lg:w-72 shrink-0">
               <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={searchFilter}
                 onChange={(event) => setSearchFilter(event.target.value)}
-                placeholder="Search activity..."
+                placeholder="Search transactions by item, user..."
                 aria-label="Search activity"
-                className="idea-input w-full pl-9 pr-3 py-2.5 text-xs"
+                className="idea-input w-full pl-9 pr-3 py-2.5 text-xs sm:text-sm"
               />
             </div>
           </div>

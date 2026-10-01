@@ -19,6 +19,7 @@ interface AssetsViewProps {
   userRole?: UserRole;
   onRefreshData: () => void;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
+  onOpenBatchLabels?: () => void;
 }
 
 const EDITABLE_STATUSES: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST'];
@@ -30,6 +31,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   userRole,
   onRefreshData,
   onOpenQRGenerator,
+  onOpenBatchLabels,
 }) => {
   const [statusFilter, setStatusFilter] = useState<AssetStatus | 'ALL'>('ALL');
   const [searchFilter, setSearchFilter] = useState('');
@@ -219,58 +221,77 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   };
 
   return (
-    <div className="flex-1 space-y-8 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
-            LAB ASSETS
-          </span>
-          <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-            Assets
-            <span className="text-[var(--color-idea-blue)]"> List</span>
-          </h2>
-        </div>
+    <div className="flex-1 overflow-y-auto idea-bg">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Unified Standard Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB · ASSET REGISTRY
+              </span>
+            </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
+              Assets & Equipment Tracking
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Track individual machines, testing instruments, bench tools, operational statuses, and assignments.
+            </p>
+          </div>
 
-        <button
-          onClick={() => setShowAddModal(true)}
-          className="idea-button flex items-center gap-2 px-5 py-2.5 text-xs font-semibold cursor-pointer"
-        >
-          <Plus className="w-4 h-4" />
-          Add Asset
-        </button>
-      </div>
+          <div className="flex items-center gap-2">
+            {onOpenBatchLabels && (
+              <button
+                type="button"
+                onClick={onOpenBatchLabels}
+                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl border border-[var(--color-idea-border)] bg-white text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] shadow-2xs cursor-pointer shrink-0 transition-all min-h-[42px]"
+                title="Print batch QR label stickers"
+              >
+                <QrCode className="w-4 h-4 text-[var(--color-idea-blue)]" />
+                <span className="hidden sm:inline">QR Sticker Sheets</span>
+              </button>
+            )}
 
-      {/* Filter Toolbar */}
-      <div className="idea-card p-4 flex flex-col md:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-1.5 bg-[var(--color-idea-light-grey)] p-1.5 rounded-2xl w-full md:w-auto overflow-x-auto">
-          {(['ALL', 'AVAILABLE', 'ISSUED', 'UNDER_REPAIR', 'DAMAGED', 'LOST'] as const).map((m) => (
             <button
-              key={m}
-              onClick={() => setStatusFilter(m)}
-              className={`px-3.5 py-1.5 text-xs font-semibold rounded-xl transition-all cursor-pointer whitespace-nowrap ${
-                statusFilter === m
-                  ? 'bg-white text-[var(--color-idea-blue)] shadow-sm'
-                  : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
-              }`}
+              onClick={() => setShowAddModal(true)}
+              className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl shadow-sm cursor-pointer shrink-0 min-h-[42px]"
             >
-              {getStatusLabel(m)}
+              <Plus className="w-4 h-4" />
+              <span>Add Asset</span>
             </button>
-          ))}
+          </div>
         </div>
 
-        {/* Search */}
-        <div className="relative w-full md:w-72">
-          <input
-            type="text"
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Search asset name or storage..."
-            className="idea-input pl-9 pr-4 py-2 text-xs"
-          />
-          <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-2.5" />
+        {/* Filter Toolbar */}
+        <div className="idea-card p-3 sm:p-4 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
+          <div className="flex items-center gap-1.5 bg-[var(--color-idea-light-grey)] p-1 rounded-xl w-full md:w-auto overflow-x-auto border border-[var(--color-idea-border)]">
+            {(['ALL', 'AVAILABLE', 'ISSUED', 'UNDER_REPAIR', 'DAMAGED', 'LOST'] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setStatusFilter(m)}
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap ${
+                  statusFilter === m
+                    ? 'bg-white text-[var(--color-idea-deep-blue)] shadow-sm'
+                    : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
+                }`}
+              >
+                {getStatusLabel(m)}
+              </button>
+            ))}
+          </div>
+
+          {/* Search */}
+          <div className="relative w-full md:w-80">
+            <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder="Search assets by code, name, serial..."
+              className="idea-input pl-9 pr-4 py-2.5 text-xs sm:text-sm w-full"
+            />
+          </div>
         </div>
-      </div>
 
       {/* Asset Table */}
       <div className="idea-card overflow-hidden">
@@ -565,6 +586,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

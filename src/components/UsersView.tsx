@@ -256,28 +256,35 @@ export const UsersView: React.FC<UsersViewProps> = ({
   // Render
   // ---------------------------------------------------------------------------
   return (
-    <div className="flex-1 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
-            Our Members
-          </span>
-          <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-            Student <span className="text-[var(--color-idea-blue)]">List</span>
-          </h2>
+    <div className="flex-1 overflow-y-auto idea-bg">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Unified Standard Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB · MEMBERS & ACCESS
+              </span>
+            </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
+              User Directory & Access Control
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Manage laboratory members, assigned roles, permissions, and approve pending student registrations.
+            </p>
+          </div>
+
+          <div className="relative w-full sm:w-72 shrink-0">
+            <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(event) => setSearchFilter(event.target.value)}
+              placeholder="Search members by name, email..."
+              className="idea-input w-full pl-9 pr-4 py-2.5 text-xs sm:text-sm"
+            />
+          </div>
         </div>
-        <div className="relative w-full sm:w-64">
-          <input
-            type="text"
-            value={searchFilter}
-            onChange={(event) => setSearchFilter(event.target.value)}
-            placeholder="Search student..."
-            className="idea-input pl-9 pr-4 py-2 text-xs"
-          />
-          <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-2.5" />
-        </div>
-      </div>
 
       {/* Pending account requests */}
       {isAdmin && pendingAccountRequests.length > 0 && (
@@ -475,6 +482,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
           </p>
         </div>
       )}
+      </div>
     </div>
   );
 };

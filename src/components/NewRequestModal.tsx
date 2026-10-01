@@ -241,36 +241,36 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-[var(--color-idea-text)]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-      <div className="bg-white rounded-2xl shadow-2xl border border-[var(--color-idea-border)] w-full max-w-lg overflow-hidden flex flex-col">
+    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white rounded-2xl shadow-2xl border border-[var(--color-idea-border)] w-full max-w-lg max-h-[92vh] overflow-hidden flex flex-col">
 
         {/* Header */}
-        <div className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between bg-[var(--color-idea-light-grey)]/50">
+        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-idea-border)] flex items-center justify-between bg-[var(--color-idea-light-grey)]/60 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[var(--color-idea-blue)] text-white rounded-xl flex items-center justify-center shadow-md">
-              <Package className="w-5 h-5" />
+            <div className="w-10 h-10 bg-[var(--color-idea-deep-blue)] text-white rounded-xl flex items-center justify-center shadow-xs">
+              <Package className="w-5 h-5 text-[var(--color-idea-blue)]" />
             </div>
 
             <div>
-              <h3 className="font-bold text-[var(--color-idea-text)] text-lg leading-tight">
-                New Request
+              <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB
+              </span>
+              <h3 className="font-bold text-[var(--color-idea-text)] text-base sm:text-lg leading-tight">
+                New Equipment Request
               </h3>
-
-              <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">
-                Ask for items or assets
-              </p>
             </div>
           </div>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors cursor-pointer"
+            className="p-2 rounded-xl hover:bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+            aria-label="Close modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
 
           {/* Requested By */}
           <div>

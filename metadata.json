@@ -1,0 +1,8 @@
+{
+  "name": "IDEA Lab Inventory Management System",
+  "description": "Comprehensive laboratory inventory, asset tracking, equipment checkout, and approval management system for AICTE IDEA Lab.",
+  "permissions": [],
+  "capabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

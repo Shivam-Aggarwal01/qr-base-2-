@@ -215,4 +215,4 @@ export interface AuditLog {
 // ---------------------------------------------------------------------------
 // View routing
 // ---------------------------------------------------------------------------
-export type ViewMode = 'dashboard' | 'inventory' | 'assets' | 'requests' | 'locations' | 'activity' | 'users';
+export type ViewMode = 'dashboard' | 'inventory' | 'assets' | 'requests' | 'locations' | 'activity' | 'users' | 'legal';

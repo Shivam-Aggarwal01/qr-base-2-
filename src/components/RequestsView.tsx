@@ -467,71 +467,64 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
-      <div className="max-w-6xl mx-auto px-6 py-8 space-y-6">
-
-        {/* HEADER */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Unified Standard Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
           <div>
-            <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
-              Material Requests
-            </span>
-
-            <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-              Requests{' '}
-              <span className="text-[var(--color-idea-blue)]">
-                List
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB · MATERIAL REQUESTS
               </span>
-            </h2>
+            </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
+              Material Requests & Approvals
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Create, review, approve, handover, and track inventory checkout requests and returns.
+            </p>
           </div>
 
           <button
             onClick={onOpenNewRequest}
-            className="idea-button flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl cursor-pointer shrink-0"
+            className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl shadow-sm cursor-pointer shrink-0"
           >
             <Plus className="w-4 h-4" />
-            New Request
+            <span>New Request</span>
           </button>
         </div>
 
-        {/* FILTER PILLS */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-          {FILTERS.map((filter) => {
-            const count = filterCount(filter);
-            const active =
-              statusFilter === filter;
+        {/* FILTER BAR */}
+        <div className="idea-card p-3 sm:p-4">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+            {FILTERS.map((filter) => {
+              const count = filterCount(filter);
+              const active = statusFilter === filter;
+              const label = filter === 'ALL' ? 'All Requests' : STATUS_CFG[filter]?.label ?? filter;
 
-            const label =
-              filter === 'ALL'
-                ? 'All'
-                : STATUS_CFG[filter]?.label ??
-                filter;
-
-            return (
-              <button
-                key={filter}
-                onClick={() =>
-                  setStatusFilter(filter)
-                }
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${active
-                  ? 'bg-[var(--color-idea-blue)] text-white border-[var(--color-idea-blue)] shadow-sm'
-                  : 'bg-white text-[var(--color-idea-muted)] border-[var(--color-idea-border)] hover:border-[var(--color-idea-blue)]/40 hover:text-[var(--color-idea-text)]'
-                  }`}
-              >
-                {label}
-
-                {count > 0 && (
-                  <span
-                    className={`text-[9px] font-bold px-1.5 py-px rounded-full ${active
-                      ? 'bg-white/20'
-                      : 'bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)]'
-                      }`}
-                  >
-                    {count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
+              return (
+                <button
+                  key={filter}
+                  onClick={() => setStatusFilter(filter)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg border transition-all cursor-pointer whitespace-nowrap ${active
+                    ? 'bg-[var(--color-idea-blue)] text-white border-[var(--color-idea-blue)] shadow-sm'
+                    : 'bg-white text-[var(--color-idea-muted)] border-[var(--color-idea-border)] hover:border-[var(--color-idea-blue)]/40 hover:text-[var(--color-idea-text)]'
+                    }`}
+                >
+                  <span>{label}</span>
+                  {count > 0 && (
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${active
+                        ? 'bg-white/20 text-white'
+                        : 'bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)]'
+                        }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* TABLE */}

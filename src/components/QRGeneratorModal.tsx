@@ -20,7 +20,6 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
   typeBadge,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-
   const [generating, setGenerating] = useState(false);
   const [generationError, setGenerationError] = useState<string | null>(null);
 
@@ -37,17 +36,16 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
 
       try {
         await QRCode.toCanvas(canvasRef.current, code, {
-          width: 240,
+          width: 220,
           margin: 2,
           errorCorrectionLevel: 'M',
           color: {
-            dark: '#0f172a',
+            dark: '#172b3a',
             light: '#ffffff',
           },
         });
       } catch (error) {
         console.error('QR generation error:', error);
-
         if (!cancelled) {
           setGenerationError('Unable to generate the QR code.');
         }
@@ -75,10 +73,8 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
     if (!canvasRef.current || !code || generationError) {
       return;
     }
-
     const link = document.createElement('a');
-
-    link.download = `QR_${code.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
+    link.download = `IDEA_LAB_QR_${code.replace(/[^a-zA-Z0-9_-]/g, '_')}.png`;
     link.href = canvasRef.current.toDataURL('image/png');
     link.click();
   };
@@ -88,108 +84,95 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
       return;
     }
 
-    const printWindow = window.open('', '_blank', 'width=500,height=600');
+    const qrImage = canvasRef.current.toDataURL('image/png');
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
 
-    if (!printWindow) {
-      alert('Please allow pop-ups to print the QR label.');
+    const doc = iframe.contentWindow?.document;
+    if (!doc) {
+      window.print();
       return;
     }
 
-    const qrImage = canvasRef.current.toDataURL('image/png');
-
-    printWindow.document.write(`
-      <!DOCTYPE html>
+    doc.open();
+    doc.write(`
+      <!doctype html>
       <html>
         <head>
-          <title>${escapeHtml(title)}</title>
+          <title>${title} - QR Label</title>
           <style>
-            @page {
-              margin: 0;
-            }
-
-            * {
-              box-sizing: border-box;
-            }
-
+            @page { size: auto; margin: 10mm; }
             body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              padding: 20px;
               margin: 0;
-              padding: 20mm;
-              background: white;
-              font-family: Arial, sans-serif;
-              color: #0f172a;
+            }
+            .label-card {
+              border: 2px solid #172b3a;
+              border-radius: 12px;
+              padding: 16px;
+              width: 240px;
               text-align: center;
+              background: #fff;
             }
-
-            .label {
-              width: 70mm;
-              margin: 0 auto;
-              padding: 6mm;
-              border: 1px solid #e2e8f0;
-              border-radius: 4mm;
-            }
-
-            .badge {
-              display: inline-block;
-              margin-bottom: 4mm;
-              padding: 1.5mm 3mm;
-              background: #eff6ff;
-              color: #1d4ed8;
-              border-radius: 10mm;
-              font-size: 8pt;
-              font-weight: 700;
-              letter-spacing: 0.08em;
+            .brand {
+              font-size: 9px;
+              font-weight: 800;
+              letter-spacing: 0.15em;
+              color: #0b4ca3;
               text-transform: uppercase;
+              margin-bottom: 6px;
             }
-
-            img {
-              width: 55mm;
-              height: 55mm;
-              display: block;
-              margin: 0 auto 4mm;
-            }
-
-            h1 {
-              margin: 0;
-              font-size: 14pt;
-              line-height: 1.2;
-            }
-
-            p {
-              margin: 2mm 0 0;
-              font-size: 9pt;
-              color: #64748b;
-            }
-
-            .code {
-              margin-top: 3mm;
-              font-family: monospace;
-              font-size: 9pt;
+            .title {
+              font-size: 13px;
               font-weight: 700;
-              color: #0f172a;
+              color: #172b3a;
+              margin-bottom: 8px;
+              word-break: break-word;
+            }
+            img {
+              width: 160px;
+              height: 160px;
+              display: block;
+              margin: 0 auto 8px auto;
+            }
+            .code {
+              font-family: monospace;
+              font-size: 10px;
+              font-weight: 600;
+              color: #687782;
               word-break: break-all;
             }
           </style>
         </head>
-
         <body>
-          <div class="label">
-            ${typeBadge ? `<div class="badge">${escapeHtml(typeBadge)}</div>` : ''}
+          <div class="label-card">
+            <div class="brand">AICTE IDEA LAB</div>
+            <div class="title">${title}</div>
             <img src="${qrImage}" alt="QR Code" />
-            <h1>${escapeHtml(title)}</h1>
-            ${subtitle ? `<p>${escapeHtml(subtitle)}</p>` : ''}
-            <div class="code">${escapeHtml(code)}</div>
+            <div class="code">${code}</div>
           </div>
         </body>
       </html>
     `);
+    doc.close();
 
-    printWindow.document.close();
-    printWindow.focus();
-
-    printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
-    };
+    iframe.contentWindow?.focus();
+    setTimeout(() => {
+      iframe.contentWindow?.print();
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 250);
   };
 
   if (!isOpen) {
@@ -198,7 +181,7 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) {
           onClose();
@@ -206,42 +189,44 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
       }}
     >
       <div
-        className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-sm overflow-hidden flex flex-col"
+        className="bg-white rounded-2xl shadow-2xl border border-[var(--color-idea-border)] w-full max-w-sm overflow-hidden flex flex-col max-h-[92vh]"
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-generator-title"
       >
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
+        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-idea-border)] flex items-center justify-between bg-[var(--color-idea-light-grey)]/60 shrink-0">
           <div>
-            <span className="text-xs font-bold uppercase tracking-widest text-slate-400">QR Code</span>
-
-            <p className="text-[10px] text-slate-400 mt-0.5">Generate, download, or print a label</p>
+            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--color-idea-blue)]">
+              AICTE IDEA LAB · QR TAG
+            </span>
+            <p id="qr-generator-title" className="font-bold text-[var(--color-idea-text)] text-base leading-tight mt-0.5">
+              Equipment Label
+            </p>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-            aria-label="Close QR code dialog"
+            className="p-2 rounded-xl hover:bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
+            aria-label="Close QR label modal"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Printable Label */}
-        <div className="p-6 text-center flex flex-col items-center space-y-4">
+        {/* Printable Label View */}
+        <div className="p-6 text-center flex flex-col items-center space-y-4 overflow-y-auto flex-1">
           {typeBadge && (
-            <span className="bg-blue-50 text-blue-700 text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-widest">
+            <span className="bg-[var(--color-idea-blue)]/10 text-[var(--color-idea-deep-blue)] text-[10px] px-3 py-1 rounded-full font-bold uppercase tracking-wider">
               {typeBadge}
             </span>
           )}
 
-          <div className="p-3 bg-white rounded-2xl border-2 border-slate-900 shadow-md">
+          <div className="p-3 bg-white rounded-2xl border-2 border-[var(--color-idea-border)] shadow-xs">
             {generationError ? (
-              <div className="w-[240px] h-[240px] flex flex-col items-center justify-center gap-2 text-slate-400">
-                <AlertCircle className="w-8 h-8" />
-
+              <div className="w-[220px] h-[220px] flex flex-col items-center justify-center gap-2 text-[var(--color-idea-muted)]">
+                <AlertCircle className="w-8 h-8 text-[var(--color-idea-red)]" />
                 <p className="text-xs font-medium">QR generation failed</p>
               </div>
             ) : (
@@ -254,21 +239,23 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
           </div>
 
           <div className="max-w-full">
-            <h3 id="qr-generator-title" className="text-lg font-bold text-slate-900 leading-tight">
+            <h3 className="text-base font-bold text-[var(--color-idea-text)] leading-snug">
               {title}
             </h3>
-
-            {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+            {subtitle && <p className="text-xs text-[var(--color-idea-muted)] mt-1">{subtitle}</p>}
+            <p className="mt-2 font-mono text-[10px] text-[var(--color-idea-muted)] bg-[var(--color-idea-light-grey)] px-2.5 py-1 rounded-md inline-block break-all">
+              {code}
+            </p>
           </div>
         </div>
 
         {/* Action Toolbar */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex items-center gap-2">
+        <div className="p-4 bg-[var(--color-idea-light-grey)]/60 border-t border-[var(--color-idea-border)] flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleDownload}
             disabled={generating || !!generationError}
-            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition-all cursor-pointer shadow-sm disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-white border border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] rounded-xl text-xs font-bold transition-all cursor-pointer shadow-2xs disabled:opacity-50 min-h-[44px]"
           >
             <Download className="w-4 h-4" />
             <span>Download</span>
@@ -278,23 +265,13 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
             type="button"
             onClick={handlePrint}
             disabled={generating || !!generationError}
-            title="Print QR label"
-            aria-label="Print QR label"
-            className="p-2.5 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition-all cursor-pointer disabled:opacity-50"
+            className="flex-1 flex items-center justify-center gap-1.5 py-2.5 idea-button text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer disabled:opacity-50 min-h-[44px]"
           >
             <Printer className="w-4 h-4" />
+            <span>Print Label</span>
           </button>
         </div>
       </div>
     </div>
   );
 };
-
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
-}

@@ -349,44 +349,48 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
   // ------------------------------------------------------------
 
   return (
-    <div className="flex-1 space-y-6 p-8 overflow-y-auto max-w-7xl mx-auto w-full idea-bg">
-      {/* Header Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
-        <div>
-          <span className="text-[10px] font-medium tracking-[0.25em] uppercase text-[var(--color-idea-muted)]">
-            LAB ITEMS
-          </span>
+    <div className="flex-1 overflow-y-auto idea-bg">
+      <div className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Unified Standard Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB · ITEMS & INVENTORY
+              </span>
+            </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
+              Items Directory & Stock
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Manage catalog items, stock quantities across storage units, and monitor replenishment thresholds.
+            </p>
+          </div>
 
-          <h2 className="text-2xl font-bold text-[var(--color-idea-text)] tracking-tight mt-1">
-            Items <span className="text-[var(--color-idea-blue)]">List</span>
-          </h2>
+          {isStaff(userRole) && (
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl shadow-sm cursor-pointer shrink-0"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add New Item</span>
+            </button>
+          )}
         </div>
 
-        {isStaff(userRole) && (
-          <button
-            onClick={() => setShowAddModal(true)}
-            className="idea-button flex items-center gap-2 px-5 py-2.5 text-xs font-semibold cursor-pointer"
-          >
-            <Plus className="w-4 h-4" />
-            Add New Item
-          </button>
-        )}
-      </div>
-
-      {/* Toolbar */}
-      <div className="idea-card p-4 flex flex-col lg:flex-row items-center justify-between gap-4">
-        {/* Search */}
-        <div className="relative w-full lg:w-80">
-          <input
-            type="text"
-            value={searchFilter}
-            onChange={(e) => setSearchFilter(e.target.value)}
-            placeholder="Search items directory..."
-            className="idea-input pl-9 pr-4 py-2 text-xs w-full"
-          />
-
-          <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-2.5" />
-        </div>
+        {/* Toolbar */}
+        <div className="idea-card p-3 sm:p-4 flex flex-col lg:flex-row items-center justify-between gap-3 sm:gap-4">
+          {/* Search */}
+          <div className="relative w-full lg:w-96">
+            <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchFilter}
+              onChange={(e) => setSearchFilter(e.target.value)}
+              placeholder="Search catalog items by name, item code..."
+              className="idea-input pl-9 pr-4 py-2.5 text-xs sm:text-sm w-full"
+            />
+          </div>
 
         {/* Stock Filters */}
         <div className="flex items-center gap-1 bg-[var(--color-idea-light-grey)] p-1 rounded-xl border border-[var(--color-idea-border)] w-full lg:w-auto">
@@ -891,6 +895,7 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };

@@ -9,6 +9,7 @@ import {
   Wrench,
   ScrollText,
   Users,
+  Plus,
 } from 'lucide-react';
 import {
   PieChart,
@@ -186,20 +187,19 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
     return (
       <div className="flex-1 overflow-y-auto idea-bg">
-        <div className="mx-auto max-w-7xl space-y-6 px-6 py-7">
-          <div className="flex flex-col justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:flex-row sm:items-end">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
             <div>
-              <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
-                Student Portal
-              </p>
-
-              <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-idea-text)]">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                  AICTE IDEA LAB · STUDENT PORTAL
+                </span>
+              </div>
+              <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
                 My Inventory Activity
               </h1>
-
-              <p className="mt-1 text-xs text-[var(--color-idea-muted)]">
-                Track your requests and items currently issued
-                to you.
+              <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+                Track your active material requests, approval milestones, and items currently issued to you.
               </p>
             </div>
 
@@ -207,9 +207,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <button
                 type="button"
                 onClick={onOpenNewRequest}
-                className="idea-button inline-flex cursor-pointer items-center justify-center gap-2 px-4 py-2.5 text-xs font-semibold"
+                className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl shadow-sm cursor-pointer shrink-0"
               >
-                New Request
+                <Plus className="w-4 h-4" />
+                <span>New Request</span>
               </button>
             )}
           </div>
@@ -597,21 +598,20 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <div className="flex-1 overflow-y-auto idea-bg">
-      <div className="mx-auto max-w-7xl space-y-6 px-6 py-7">
-        {/* Header */}
-        <div className="flex flex-col justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:flex-row sm:items-end">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Unified Standard Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
-              AICTE IDEA Lab
-            </p>
-
-            <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--color-idea-text)]">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB · OVERVIEW
+              </span>
+            </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
               Inventory Dashboard
             </h1>
-
-            <p className="mt-1 text-xs text-[var(--color-idea-muted)]">
-              Current inventory, requests, assets, and activity
-              at a glance.
+            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              Real-time monitoring of laboratory stock, equipment utilization, pending approvals, and transaction flow.
             </p>
           </div>
         </div>

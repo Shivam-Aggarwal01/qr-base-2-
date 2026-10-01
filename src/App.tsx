@@ -12,6 +12,7 @@ import {
   updateFirestoreDocument,
   ensureUserProfile,
   getUserProfile,
+  getAccountRequest,
   reviewAccountRequest,
   submitAccountRequest,
   STUDENT_SIGNUP_NAME_KEY,
@@ -75,13 +76,18 @@ const viewPaths: Record<ViewMode, string> = {
   locations: '/locations',
   activity: '/activity',
   users: '/users',
+  legal: '/legal',
 };
 
-const pathViews = Object.fromEntries(
-  Object.entries(viewPaths).map(([view, path]) => [path, view as ViewMode])
-) as Record<string, ViewMode>;
+const pathViews: Record<string, ViewMode> = {
+  ...Object.fromEntries(
+    Object.entries(viewPaths).map(([view, path]) => [path, view as ViewMode])
+  ),
+  '/privacy': 'legal',
+  '/terms': 'legal',
+};
 
-const legalPaths = ['/privacy', '/terms'];
+const legalPaths = ['/privacy', '/terms', '/legal'];
 
 const viewMetadata: Record<ViewMode, { title: string; description: string }> = {
   dashboard: {
@@ -111,6 +117,10 @@ const viewMetadata: Record<ViewMode, { title: string; description: string }> = {
   users: {
     title: 'Users',
     description: 'Manage lab users, access roles, and account approval requests.',
+  },
+  legal: {
+    title: 'Legal & Policies',
+    description: 'Privacy policy, terms of service, and lab governance guidelines.',
   },
 };
 
@@ -191,6 +201,9 @@ export default function App() {
     isOpen: false,
     qrResult: null,
   });
+  const [isBatchLabelsOpen, setIsBatchLabelsOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [pendingNewUser, setPendingNewUser] = useState<FirebaseUser | null>(null);
 
   // ---------------------------------------------------------------------------
   // Derived state
@@ -272,34 +285,40 @@ export default function App() {
         if (existingProfile) {
           window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
           setAccessNotice(null);
+          setPendingNewUser(null);
           setFirebaseUserProfile(existingProfile);
           setActiveUser(existingProfile);
           await refreshAllData();
           return;
         }
-        /*
-         * A newly authenticated student does not receive a profile
-         * until their account request is approved.
-         */
-        const requestedName = window.sessionStorage.getItem(STUDENT_SIGNUP_NAME_KEY);
-        const accessRequest = await submitAccountRequest(firebaseUser, requestedName ?? undefined);
-        window.sessionStorage.removeItem(STUDENT_SIGNUP_NAME_KEY);
-        if (accessRequest.status === 'APPROVED') {
-          const profile = await ensureUserProfile(firebaseUser, 'STUDENT', requestedName ?? undefined);
-          setAccessNotice(null);
-          setFirebaseUserProfile(profile);
-          setActiveUser(profile);
-          await refreshAllData();
+
+        const existingRequest = await getAccountRequest(firebaseUser.uid);
+        if (existingRequest) {
+          if (existingRequest.status === 'APPROVED') {
+            const profile = await ensureUserProfile(firebaseUser, 'STUDENT', existingRequest.name);
+            setAccessNotice(null);
+            setPendingNewUser(null);
+            setFirebaseUserProfile(profile);
+            setActiveUser(profile);
+            await refreshAllData();
+            return;
+          }
+          setAccessNotice({
+            status: existingRequest.status,
+            name: existingRequest.name,
+            email: existingRequest.email,
+          });
+          setPendingNewUser(null);
+          setFirebaseUserProfile(null);
+          setActiveUser(null);
+          await signOut(auth);
           return;
         }
-        setAccessNotice({
-          status: accessRequest.status,
-          name: accessRequest.name,
-          email: accessRequest.email,
-        });
+
+        // User is not in DB and has no request yet -> prompt for name
+        setPendingNewUser(firebaseUser);
         setFirebaseUserProfile(null);
         setActiveUser(null);
-        await signOut(auth);
       } catch (error) {
         console.error('Failed to initialise Firebase user:', error);
         setFirebaseUserProfile(null);
@@ -352,7 +371,7 @@ export default function App() {
       navigate(viewPaths.dashboard, { replace: true });
       return;
     }
-    if (isStudentUser && currentView !== 'dashboard' && currentView !== 'requests' && currentView !== 'inventory') {
+    if (isStudentUser && currentView !== 'dashboard' && currentView !== 'requests' && currentView !== 'inventory' && currentView !== 'legal') {
       navigate(viewPaths.requests, { replace: true });
     }
   }, [isStudentUser, currentView, location.pathname, navigate]);
@@ -494,8 +513,13 @@ export default function App() {
   // ---------------------------------------------------------------------------
   // Authentication screens
   // ---------------------------------------------------------------------------
-  if (location.pathname === '/privacy' || location.pathname === '/terms') {
-    return <LegalPage kind={location.pathname === '/privacy' ? 'privacy' : 'terms'} />;
+  if (!currentUser && (location.pathname === '/privacy' || location.pathname === '/terms' || location.pathname === '/legal')) {
+    return (
+      <>
+        {pageHead}
+        <LegalPage kind={location.pathname === '/terms' ? 'terms' : 'privacy'} inAppShell={false} />
+      </>
+    );
   }
   if (!authReady) {
     return (
@@ -511,7 +535,11 @@ export default function App() {
     return (
       <>
         {pageHead}
-        <FirebaseAuthPanel accessNotice={accessNotice} />
+        <FirebaseAuthPanel
+          accessNotice={accessNotice}
+          pendingNewUser={pendingNewUser}
+          onClearPendingNewUser={() => setPendingNewUser(null)}
+        />
       </>
     );
   }
@@ -532,6 +560,7 @@ export default function App() {
         onSearch={handleGlobalSearch}
         onResetData={handleResetData}
         onLogout={handleLogout}
+        onToggleMobileMenu={() => setMobileMenuOpen((prev) => !prev)}
       />
       <div className="flex flex-col-reverse md:flex-row flex-1 overflow-hidden">
         <Sidebar
@@ -540,6 +569,9 @@ export default function App() {
           pendingRequestsCount={pendingRequestsCount}
           pendingAccountCount={pendingAccountCount}
           userRole={effectiveRole ?? currentUser.role}
+          mobileOpen={mobileMenuOpen}
+          onCloseMobile={() => setMobileMenuOpen(false)}
+          onToggleMobile={() => setMobileMenuOpen((prev) => !prev)}
         />
         <main className="flex-1 flex flex-col overflow-hidden relative">
           {currentView === 'dashboard' && (
@@ -588,6 +620,7 @@ export default function App() {
               userRole={effectiveRole ?? currentUser.role}
               onRefreshData={refreshAllData}
               onOpenQRGenerator={handleOpenQRGenerator}
+              onOpenBatchLabels={() => setIsBatchLabelsOpen(true)}
             />
           )}
           {currentView === 'requests' && (
@@ -638,6 +671,12 @@ export default function App() {
               onRefreshData={refreshAllData}
             />
           )}
+          {currentView === 'legal' && (
+            <LegalPage
+              kind={location.pathname === '/terms' ? 'terms' : 'privacy'}
+              inAppShell={true}
+            />
+          )}
         </main>
       </div>
       {/* Global modals */}
@@ -681,6 +720,13 @@ export default function App() {
         assets={assets}
         initialItems={newRequestPrefillItems.length > 0 ? newRequestPrefillItems : undefined}
         onRefreshData={refreshAllData}
+      />
+      <BatchQRLabelsModal
+        isOpen={isBatchLabelsOpen}
+        onClose={() => setIsBatchLabelsOpen(false)}
+        assets={assets}
+        catalogItems={catalogItems}
+        locations={locations}
       />
     </div>
   );

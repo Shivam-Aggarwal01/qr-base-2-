@@ -1,8 +1,28 @@
-import type { FC } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useMemo } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { Helmet } from 'react-helmet-async';
+import {
+  Shield,
+  FileText,
+  Search,
+  Printer,
+  ArrowLeft,
+  ChevronRight,
+  ExternalLink,
+  CheckCircle2,
+  Lock,
+  Clock,
+  Sparkles,
+  HelpCircle,
+  Building,
+} from 'lucide-react';
 
-type LegalPageKind = 'privacy' | 'terms';
+export type LegalPageKind = 'privacy' | 'terms';
+
+export interface LegalPageProps {
+  kind: LegalPageKind;
+  inAppShell?: boolean;
+}
 
 interface LegalSection {
   heading: string;
@@ -14,6 +34,7 @@ interface LegalPageContent {
   title: string;
   eyebrow: string;
   description: string;
+  summaryHighlights: { title: string; desc: string }[];
   sections: LegalSection[];
 }
 
@@ -22,9 +43,23 @@ const EFFECTIVE_DATE = 'September 27, 2026';
 const pageContent: Record<LegalPageKind, LegalPageContent> = {
   privacy: {
     title: 'Privacy Policy',
-    eyebrow: 'AICTE IDEA Lab Inventory Management System',
+    eyebrow: 'Data Protection & Governance',
     description:
-      'This Privacy Policy explains how the AICTE IDEA Lab Inventory Management System collects, uses, stores, and protects information when authorized users access the system.',
+      'This Privacy Policy explains how the AICTE IDEA Lab Inventory Management System collects, uses, stores, and protects information when authorized users access the laboratory platform.',
+    summaryHighlights: [
+      {
+        title: 'Authentication Only',
+        desc: 'Google Sign-In is strictly used to identify authorized laboratory personnel and students. Passwords are never seen or stored.',
+      },
+      {
+        title: 'Zero Advertising or Data Selling',
+        desc: 'User information and activity records are strictly used for lab accountability and are never sold or shared with advertisers.',
+      },
+      {
+        title: 'Institutional Equipment Records',
+        desc: 'Equipment requests, checkouts, and returns are logged in an immutable audit ledger to protect public laboratory resources.',
+      },
+    ],
     sections: [
       {
         heading: '1. About this application',
@@ -37,7 +72,7 @@ const pageContent: Record<LegalPageKind, LegalPageContent> = {
         heading: '2. Information we collect',
         paragraphs: [
           'When you sign in using Google Sign-In, the application receives the basic Google account information made available through the authentication process. Depending on the Google authentication configuration, this may include your name, email address, profile picture, and a unique Google account identifier associated with your Firebase Authentication account.',
-          'The application does not request your Google password. Authentication is handled through Google and Firebase Authentication.',
+          'The application does not request your Google password. Authentication is handled securely through Google and Firebase Authentication.',
           'The application may also create an internal user profile containing information necessary to operate the inventory system, such as your assigned role, account status, and identifiers required to associate your activity with your account.',
         ],
         bullets: [
@@ -143,9 +178,23 @@ const pageContent: Record<LegalPageKind, LegalPageContent> = {
 
   terms: {
     title: 'Terms of Service',
-    eyebrow: 'AICTE IDEA Lab Inventory Management System',
+    eyebrow: 'Rules & User Conduct',
     description:
       'These Terms of Service govern authorized use of the AICTE IDEA Lab Inventory Management System for laboratory inventory, equipment tracking, requests, assignments, and operational records.',
+    summaryHighlights: [
+      {
+        title: 'Authorized Personnel Only',
+        desc: 'Access is limited to approved students, faculty, and lab managers. Credentials may never be shared or loaned.',
+      },
+      {
+        title: 'Duty of Care for Equipment',
+        desc: 'Users are personally accountable for borrowed tools and materials, requiring prompt return by stated deadlines.',
+      },
+      {
+        title: 'QR & Inventory Integrity',
+        desc: 'QR codes, serial numbers, and storage tags must not be altered, removed, or cloned under any circumstances.',
+      },
+    ],
     sections: [
       {
         heading: '1. About the service',
@@ -170,8 +219,8 @@ const pageContent: Record<LegalPageKind, LegalPageContent> = {
           'Do not share your account or authentication session with another person.',
           'Do not attempt to access another user’s account.',
           'Do not provide false information when requesting or using access.',
-          'Report suspected unauthorized access to a laboratory administrator.',
-          'Use the application only for legitimate laboratory or institutional purposes.',
+          'Report suspected unauthorized access to a laboratory administrator immediately.',
+          'Use the application only for legitimate laboratory or institutional educational purposes.',
         ],
       },
       {
@@ -180,18 +229,18 @@ const pageContent: Record<LegalPageKind, LegalPageContent> = {
           'Users are expected to handle laboratory equipment responsibly and maintain accurate information when performing inventory-related actions.',
         ],
         bullets: [
-          'Review equipment information before submitting a request.',
+          'Review equipment information before submitting a material request.',
           'Record check-outs, returns, transfers, and other actions accurately.',
-          'Return equipment according to applicable laboratory procedures.',
-          'Report loss, damage, incorrect inventory information, or missing equipment promptly.',
+          'Return equipment promptly according to applicable laboratory procedures and return deadlines.',
+          'Report loss, damage, incorrect inventory information, or missing equipment immediately to staff.',
           'Do not modify or remove inventory information without authorization.',
         ],
       },
       {
         heading: '5. QR codes and equipment identification',
         paragraphs: [
-          'The application may use QR codes or similar identifiers to identify laboratory inventory items. These identifiers are intended for inventory management and operational purposes.',
-          'Users must not intentionally alter, duplicate, misuse, or apply inventory identifiers to unrelated purposes in a way that could create inaccurate inventory records or interfere with laboratory operations.',
+          'The application uses QR codes and serial barcodes to track laboratory inventory items across workbenches and shelves.',
+          'Users must not intentionally alter, duplicate, remove, or apply inventory identifiers to unrelated items. Tampering with equipment tags constitutes a serious breach of laboratory discipline.',
         ],
       },
       {
@@ -210,266 +259,365 @@ const pageContent: Record<LegalPageKind, LegalPageContent> = {
       {
         heading: '7. Inventory records and audit history',
         paragraphs: [
-          'Information displayed by the application may contain errors, delays, synchronization issues, or information entered by users or imported from another source.',
-          'Laboratory administrators may correct inventory information when necessary. Historical activity and audit records may be retained to maintain equipment accountability and operational history.',
-          'The application should not be treated as the sole source of truth for safety-critical or legally significant decisions. Users should follow applicable laboratory procedures and instructions from authorized personnel.',
+          'Information displayed by the application represents real laboratory hardware. Laboratory administrators may audit or correct inventory counts when necessary.',
+          'Historical activity and audit records are permanently retained in the ledger to maintain equipment custody chains.',
+          'The application should be used alongside physical lab protocols and direct instructions from the Lab In-Charge or Faculty Coordinator.',
         ],
       },
       {
         heading: '8. Service availability',
         paragraphs: [
           'The application is provided for internal operational use. Features, integrations, and availability may change over time.',
-          'Access may occasionally be interrupted because of maintenance, software updates, infrastructure issues, authentication provider outages, network problems, security measures, or circumstances outside the laboratory’s control.',
+          'Access may occasionally be interrupted for scheduled maintenance, updates, or infrastructure upgrades.',
         ],
       },
       {
         heading: '9. Third-party services',
         paragraphs: [
-          'The application may depend on third-party services, including Google and Firebase services, for authentication, data storage, hosting, or other technical functions.',
-          'Use of those services may also be subject to the applicable terms, policies, and technical limitations of the respective service providers.',
+          'The application depends on Google and Firebase services for authentication, database storage, and hosting.',
+          'Use of those services is also subject to the standard Google and Firebase service agreements.',
         ],
       },
       {
         heading: '10. Suspension or termination',
         paragraphs: [
-          'Access may be suspended or terminated if a user violates these terms, loses authorization to use the laboratory, misuses the application, or creates a security or operational risk.',
-          'Suspension or termination of access does not necessarily delete historical inventory or audit records associated with the user when those records are required for laboratory operations, accountability, security, or institutional record keeping.',
+          'Access may be suspended or revoked immediately if a user violates these terms, misuses equipment, fails to return borrowed assets, or poses an operational safety risk.',
+          'Termination of access does not relieve a user of the obligation to return physical equipment or address reported damages.',
         ],
       },
       {
         heading: '11. Changes to these terms',
         paragraphs: [
-          'These Terms of Service may be updated when the application or its operational requirements change.',
-          'The effective date displayed on this page identifies the current version. Continued authorized use of the application after an update constitutes use under the revised terms, subject to applicable institutional requirements.',
+          'These Terms of Service may be updated periodically. The effective date displayed indicates the active version.',
+          'Continued use of the IDEA Lab inventory portal represents acceptance of the active guidelines.',
         ],
       },
       {
-        heading: '12. Contact and incident reporting',
+        heading: '12. Contact and grievances',
         paragraphs: [
-          'Questions regarding these terms, account access, inventory records, equipment incidents, or suspected security issues should be directed to the administrator responsible for the AICTE IDEA Lab Inventory Management System through your institution’s normal support channel.',
+          'For questions or escalation regarding these terms, contact the AICTE IDEA Lab Faculty In-Charge or Student Lead through your campus administrative office.',
         ],
       },
     ],
   },
 };
 
-export const LegalPage: FC<LegalPageProps> = ({ kind }) => {
-  const content = pageContent[kind];
-  const path = kind === 'privacy' ? '/privacy' : '/terms';
-  const otherPath = kind === 'privacy' ? '/terms' : '/privacy';
-  const otherLabel = kind === 'privacy' ? 'Terms of Service' : 'Privacy Policy';
+export const LegalPage: React.FC<LegalPageProps> = ({ kind: initialKind, inAppShell = false }) => {
+  const [activeTab, setActiveTab] = useState<LegalPageKind>(initialKind);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [expandedSection, setExpandedSection] = useState<string | null>(null);
+  const navigate = useNavigate();
+
+  const content = pageContent[activeTab];
+
+  const handleTabSwitch = (newTab: LegalPageKind) => {
+    setActiveTab(newTab);
+    navigate(newTab === 'privacy' ? '/privacy' : '/terms', { replace: true });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const filteredSections = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return content.sections;
+    return content.sections.filter((section) => {
+      const inHeading = section.heading.toLowerCase().includes(q);
+      const inParagraphs = section.paragraphs?.some((p) => p.toLowerCase().includes(q));
+      const inBullets = section.bullets?.some((b) => b.toLowerCase().includes(q));
+      return inHeading || inParagraphs || inBullets;
+    });
+  }, [content.sections, searchQuery]);
 
   return (
-    <div className="min-h-screen bg-[#f7f9fc] text-slate-900">
+    <div className={`flex-1 overflow-y-auto idea-bg ${inAppShell ? '' : 'min-h-screen'}`}>
       <Helmet>
         <title>{content.title} | AICTE IDEA Lab Inventory Management</title>
-
         <meta name="description" content={content.description} />
-
-        <meta name="robots" content="index, follow" />
-
-        <link rel="canonical" href={`${window.location.origin}${path} `} />
       </Helmet>
 
-      {/* Top navigation */}
-      <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-4 sm:px-8">
-          <Link to="/" className="group flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-sm font-bold text-white shadow-sm">
-              IL
-            </div>
-
-            <div className="leading-tight">
-              <div className="text-sm font-bold text-slate-900">AICTE IDEA Lab</div>
-              <div className="text-[11px] font-medium text-slate-500">Inventory Management System</div>
-            </div>
-          </Link>
-
-          <Link
-            to="/"
-            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              aria-hidden="true"
-            >
-              <path d="M19 12H5" />
-              <path d="M12 19l-7-7 7-7" />
-            </svg>
-            Back to application
-          </Link>
-        </div>
-      </header>
-
-      {/* Main */}
-      <main className="mx-auto max-w-6xl px-5 py-10 sm:px-8 sm:py-16">
-        <div className="grid gap-10 lg:grid-cols-[240px_minmax(0,1fr)] lg:gap-16">
-          {/* Sidebar */}
-          <aside className="hidden lg:block">
-            <div className="sticky top-28">
-              <div className="mb-5 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Legal</div>
-
-              <nav className="space-y-1" aria-label="Legal navigation">
-                <Link
-                  to="/privacy"
-                  className={`block rounded - lg px - 3 py - 2.5 text - sm font - semibold transition ${
-                    kind === 'privacy'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  } `}
-                >
-                  Privacy Policy
-                </Link>
-
-                <Link
-                  to="/terms"
-                  className={`block rounded - lg px - 3 py - 2.5 text - sm font - semibold transition ${
-                    kind === 'terms'
-                      ? 'bg-slate-900 text-white shadow-sm'
-                      : 'text-slate-600 hover:bg-white hover:text-slate-900'
-                  } `}
-                >
-                  Terms of Service
-                </Link>
-              </nav>
-
-              <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4">
-                <div className="flex items-center gap-2 text-xs font-bold text-slate-800">
-                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
-                  Internal system
-                </div>
-
-                <p className="mt-2 text-xs leading-5 text-slate-500">
-                  This application is intended for authorized laboratory users.
+      {/* Standalone Top Bar if not inside App Shell */}
+      {!inAppShell && (
+        <header className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-[var(--color-idea-border)] px-4 sm:px-8 py-3.5">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-4">
+            <Link to="/" className="flex items-center gap-3">
+              <img src="/logo.png" alt="AICTE IDEA Lab" className="h-10 sm:h-12 w-auto object-contain" />
+              <div>
+                <span className="text-base sm:text-lg font-bold tracking-tight text-[var(--color-idea-text)]">
+                  AICTE <span className="text-[var(--color-idea-blue)] font-normal">IDEA LAB</span>
+                </span>
+                <p className="text-[9px] sm:text-[10px] text-[var(--color-idea-muted)] tracking-wide uppercase">
+                  Inventory Management System
                 </p>
               </div>
+            </Link>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="hidden sm:inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[var(--color-idea-text)] bg-white border border-[var(--color-idea-border)] rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4 text-[var(--color-idea-muted)]" />
+                <span>Print</span>
+              </button>
+              <Link
+                to="/"
+                className="idea-button flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                <ArrowLeft className="w-4 h-4" />
+                <span>Return to Portal</span>
+              </Link>
             </div>
-          </aside>
+          </div>
+        </header>
+      )}
 
-          {/* Content */}
-          <article className="min-w-0">
-            {/* Hero */}
-            <div className="max-w-3xl">
-              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 shadow-sm">
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-600" />
-                {content.eyebrow}
-              </div>
-
-              <h1 className="text-4xl font-bold tracking-tight text-slate-950 sm:text-5xl">{content.title}</h1>
-
-              <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">{content.description}</p>
-
-              <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs font-medium text-slate-500">
-                <span>Effective {EFFECTIVE_DATE}</span>
-
-                <span className="hidden h-1 w-1 rounded-full bg-slate-300 sm:block" />
-
-                <span>Internal institutional application</span>
-              </div>
+      {/* Main Container */}
+      <main className="max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
+        {/* Unified Standard Page Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--color-idea-border)] pb-5 sm:pb-6">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-[var(--color-idea-blue)]">
+                AICTE IDEA LAB · LEGAL & POLICIES
+              </span>
             </div>
+            <h1 className="mt-1 text-2xl sm:text-3xl font-bold tracking-tight text-[var(--color-idea-text)]">
+              {content.title}
+            </h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-[var(--color-idea-muted)] max-w-2xl leading-relaxed">
+              {content.description}
+            </p>
+          </div>
 
-            {/* Notice */}
-            <div className="mt-10 max-w-3xl rounded-2xl border border-blue-100 bg-blue-50/70 p-5">
-              <div className="flex gap-3">
-                <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-700">
-                  <svg
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    aria-hidden="true"
-                  >
-                    <circle cx="12" cy="12" r="9" />
-                    <path d="M12 11v5" />
-                    <path d="M12 8h.01" />
-                  </svg>
+          <div className="flex items-center gap-2 shrink-0">
+            {inAppShell && (
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-[var(--color-idea-text)] bg-white border border-[var(--color-idea-border)] rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-all cursor-pointer"
+              >
+                <Printer className="w-4 h-4 text-[var(--color-idea-muted)]" />
+                <span>Print Copy</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Tab Switcher & Search Bar */}
+        <div className="idea-card p-3 sm:p-4 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3 sm:gap-4">
+          {/* Segmented Tab Controls */}
+          <div className="inline-flex p-1 bg-[var(--color-idea-light-grey)] rounded-xl border border-[var(--color-idea-border)] shrink-0">
+            <button
+              type="button"
+              onClick={() => handleTabSwitch('privacy')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'privacy'
+                  ? 'bg-white text-[var(--color-idea-deep-blue)] shadow-sm'
+                  : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
+              }`}
+            >
+              <Shield className="w-3.5 h-3.5" />
+              <span>Privacy Policy</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTabSwitch('terms')}
+              className={`flex items-center justify-center gap-2 px-4 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                activeTab === 'terms'
+                  ? 'bg-white text-[var(--color-idea-deep-blue)] shadow-sm'
+                  : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Terms of Service</span>
+            </button>
+          </div>
+
+          {/* Search within document */}
+          <div className="relative flex-1 max-w-md">
+            <Search className="w-4 h-4 text-[var(--color-idea-muted)] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search policy sections, Google auth, rules..."
+              className="idea-input w-full pl-9 pr-4 py-2 text-xs"
+            />
+          </div>
+
+          {/* Effective Date Stamp */}
+          <div className="hidden lg:flex items-center gap-2 text-xs text-[var(--color-idea-muted)] shrink-0 font-medium">
+            <Clock className="w-3.5 h-3.5 text-[var(--color-idea-blue)]" />
+            <span>Effective: {EFFECTIVE_DATE}</span>
+          </div>
+        </div>
+
+        {/* Key Takeaways Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {content.summaryHighlights.map((highlight, idx) => (
+            <div
+              key={idx}
+              className="idea-card p-4 sm:p-5 flex flex-col justify-between hover:border-[var(--color-idea-blue)]/40 transition-all"
+            >
+              <div className="flex items-start gap-3">
+                <div className="w-7 h-7 rounded-lg bg-[var(--color-idea-blue)]/10 text-[var(--color-idea-blue)] flex items-center justify-center shrink-0 mt-0.5">
+                  <CheckCircle2 className="w-4 h-4" />
                 </div>
-
                 <div>
-                  <h2 className="text-sm font-bold text-blue-950">About this policy</h2>
-
-                  <p className="mt-1.5 text-sm leading-6 text-blue-900/75">
-                    This page describes the data practices and authorized use of this specific inventory management
-                    application. It is not a general privacy policy for the institution.
+                  <h3 className="text-xs sm:text-sm font-bold text-[var(--color-idea-text)]">
+                    {highlight.title}
+                  </h3>
+                  <p className="mt-1 text-xs text-[var(--color-idea-muted)] leading-relaxed">
+                    {highlight.desc}
                   </p>
                 </div>
               </div>
             </div>
+          ))}
+        </div>
 
-            {/* Sections */}
-            <div className="mt-10 max-w-3xl divide-y divide-slate-200 rounded-2xl border border-slate-200 bg-white shadow-sm">
-              {content.sections.map((section) => (
-                <section key={section.heading} className="px-6 py-7 sm:px-8 sm:py-8">
-                  <h2 className="text-base font-bold tracking-tight text-slate-950 sm:text-lg">{section.heading}</h2>
-
-                  {section.paragraphs && (
-                    <div className="mt-3 space-y-3">
-                      {section.paragraphs.map((paragraph) => (
-                        <p key={paragraph} className="text-sm leading-7 text-slate-600">
-                          {paragraph}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-
-                  {section.bullets && (
-                    <ul className="mt-4 space-y-2.5">
-                      {section.bullets.map((bullet) => (
-                        <li key={bullet} className="flex gap-3 text-sm leading-6 text-slate-600">
-                          <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-                          <span>{bullet}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
-              ))}
+        {/* Content Layout with Quick Jump */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 items-start">
+          {/* Quick Index Sidebar (Desktop) */}
+          <div className="hidden lg:block lg:col-span-4 sticky top-20 space-y-4">
+            <div className="idea-card p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--color-idea-muted)] mb-3">
+                Table of Contents
+              </p>
+              <nav className="space-y-1 max-h-[60vh] overflow-y-auto pr-2">
+                {content.sections.map((section, idx) => (
+                  <a
+                    key={idx}
+                    href={`#section-${idx}`}
+                    className="block px-3 py-1.5 text-xs text-[var(--color-idea-muted)] hover:text-[var(--color-idea-deep-blue)] hover:bg-[var(--color-idea-light-grey)] rounded-lg transition-colors truncate"
+                  >
+                    {section.heading}
+                  </a>
+                ))}
+              </nav>
             </div>
 
-            {/* Bottom navigation */}
-            <div className="mt-8 flex max-w-3xl flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <div>
-                <p className="text-sm font-bold text-slate-900">Related legal document</p>
+            <div className="idea-card p-4 bg-gradient-to-br from-[var(--color-idea-light-grey)] to-white border-[var(--color-idea-blue)]/20">
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--color-idea-deep-blue)]">
+                <Building className="w-4 h-4 text-[var(--color-idea-blue)]" />
+                <span>AICTE IDEA Lab Directorate</span>
+              </div>
+              <p className="mt-2 text-xs text-[var(--color-idea-muted)] leading-relaxed">
+                Operating strictly under institutional lab protocols for technical innovation and skill development.
+              </p>
+            </div>
+          </div>
 
-                <p className="mt-1 text-xs text-slate-500">
-                  Review the {otherLabel.toLowerCase()} for additional information.
+          {/* Policy Sections */}
+          <div className="lg:col-span-8 space-y-4">
+            {filteredSections.length === 0 ? (
+              <div className="idea-card p-8 sm:p-12 text-center">
+                <Search className="w-8 h-8 text-[var(--color-idea-muted)] mx-auto mb-3" />
+                <p className="font-semibold text-sm text-[var(--color-idea-text)]">
+                  No matching policy sections found
+                </p>
+                <p className="text-xs text-[var(--color-idea-muted)] mt-1">
+                  Try searching for keywords like "Google", "equipment", "returns", or "security".
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="mt-4 px-4 py-2 text-xs font-semibold text-[var(--color-idea-blue)] bg-[var(--color-idea-blue)]/10 rounded-xl hover:bg-[var(--color-idea-blue)]/20 transition-all cursor-pointer"
+                >
+                  Clear Search
+                </button>
+              </div>
+            ) : (
+              filteredSections.map((section, idx) => {
+                const sectionId = `section-${idx}`;
+                return (
+                  <article
+                    id={sectionId}
+                    key={section.heading}
+                    className="idea-card p-5 sm:p-7 space-y-4 scroll-mt-24 transition-all"
+                  >
+                    <h2 className="text-base sm:text-lg font-bold text-[var(--color-idea-text)] flex items-center justify-between">
+                      <span>{section.heading}</span>
+                    </h2>
+
+                    {section.paragraphs && (
+                      <div className="space-y-3">
+                        {section.paragraphs.map((p, pIdx) => (
+                          <p key={pIdx} className="text-xs sm:text-sm text-[var(--color-idea-muted)] leading-relaxed">
+                            {p}
+                          </p>
+                        ))}
+                      </div>
+                    )}
+
+                    {section.bullets && (
+                      <ul className="space-y-2 pt-2 border-t border-[var(--color-idea-border)]/60">
+                        {section.bullets.map((b, bIdx) => (
+                          <li key={bIdx} className="flex items-start gap-2.5 text-xs sm:text-sm text-[var(--color-idea-text)]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-idea-blue)] shrink-0 mt-2" />
+                            <span className="leading-relaxed">{b}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </article>
+                );
+              })
+            )}
+
+            {/* Bottom Support / Switch Box */}
+            <div className="idea-card p-5 sm:p-6 bg-white border-[var(--color-idea-border)] flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold text-[var(--color-idea-text)]">
+                  Need clarification on lab policies or access?
+                </p>
+                <p className="text-xs text-[var(--color-idea-muted)] mt-0.5">
+                  Contact your designated AICTE IDEA Lab Coordinator or Laboratory Assistant.
                 </p>
               </div>
-
-              <Link
-                to={otherPath}
-                className="inline-flex items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800"
+              <button
+                type="button"
+                onClick={() => handleTabSwitch(activeTab === 'privacy' ? 'terms' : 'privacy')}
+                className="idea-button shrink-0 flex items-center gap-2 px-4 py-2 text-xs font-semibold rounded-xl cursor-pointer"
               >
-                View {otherLabel}
-              </Link>
+                <span>Read {activeTab === 'privacy' ? 'Terms of Service' : 'Privacy Policy'}</span>
+                <ChevronRight className="w-4 h-4" />
+              </button>
             </div>
-
-            {/* Footer */}
-            <footer className="mt-10 max-w-3xl border-t border-slate-200 pt-6">
-              <div className="flex flex-col gap-3 text-xs text-slate-500 sm:flex-row sm:items-center sm:justify-between">
-                <p>© {new Date().getFullYear()} AICTE IDEA Lab Inventory Management System</p>
-
-                <div className="flex gap-4">
-                  <Link to="/privacy" className="hover:text-slate-900">
-                    Privacy
-                  </Link>
-
-                  <Link to="/terms" className="hover:text-slate-900">
-                    Terms
-                  </Link>
-                </div>
-              </div>
-            </footer>
-          </article>
+          </div>
         </div>
       </main>
+
+      {/* Quiet Unified Footer */}
+      {!inAppShell && (
+        <footer className="mt-12 border-t border-[var(--color-idea-border)] bg-white py-6 px-4 sm:px-8">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-[var(--color-idea-muted)]">
+            <p>© {new Date().getFullYear()} AICTE IDEA Lab Inventory Management System</p>
+            <div className="flex items-center gap-6">
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('privacy')}
+                className="hover:text-[var(--color-idea-deep-blue)] cursor-pointer"
+              >
+                Privacy Policy
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTabSwitch('terms')}
+                className="hover:text-[var(--color-idea-deep-blue)] cursor-pointer"
+              >
+                Terms of Service
+              </button>
+              <Link to="/" className="text-[var(--color-idea-blue)] font-semibold hover:underline">
+                Portal Sign-in
+              </Link>
+            </div>
+          </div>
+        </footer>
+      )}
     </div>
   );
 };
