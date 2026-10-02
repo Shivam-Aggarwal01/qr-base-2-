@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, QrCode } from 'lucide-react';
 import {
   Asset,
@@ -148,6 +148,17 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     resetFormState();
     onClose();
   };
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        handleClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen]);
 
   const triggerSuccess = () => {
     confetti({
@@ -1044,10 +1055,15 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
       aria-label="QR action panel"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          handleClose();
+        }
+      }}
     >
       <div className="idea-card relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden">
         <div className="h-1 w-full bg-[var(--color-idea-blue)]" />

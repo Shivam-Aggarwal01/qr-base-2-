@@ -40,6 +40,18 @@
   select {
     font-family: inherit;
   }
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled,
+  [disabled] {
+    cursor: not-allowed !important;
+    opacity: 0.55;
+  }
   ::selection {
     background-color: rgba(0, 113, 227, 0.15);
     color: #0071e3;
