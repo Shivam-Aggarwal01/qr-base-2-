@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Download, Printer, AlertCircle } from 'lucide-react';
 import QRCode from 'qrcode';
+import { useFocusTrap } from '../shared/lib/focusTrap';
 interface QRGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -51,6 +52,19 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
       cancelled = true;
     };
   }, [isOpen, code]);
+  const modalRef = useFocusTrap(isOpen);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
+
   useEffect(() => {
     if (!isOpen) {
       setGenerationError(null);
@@ -127,7 +141,9 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
     >
       {' '}
       <div
-        className=" w-full max-w-sm bg-white rounded-2xl border border-[var(--color-idea-border)] shadow-2xl overflow-hidden "
+        ref={modalRef}
+        tabIndex={-1}
+        className=" w-full max-w-sm bg-white rounded-2xl border border-[var(--color-idea-border)] shadow-2xl overflow-hidden focus:outline-none "
         role="dialog"
         aria-modal="true"
         aria-labelledby="qr-generator-title"

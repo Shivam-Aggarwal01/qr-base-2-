@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { QrCode, ChevronDown, Menu, ShieldCheck, LogOut, UserCheck } from 'lucide-react';
+import { QrCode, ChevronDown, Menu, LogOut, UserCheck } from 'lucide-react';
 import { isStudent } from '../services/authRoles';
 import { User } from '../types/inventory';
 import { Link } from 'react-router-dom';

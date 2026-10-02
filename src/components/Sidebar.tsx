@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Box, Layers, ClipboardList, MapPin, History, Users, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Box, Layers, ClipboardList, MapPin, History, Users, X } from 'lucide-react';
 import { User, ViewMode } from '../types/inventory';
 import { isStudent } from '../services/authRoles';
 import { Link } from 'react-router-dom';
@@ -12,7 +12,6 @@ interface SidebarProps {
   userRole?: User['role'];
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
-  onToggleMobile?: () => void;
 }
 
 interface MenuItem {
@@ -30,7 +29,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userRole = 'STUDENT',
   mobileOpen = false,
   onCloseMobile,
-  onToggleMobile,
 }) => {
   const studentMode = isStudent(userRole);
 

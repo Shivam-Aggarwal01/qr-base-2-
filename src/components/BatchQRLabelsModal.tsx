@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { Asset, CatalogItem, Location } from '../types/inventory';
+import { useFocusTrap } from '../shared/lib/focusTrap';
 
 interface BatchQRLabelsModalProps {
   isOpen?: boolean;
@@ -84,6 +85,18 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
   const [size, setSize] = useState<LabelSize>('medium');
   const [guides, setGuides] = useState(true);
   const [readyItems, setReadyItems] = useState<PrintItem[] | null>(null);
+  const modalRef = useFocusTrap(!!isOpen);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && onClose) {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   const printItems = useMemo<PrintItem[]>(() => {
     switch (filterType) {
@@ -186,10 +199,12 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
         onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
       >
         <div
+          ref={modalRef}
+          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-labelledby="qr-modal-title"
-          className="flex w-full max-w-4xl max-h-[94vh] max-h-[94dvh] flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)]"
+          className="flex w-full max-w-4xl max-h-[94vh] max-h-[94dvh] flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)] focus:outline-none"
         >
           <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-black/15 sm:hidden" aria-hidden="true" />
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Asset, CatalogItem, RequestLineDraft, RequestUsage, User } from '../types/inventory';
 import { createRequestFirestore } from '../services/firebaseCollections';
+import { useFocusTrap } from '../shared/lib/focusTrap';
 
 interface NewRequestModalProps {
   isOpen: boolean;
@@ -40,6 +41,18 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   };
 
   const [requestItems, setRequestItems] = useState<RequestLineDraft[]>(getInitialItems());
+  const modalRef = useFocusTrap(isOpen);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -153,13 +166,31 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
     [asset.name, asset.serial_number ? `SN: ${asset.serial_number}` : ''].filter(Boolean).join(' · ');
 
   return (
-    <div className="fixed inset-0 bg-[var(--color-idea-text)]/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-[var(--color-idea-border)]">
+    <div
+      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="new-request-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-[var(--color-idea-border)] focus:outline-none"
+      >
         <div className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between">
-          <h3 className="font-semibold text-[var(--color-idea-text)] text-lg tracking-tight">New Request</h3>
+          <h3 id="new-request-title" className="font-semibold text-[var(--color-idea-text)] text-lg tracking-tight">
+            New Request
+          </h3>
           <button
+            type="button"
             onClick={onClose}
-            className="text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors text-2xl font-light leading-none"
+            aria-label="Close new request modal"
+            className="text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors text-2xl font-light leading-none cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none p-1 rounded-lg"
           >
             ×
           </button>

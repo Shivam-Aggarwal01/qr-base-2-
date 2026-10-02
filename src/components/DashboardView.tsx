@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import {
-  Package,
   Boxes,
   MapPin,
   ClipboardList,
@@ -262,7 +261,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const availableAssets = useMemo(() => assets.filter((asset) => asset.status === 'AVAILABLE'), [assets]);
   const damagedAssets = useMemo(() => assets.filter((asset) => asset.status === 'DAMAGED'), [assets]);
   const repairAssets = useMemo(() => assets.filter((asset) => asset.status === 'UNDER_REPAIR'), [assets]);
-  const pendingRequests = useMemo(() => requests.filter((r) => r.status === 'PENDING'), [requests]);
 
   const lowStockItems = useMemo(
     () =>

@@ -13,6 +13,7 @@ import {
 import { InventoryStorage } from '../services/storage';
 import { canIssueInventory, canReturnOrRepairItems, isStudent } from '../services/authRoles';
 import confetti from 'canvas-confetti';
+import { useFocusTrap } from '../shared/lib/focusTrap';
 
 interface QuickActionModalProps {
   isOpen: boolean;
@@ -53,6 +54,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const [qtyInput, setQtyInput] = useState(1);
   const [remarksInput, setRemarksInput] = useState('');
   const [statusInput, setStatusInput] = useState<AssetStatus>('DAMAGED');
+  const modalRef = useFocusTrap(isOpen);
 
   const role = activeUser?.role;
   const quickStatusOptions: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST', 'RETIRED'];
@@ -1065,7 +1067,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         }
       }}
     >
-      <div className="idea-card relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden">
+      <div
+        ref={modalRef}
+        tabIndex={-1}
+        className="idea-card relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden focus:outline-none"
+      >
         <div className="h-1 w-full bg-[var(--color-idea-blue)]" />
 
         <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-white px-6 py-4">

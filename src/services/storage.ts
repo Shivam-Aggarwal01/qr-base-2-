@@ -294,7 +294,7 @@ export class InventoryStorage {
     toUserId: string,
     remarks?: string,
     requestId?: string,
-    quantityToTake: number = 1
+    _quantityToTake: number = 1
   ): Asset {
     const assets = this.getAssets();
     const activeUser = this.getActiveUser();
@@ -357,7 +357,7 @@ export class InventoryStorage {
   }
 
   // Return Reusable Asset (or return units to a Box asset)
-  static returnAsset(assetId: string, toLocationId: string, remarks?: string, quantityToReturn: number = 1): Asset {
+  static returnAsset(assetId: string, toLocationId: string, remarks?: string, _quantityToReturn: number = 1): Asset {
     const assets = this.getAssets();
     const activeUser = this.getActiveUser();
     const now = new Date().toISOString();

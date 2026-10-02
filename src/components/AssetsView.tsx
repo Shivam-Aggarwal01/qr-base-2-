@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Search, QrCode, Pencil, Trash2 } from 'lucide-react';
-import { Asset, CatalogItem, Location, User, AssetStatus, UserRole } from '../types/inventory';
+import { Asset, Location, User, AssetStatus, UserRole } from '../types/inventory';
 import {
   COLLECTIONS,
   createAssetInFirestore,

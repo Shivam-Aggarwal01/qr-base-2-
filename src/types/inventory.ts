@@ -78,9 +78,6 @@ export interface CatalogItem {
 // Location
 // code is auto-generated as LOC-<docId prefix> after creation
 // ---------------------------------------------------------------------------
-// Location
-// code is auto-generated as LOC-<docId prefix> after creation
-// ---------------------------------------------------------------------------
 
 export interface Location {
   id: string;
