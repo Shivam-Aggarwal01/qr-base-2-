@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Search, QrCode, Pencil, Trash2 } from 'lucide-react';
+import { Modal, KeyboardBadge } from './Modal';
 import { Asset, Location, User, AssetStatus, UserRole } from '../types/inventory';
 import {
   COLLECTIONS,
@@ -409,199 +410,209 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         </div>
 
         {/* Edit Asset Modal */}
-        {showEditAssetModal && editingAsset && (
-          <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
-              <div className="border-b border-[var(--color-idea-border)] pb-2">
-                <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Edit Asset</h3>
-                <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5 font-mono">{editingAsset.asset_code}</p>
+        <Modal
+          isOpen={showEditAssetModal && !!editingAsset}
+          onClose={closeEditAssetModal}
+          title="Edit Equipment / Asset"
+          subtitle={editingAsset ? `ID: ${editingAsset.asset_code}` : undefined}
+          category="Equipment Management"
+          preventClose={editAssetSaving}
+          closeOnOutsideClick={true}
+          closeOnEscape={true}
+          maxWidth="md"
+          bodyClassName="p-6"
+        >
+          {editingAsset && (
+            <form onSubmit={handleEditAssetSubmit} className="space-y-4">
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Asset Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={editAssetName}
+                  onChange={(e) => setEditAssetName(e.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                />
               </div>
-              <form onSubmit={handleEditAssetSubmit} className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Asset Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={editAssetName}
-                    onChange={(e) => setEditAssetName(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs w-full"
-                  />
-                </div>
 
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Status
-                  </label>
-                  {editingAsset.status === 'ISSUED' ? (
-                    <div className="mt-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
-                      Issued to student
-                    </div>
-                  ) : (
-                    <select
-                      value={editAssetStatus}
-                      onChange={(e) => setEditAssetStatus(e.target.value as AssetStatus)}
-                      className="idea-input mt-1 p-2.5 text-xs w-full"
-                    >
-                      {EDITABLE_STATUSES.map((status) => (
-                        <option key={status} value={status}>
-                          {getStatusLabel(status)}
-                        </option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Location
-                  </label>
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Status
+                </label>
+                {editingAsset.status === 'ISSUED' ? (
+                  <div className="mt-1 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-700">
+                    Issued to student
+                  </div>
+                ) : (
                   <select
-                    value={editAssetLocationId}
-                    onChange={(e) => setEditAssetLocationId(e.target.value)}
+                    value={editAssetStatus}
+                    onChange={(e) => setEditAssetStatus(e.target.value as AssetStatus)}
                     className="idea-input mt-1 p-2.5 text-xs w-full"
-                    disabled={editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED'}
                   >
-                    <option value="" disabled>
-                      {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
-                    </option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
+                    {EDITABLE_STATUSES.map((status) => (
+                      <option key={status} value={status}>
+                        {getStatusLabel(status)}
                       </option>
                     ))}
                   </select>
-                  {(editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED') && (
-                    <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
-                      Location is cleared automatically for this status.
-                    </p>
-                  )}
-                </div>
+                )}
+              </div>
 
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Inspection Notes
-                  </label>
-                  <input
-                    type="text"
-                    value={editAssetNotes}
-                    onChange={(e) => setEditAssetNotes(e.target.value)}
-                    placeholder="e.g. Minor cosmetic scratch on body"
-                    className="idea-input mt-1 p-2.5 text-xs w-full"
-                  />
-                </div>
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Location
+                </label>
+                <select
+                  value={editAssetLocationId}
+                  onChange={(e) => setEditAssetLocationId(e.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                  disabled={editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED'}
+                >
+                  <option value="" disabled>
+                    {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
+                  </option>
+                  {locations.map((l) => (
+                    <option key={l.id} value={l.id}>
+                      {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {(editAssetStatus === 'LOST' || editAssetStatus === 'RETIRED') && (
+                  <p className="text-[10px] text-[var(--color-idea-muted)] mt-1">
+                    Location is cleared automatically for this status.
+                  </p>
+                )}
+              </div>
 
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={closeEditAssetModal}
-                    disabled={editAssetSaving}
-                    className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={editAssetSaving}
-                    className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50"
-                  >
-                    {editAssetSaving ? 'Saving…' : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Inspection Notes
+                </label>
+                <input
+                  type="text"
+                  value={editAssetNotes}
+                  onChange={(e) => setEditAssetNotes(e.target.value)}
+                  placeholder="e.g. Minor cosmetic scratch on body"
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                />
+              </div>
+
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={closeEditAssetModal}
+                  disabled={editAssetSaving}
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <span>Cancel</span>
+                  <KeyboardBadge>Esc</KeyboardBadge>
+                </button>
+                <button
+                  type="submit"
+                  disabled={editAssetSaving}
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <span>{editAssetSaving ? 'Saving…' : 'Save Changes'}</span>
+                  <KeyboardBadge>↵ Enter</KeyboardBadge>
+                </button>
+              </div>
+            </form>
+          )}
+        </Modal>
 
         {/* Add Asset Modal */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
-              <h3 className="font-bold text-[var(--color-idea-text)] text-lg border-b border-[var(--color-idea-border)] pb-2">
-                Add Asset
-              </h3>
-
-              <form onSubmit={handleAddAssetSubmit} className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Asset Name
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    placeholder="e.g. Soldering Station 01"
-                    value={newAssetName}
-                    onChange={(e) => setNewAssetName(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Asset Status
-                  </label>
-                  <div className="mt-1 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-3 py-2 text-xs font-semibold text-[var(--color-idea-text)]">
-                    Available
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Location
-                  </label>
-                  <select
-                    value={newLocationId}
-                    onChange={(e) => setNewLocationId(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs w-full"
-                    required
-                  >
-                    <option value="" disabled>
-                      {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
-                    </option>
-                    {locations.map((l) => (
-                      <option key={l.id} value={l.id}>
-                        {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Inspection Notes
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Fresh batch sealed in box"
-                    value={newNotes}
-                    onChange={(e) => setNewNotes(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs w-full"
-                  />
-                </div>
-
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
-                  >
-                    Add Asset
-                  </button>
-                </div>
-              </form>
+        <Modal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          title="Add Equipment / Asset"
+          category="Equipment Management"
+          closeOnOutsideClick={true}
+          closeOnEscape={true}
+          maxWidth="md"
+          bodyClassName="p-6"
+        >
+          <form onSubmit={handleAddAssetSubmit} className="space-y-4">
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Asset Name
+              </label>
+              <input
+                type="text"
+                required
+                autoFocus
+                placeholder="e.g. Soldering Station 01"
+                value={newAssetName}
+                onChange={(e) => setNewAssetName(e.target.value)}
+                className="idea-input mt-1 p-2.5 text-xs w-full"
+              />
             </div>
-          </div>
-        )}
+
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Asset Status
+              </label>
+              <div className="mt-1 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)] px-3 py-2 text-xs font-semibold text-[var(--color-idea-text)]">
+                Available
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Location
+              </label>
+              <select
+                value={newLocationId}
+                onChange={(e) => setNewLocationId(e.target.value)}
+                className="idea-input mt-1 p-2.5 text-xs w-full"
+                required
+              >
+                <option value="" disabled>
+                  {locations.length === 0 ? 'Loading locations...' : 'Select storage location'}
+                </option>
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Inspection Notes
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Fresh batch sealed in box"
+                value={newNotes}
+                onChange={(e) => setNewNotes(e.target.value)}
+                className="idea-input mt-1 p-2.5 text-xs w-full"
+              />
+            </div>
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>Cancel</span>
+                <KeyboardBadge>Esc</KeyboardBadge>
+              </button>
+
+              <button
+                type="submit"
+                className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>Add Asset</span>
+                <KeyboardBadge>↵ Enter</KeyboardBadge>
+              </button>
+            </div>
+          </form>
+        </Modal>
       </div>
     </div>
   );

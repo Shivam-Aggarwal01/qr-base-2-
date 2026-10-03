@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { Modal, KeyboardBadge } from './Modal';
 import { Asset, CatalogItem, RequestLineDraft, RequestUsage, User } from '../types/inventory';
 import { createRequestFirestore } from '../services/firebaseCollections';
-import { useFocusTrap } from '../shared/lib/focusTrap';
 
 interface NewRequestModalProps {
   isOpen: boolean;
@@ -41,18 +41,6 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   };
 
   const [requestItems, setRequestItems] = useState<RequestLineDraft[]>(getInitialItems());
-  const modalRef = useFocusTrap(isOpen);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -166,48 +154,29 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
     [asset.name, asset.serial_number ? `SN: ${asset.serial_number}` : ''].filter(Boolean).join(' · ');
 
   return (
-    <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="new-request-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="New Request"
+      category="Student Requests"
+      preventClose={isSubmitting}
+      closeOnOutsideClick={true}
+      closeOnEscape={true}
+      maxWidth="lg"
+      bodyClassName="p-6 overflow-y-auto max-h-[80vh]"
     >
-      <div
-        ref={modalRef}
-        tabIndex={-1}
-        className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden flex flex-col border border-[var(--color-idea-border)] focus:outline-none"
-      >
-        <div className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between">
-          <h3 id="new-request-title" className="font-semibold text-[var(--color-idea-text)] text-lg tracking-tight">
-            New Request
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close new request modal"
-            className="text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors text-2xl font-light leading-none cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none p-1 rounded-lg"
-          >
-            ×
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 overflow-y-auto max-h-[80vh]">
-          <div>
-            <label className="text-[10px] font-medium text-[var(--color-idea-muted)] uppercase tracking-widest mb-2 block">
-              Requester
-            </label>
-            <div className="px-4 py-3 bg-[var(--color-idea-light-grey)]/60 rounded-2xl text-sm text-[var(--color-idea-text)] flex justify-between items-center border border-[var(--color-idea-border)]">
-              <span className="font-medium">{activeUser.name}</span>
-              <span className="text-[10px] font-medium text-[var(--color-idea-muted)] tracking-wider uppercase">
-                {activeUser.role}
-              </span>
-            </div>
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <label className="text-[10px] font-medium text-[var(--color-idea-muted)] uppercase tracking-widest mb-2 block">
+            Requester
+          </label>
+          <div className="px-4 py-3 bg-[var(--color-idea-light-grey)]/60 rounded-2xl text-sm text-[var(--color-idea-text)] flex justify-between items-center border border-[var(--color-idea-border)]">
+            <span className="font-medium">{activeUser.name}</span>
+            <span className="text-[10px] font-medium text-[var(--color-idea-muted)] tracking-wider uppercase">
+              {activeUser.role}
+            </span>
           </div>
+        </div>
 
           <div>
             <label className="text-[10px] font-medium text-[var(--color-idea-muted)] uppercase tracking-widest mb-2 block">
@@ -349,25 +318,26 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             />
           </div>
 
-          <div className="pt-4 flex gap-3">
+          <div className="pt-4 flex items-center gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 py-3 bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] text-sm font-semibold rounded-2xl hover:bg-gray-100 transition-colors"
+              className="flex-1 py-3 bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] text-sm font-semibold rounded-2xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              Cancel
+              <span>Cancel</span>
+              <KeyboardBadge>Esc</KeyboardBadge>
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-3 bg-[var(--color-idea-deep-blue)] text-white text-sm font-semibold rounded-2xl hover:bg-[var(--color-idea-blue)] transition-colors disabled:opacity-50"
+              className="flex-1 py-3 bg-[var(--color-idea-deep-blue)] text-white text-sm font-semibold rounded-2xl hover:bg-[var(--color-idea-blue)] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
             >
-              {isSubmitting ? 'Submitting...' : 'Submit'}
+              <span>{isSubmitting ? 'Submitting...' : 'Submit'}</span>
+              <KeyboardBadge>↵ Enter</KeyboardBadge>
             </button>
           </div>
         </form>
-      </div>
-    </div>
-  );
-};
+      </Modal>
+    );
+  };

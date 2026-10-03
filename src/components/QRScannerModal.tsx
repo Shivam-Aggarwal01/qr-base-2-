@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, Upload, AlertCircle, RefreshCw, KeyRound, ArrowRight } from 'lucide-react';
+import { Modal, KeyboardBadge } from './Modal';
 import jsQR from 'jsqr';
 
 interface QRScannerModalProps {
@@ -153,77 +154,55 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose,
   if (!isOpen) return null;
 
   return (
-    <div
-      className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="qr-scanner-title"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
-      }}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="Lab QR Scanner"
+      category="AICTE IDEA LAB · SCANNER"
+      closeOnOutsideClick={true}
+      closeOnEscape={true}
+      maxWidth="md"
+      bodyClassName="p-0 flex flex-col flex-1"
     >
-      <div className="bg-white rounded-2xl shadow-2xl border border-[var(--color-idea-border)] w-full max-w-md overflow-hidden flex flex-col max-h-[92vh]">
-        {/* Header */}
-        <div className="px-5 sm:px-6 py-4 border-b border-[var(--color-idea-border)] flex items-center justify-between bg-[var(--color-idea-light-grey)]/60 shrink-0">
-          <div>
-            <span className="text-[9px] font-bold uppercase tracking-[0.18em] text-[var(--color-idea-blue)]">
-              AICTE IDEA LAB · SCANNER
-            </span>
-            <h3 id="qr-scanner-title" className="font-bold text-[var(--color-idea-text)] text-base sm:text-lg leading-tight">
-              Lab QR Scanner
-            </h3>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl hover:bg-[var(--color-idea-light-grey)] text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center cursor-pointer"
-            aria-label="Close scanner"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {/* Tab Buttons */}
-        <div className="flex border-b border-[var(--color-idea-border)] px-4 pt-3 gap-1.5 bg-[var(--color-idea-light-grey)]/40 shrink-0">
-          <button
-            type="button"
-            onClick={() => setActiveTab('camera')}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer border-b-2 ${
-              activeTab === 'camera'
-                ? 'border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] bg-white shadow-xs'
-                : 'border-transparent text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
-            }`}
-          >
-            <Camera className="w-3.5 h-3.5" />
-            <span>Camera</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('upload')}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer border-b-2 ${
-              activeTab === 'upload'
-                ? 'border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] bg-white shadow-xs'
-                : 'border-transparent text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
-            }`}
-          >
-            <Upload className="w-3.5 h-3.5" />
-            <span>Upload</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('manual')}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer border-b-2 ${
-              activeTab === 'manual'
-                ? 'border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] bg-white shadow-xs'
-                : 'border-transparent text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
-            }`}
-          >
-            <KeyRound className="w-3.5 h-3.5" />
-            <span>Manual</span>
-          </button>
-        </div>
+      {/* Tab Buttons */}
+      <div className="flex border-b border-[var(--color-idea-border)] px-4 pt-3 gap-1.5 bg-[var(--color-idea-light-grey)]/40 shrink-0">
+        <button
+          type="button"
+          onClick={() => setActiveTab('camera')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer border-b-2 ${
+            activeTab === 'camera'
+              ? 'border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] bg-white shadow-xs'
+              : 'border-transparent text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
+          }`}
+        >
+          <Camera className="w-3.5 h-3.5" />
+          <span>Camera</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('upload')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer border-b-2 ${
+            activeTab === 'upload'
+              ? 'border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] bg-white shadow-xs'
+              : 'border-transparent text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
+          }`}
+        >
+          <Upload className="w-3.5 h-3.5" />
+          <span>Upload</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('manual')}
+          className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-xl transition-all cursor-pointer border-b-2 ${
+            activeTab === 'manual'
+              ? 'border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] bg-white shadow-xs'
+              : 'border-transparent text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'
+          }`}
+        >
+          <KeyRound className="w-3.5 h-3.5" />
+          <span>Manual</span>
+        </button>
+      </div>
 
         {/* Modal Body */}
         <div className="p-4 sm:p-6 overflow-y-auto flex-1">
@@ -308,7 +287,6 @@ export const QRScannerModal: React.FC<QRScannerModalProps> = ({ isOpen, onClose,
             </form>
           )}
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 };

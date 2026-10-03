@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { Modal, KeyboardBadge } from './Modal';
 import {
   Plus,
   ClipboardList,
@@ -578,156 +579,162 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
       </div>
 
       {/* ACTION MODAL */}
-      {selectedRequest && (
-        <div className="fixed inset-0 bg-[var(--color-idea-text)]/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden flex flex-col">
-            <div className="px-6 py-4 border-b border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/60 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-xl idea-gradient-soft flex items-center justify-center shrink-0">
-                {modalMode === 'review' ? (
-                  <CheckCircle2 className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                ) : selectedRequest.items?.some(
-                    (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
-                  ) ? (
-                  <RotateCcw className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                ) : (
-                  <CheckCircle2 className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                )}
-              </div>
+      <Modal
+        isOpen={!!selectedRequest}
+        onClose={closeModal}
+        title={
+          modalMode === 'review'
+            ? 'Approve & Issue Request'
+            : selectedRequest?.items?.some(
+                  (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
+                )
+              ? 'Accept Return'
+              : 'Complete Request'
+        }
+        subtitle={selectedRequest ? `Request #${selectedRequest.request_number}` : undefined}
+        category="Request Action"
+        icon={
+          modalMode === 'review' ? (
+            <CheckCircle2 className="w-4 h-4 text-[var(--color-idea-blue)]" />
+          ) : selectedRequest?.items?.some(
+              (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
+            ) ? (
+            <RotateCcw className="w-4 h-4 text-[var(--color-idea-blue)]" />
+          ) : (
+            <CheckCircle2 className="w-4 h-4 text-[var(--color-idea-blue)]" />
+          )
+        }
+        preventClose={isProcessing}
+        closeOnOutsideClick={true}
+        closeOnEscape={true}
+        maxWidth="md"
+        bodyClassName="p-6 space-y-4"
+        footer={
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={closeModal}
+              disabled={isProcessing}
+              className="flex-1 px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+            >
+              <span>Cancel</span>
+              <KeyboardBadge>Esc</KeyboardBadge>
+            </button>
 
-              <div>
-                <p className="font-bold text-[var(--color-idea-text)] text-sm">
-                  {modalMode === 'review'
-                    ? 'Approve & Issue Request'
-                    : selectedRequest.items?.some(
-                          (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
-                        )
-                      ? 'Accept Return'
-                      : 'Complete Request'}
-                </p>
-
-                <p className="text-[10px] font-mono text-[var(--color-idea-blue)] mt-0.5">
-                  {selectedRequest.request_number}
-                </p>
-              </div>
-            </div>
-
-            <div className="p-6 space-y-4 overflow-y-auto max-h-[55vh]">
-              {processingError && (
-                <div className="flex items-start gap-2 p-3 idea-error rounded-xl text-xs">
-                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
-                  <span>{processingError}</span>
-                </div>
-              )}
-
-              <p className="text-xs text-[var(--color-idea-muted)] leading-relaxed">
-                {modalMode === 'review'
-                  ? 'Approving deducts stock and marks any assets issued immediately — there is no separate handover step.'
-                  : selectedRequest.items?.some(
-                        (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
-                      )
-                    ? 'Confirm the items have physically come back. Stock and asset status will be restored and the request closed.'
-                    : 'Mark this request as completed. Consumables are already deducted.'}
-              </p>
-
-              <div className="space-y-1.5">
-                <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
-                  Items in this request
-                </p>
-
-                {selectedRequest.items?.map((item) => {
-                  const label = lineLabel(item);
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex justify-between items-center px-3 py-2 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/60 text-xs"
-                    >
-                      <span className="font-semibold text-[var(--color-idea-text)]">{label.name}</span>
-
-                      <span className="text-[var(--color-idea-blue)] font-mono text-[10px]">
-                        {label.isAsset ? 'Asset · 1 unit' : label.qty}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div>
-                <label className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] block mb-1.5">
-                  Note
-                </label>
-
-                <input
-                  type="text"
-                  value={remarks}
-                  onChange={(event) => setRemarks(event.target.value)}
-                  placeholder="Add a note for this request…"
-                  className="idea-input px-3 py-2.5 text-xs"
-                />
-              </div>
-
-              {modalMode === 'complete' &&
-                selectedRequest.items?.some((item) => getRequestLineKind(item) === 'ASSET') && (
-                  <div>
-                    <label className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] block mb-1.5">
-                      Return Location
-                    </label>
-
-                    <select
-                      value={returnLocationId}
-                      onChange={(event) => setReturnLocationId(event.target.value)}
-                      className="idea-input px-3 py-2.5 text-xs"
-                    >
-                      <option value="">Choose storage location</option>
-
-                      {locations.map((location) => (
-                        <option key={location.id} value={location.id}>
-                          {location.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
-            </div>
-
-            <div className="px-6 py-4 border-t border-[var(--color-idea-border)] flex gap-2">
+            {modalMode === 'review' && (
               <button
-                onClick={closeModal}
+                type="button"
+                onClick={handleReject}
                 disabled={isProcessing}
-                className="flex-1 px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
+                className="flex-1 py-2.5 idea-error rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50"
               >
-                Cancel
+                Reject
               </button>
+            )}
 
-              {modalMode === 'review' && (
-                <button
-                  onClick={handleReject}
-                  disabled={isProcessing}
-                  className="flex-1 py-2.5 idea-error rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50"
-                >
-                  Reject
-                </button>
-              )}
-
-              <button
-                onClick={handleAction}
-                disabled={isProcessing}
-                className="py-2.5 flex-1 px-4 idea-button rounded-xl text-xs font-bold cursor-pointer disabled:opacity-60"
-              >
+            <button
+              type="button"
+              onClick={handleAction}
+              disabled={isProcessing}
+              className="py-2.5 flex-1 px-4 idea-button rounded-xl text-xs font-bold cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+            >
+              <span>
                 {isProcessing
                   ? 'Processing…'
                   : modalMode === 'review'
                     ? 'Approve & Issue'
-                    : selectedRequest.items?.some(
+                    : selectedRequest?.items?.some(
                           (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
                         )
                       ? 'Accept Return'
                       : 'Complete Request'}
-              </button>
-            </div>
+              </span>
+              <KeyboardBadge>↵ Enter</KeyboardBadge>
+            </button>
           </div>
-        </div>
-      )}
+        }
+      >
+        {selectedRequest && (
+          <>
+            {processingError && (
+              <div className="flex items-start gap-2 p-3 idea-error rounded-xl text-xs">
+                <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{processingError}</span>
+              </div>
+            )}
+
+            <p className="text-xs text-[var(--color-idea-muted)] leading-relaxed">
+              {modalMode === 'review'
+                ? 'Approving deducts stock and marks any assets issued immediately — there is no separate handover step.'
+                : selectedRequest.items?.some(
+                      (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
+                    )
+                  ? 'Confirm the items have physically come back. Stock and asset status will be restored and the request closed.'
+                  : 'Mark this request as completed. Consumables are already deducted.'}
+            </p>
+
+            <div className="space-y-1.5">
+              <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">
+                Items in this request
+              </p>
+
+              {selectedRequest.items?.map((item) => {
+                const label = lineLabel(item);
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex justify-between items-center px-3 py-2 rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/60 text-xs"
+                  >
+                    <span className="font-semibold text-[var(--color-idea-text)]">{label.name}</span>
+
+                    <span className="text-[var(--color-idea-blue)] font-mono text-[10px]">
+                      {label.isAsset ? 'Asset · 1 unit' : label.qty}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div>
+              <label className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] block mb-1.5">
+                Note
+              </label>
+
+              <input
+                type="text"
+                value={remarks}
+                onChange={(event) => setRemarks(event.target.value)}
+                placeholder="Add a note for this request…"
+                className="idea-input px-3 py-2.5 text-xs"
+              />
+            </div>
+
+            {modalMode === 'complete' &&
+              selectedRequest.items?.some((item) => getRequestLineKind(item) === 'ASSET') && (
+                <div>
+                  <label className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)] block mb-1.5">
+                    Return Location
+                  </label>
+
+                  <select
+                    value={returnLocationId}
+                    onChange={(event) => setReturnLocationId(event.target.value)}
+                    className="idea-input px-3 py-2.5 text-xs"
+                  >
+                    <option value="">Choose storage location</option>
+
+                    {locations.map((location) => (
+                      <option key={location.id} value={location.id}>
+                        {location.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+          </>
+        )}
+      </Modal>
     </div>
   );
 };

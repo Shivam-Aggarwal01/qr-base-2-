@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, MapPin, QrCode, Box, Layers, Search, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
+import { Modal, KeyboardBadge } from './Modal';
 import { Location, CatalogItem, Asset, StockLevel, UserRole } from '../types/inventory';
 import {
   createLocationInFirestore,
@@ -449,166 +450,150 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
       </div>
 
       {/* Edit Location Modal */}
-      {showEditModal && editingLoc && (
-        <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-medium tracking-[0.2em] uppercase text-[var(--color-idea-muted)]">
-                  Lab Setup
-                </p>
-                <h3 className="font-bold text-[var(--color-idea-text)] text-lg mt-1">Edit Location</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setShowEditModal(false);
-                  setEditingLoc(null);
-                }}
-                disabled={editSaving}
-                className="p-2 text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] disabled:opacity-50 cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <form onSubmit={handleEditLocation} className="p-6 space-y-4">
-              {editFormError && <div className="idea-error rounded-xl px-3 py-2.5 text-xs">{editFormError}</div>}
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Location Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  value={editLocName}
-                  onChange={(e) => setEditLocName(e.target.value)}
-                  className="idea-input mt-1.5 p-2.5 text-xs"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Detailed Path
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Main Lab &gt; Wall Almirah &gt; Shelf 2 &gt; Bin B"
-                  value={editStoragePath}
-                  onChange={(e) => setEditStoragePath(e.target.value)}
-                  className="idea-input mt-1.5 p-2.5 text-xs font-mono w-full"
-                />
-                <div className="mt-2 p-2.5 rounded-lg bg-[var(--color-idea-light-grey)]/60 border border-[var(--color-idea-border)] w-full">
-                  <span className="text-[10px] text-[var(--color-idea-muted)] block mb-1">Live Route Preview:</span>
-                  <LocationPathBreadcrumb path={editStoragePath} />
-                </div>
-              </div>
-              <div className="pt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowEditModal(false);
-                    setEditingLoc(null);
-                  }}
-                  disabled={editSaving}
-                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editSaving}
-                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
-                >
-                  {editSaving ? 'Saving…' : 'Save Changes'}
-                </button>
-              </div>
-            </form>
+      <Modal
+        isOpen={showEditModal && !!editingLoc}
+        onClose={() => {
+          setShowEditModal(false);
+          setEditingLoc(null);
+        }}
+        title="Edit Location"
+        category="Lab Setup"
+        icon={<MapPin className="w-4 h-4" />}
+        preventClose={editSaving}
+        closeOnOutsideClick={true}
+        closeOnEscape={true}
+        maxWidth="md"
+        bodyClassName="p-6"
+      >
+        <form onSubmit={handleEditLocation} className="space-y-4">
+          {editFormError && <div className="idea-error rounded-xl px-3 py-2.5 text-xs">{editFormError}</div>}
+          <div>
+            <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Location Name
+            </label>
+            <input
+              type="text"
+              required
+              autoFocus
+              value={editLocName}
+              onChange={(e) => setEditLocName(e.target.value)}
+              className="idea-input mt-1.5 p-2.5 text-xs"
+            />
           </div>
-        </div>
-      )}
+          <div>
+            <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Detailed Path
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Main Lab > Wall Almirah > Shelf 2 > Bin B"
+              value={editStoragePath}
+              onChange={(e) => setEditStoragePath(e.target.value)}
+              className="idea-input mt-1.5 p-2.5 text-xs font-mono w-full"
+            />
+            <div className="mt-2 p-2.5 rounded-lg bg-[var(--color-idea-light-grey)]/60 border border-[var(--color-idea-border)] w-full">
+              <span className="text-[10px] text-[var(--color-idea-muted)] block mb-1">Live Route Preview:</span>
+              <LocationPathBreadcrumb path={editStoragePath} />
+            </div>
+          </div>
+          <div className="pt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setShowEditModal(false);
+                setEditingLoc(null);
+              }}
+              disabled={editSaving}
+              className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>Cancel</span>
+              <KeyboardBadge>Esc</KeyboardBadge>
+            </button>
+            <button
+              type="submit"
+              disabled={editSaving}
+              className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>{editSaving ? 'Saving…' : 'Save Changes'}</span>
+              <KeyboardBadge>↵ Enter</KeyboardBadge>
+            </button>
+          </div>
+        </form>
+      </Modal>
 
       {/* Add Location Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden">
-            <div className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-medium tracking-[0.2em] uppercase text-[var(--color-idea-muted)]">
-                  Lab Setup
-                </p>
-                <h3 className="font-bold text-[var(--color-idea-text)] text-lg mt-1">Add Physical Location</h3>
-              </div>
-              <button
-                type="button"
-                onClick={closeAddModal}
-                disabled={saving}
-                className="p-2 text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] disabled:opacity-50 cursor-pointer"
-                aria-label="Close add location dialog"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <Modal
+        isOpen={showAddModal}
+        onClose={closeAddModal}
+        title="Add Physical Location"
+        category="Lab Setup"
+        icon={<MapPin className="w-4 h-4" />}
+        preventClose={saving}
+        closeOnOutsideClick={true}
+        closeOnEscape={true}
+        maxWidth="md"
+        bodyClassName="p-6"
+      >
+        <form onSubmit={handleAddLocation} className="space-y-4">
+          {formError && <div className="idea-error rounded-xl px-3 py-2.5 text-xs">{formError}</div>}
 
-            <form onSubmit={handleAddLocation} className="p-6 space-y-4">
-              {formError && <div className="idea-error rounded-xl px-3 py-2.5 text-xs">{formError}</div>}
-
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Location Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="e.g. Electronics Workbench A"
-                  value={locName}
-                  onChange={(event) => setLocName(event.target.value)}
-                  className="idea-input mt-1.5 p-2.5 text-xs"
-                />
-              </div>
-
-              <div>
-                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                  Detailed Path
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Main Lab > Wall Almirah > Shelf 2 > Bin B"
-                  value={storagePath}
-                  onChange={(event) => setStoragePath(event.target.value)}
-                  className="idea-input mt-1.5 p-2.5 text-xs font-mono w-full"
-                />
-                <div className="mt-2 p-2.5 rounded-lg bg-[var(--color-idea-light-grey)]/60 border border-[var(--color-idea-border)] w-full">
-                  <span className="text-[10px] text-[var(--color-idea-muted)] block mb-1">Live Route Preview:</span>
-                  <LocationPathBreadcrumb path={storagePath} />
-                </div>
-                <p className="text-[10px] text-[var(--color-idea-muted)] mt-1.5">
-                  Use <span className="font-mono">&gt;</span> or <span className="font-mono">/</span> to specify nested
-                  lab zones (Room &gt; Rack &gt; Shelf).
-                </p>
-              </div>
-
-              <div className="pt-2 flex gap-2">
-                <button
-                  type="button"
-                  onClick={closeAddModal}
-                  disabled={saving}
-                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={saving}
-                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer"
-                >
-                  {saving ? 'Creating...' : 'Create Location'}
-                </button>
-              </div>
-            </form>
+          <div>
+            <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Location Name
+            </label>
+            <input
+              type="text"
+              required
+              autoFocus
+              placeholder="e.g. Electronics Workbench A"
+              value={locName}
+              onChange={(event) => setLocName(event.target.value)}
+              className="idea-input mt-1.5 p-2.5 text-xs"
+            />
           </div>
-        </div>
-      )}
+
+          <div>
+            <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Detailed Path
+            </label>
+            <input
+              type="text"
+              placeholder="e.g. Main Lab > Wall Almirah > Shelf 2 > Bin B"
+              value={storagePath}
+              onChange={(event) => setStoragePath(event.target.value)}
+              className="idea-input mt-1.5 p-2.5 text-xs font-mono w-full"
+            />
+            <div className="mt-2 p-2.5 rounded-lg bg-[var(--color-idea-light-grey)]/60 border border-[var(--color-idea-border)] w-full">
+              <span className="text-[10px] text-[var(--color-idea-muted)] block mb-1">Live Route Preview:</span>
+              <LocationPathBreadcrumb path={storagePath} />
+            </div>
+            <p className="text-[10px] text-[var(--color-idea-muted)] mt-1.5">
+              Use <span className="font-mono">&gt;</span> or <span className="font-mono">/</span> to specify nested
+              lab zones (Room &gt; Rack &gt; Shelf).
+            </p>
+          </div>
+
+          <div className="pt-2 flex items-center gap-2">
+            <button
+              type="button"
+              onClick={closeAddModal}
+              disabled={saving}
+              className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>Cancel</span>
+              <KeyboardBadge>Esc</KeyboardBadge>
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+            >
+              <span>{saving ? 'Creating...' : 'Create Location'}</span>
+              <KeyboardBadge>↵ Enter</KeyboardBadge>
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 };

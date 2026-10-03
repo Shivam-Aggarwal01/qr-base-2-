@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Download, Printer, AlertCircle } from 'lucide-react';
+import { Modal, KeyboardBadge } from './Modal';
 import QRCode from 'qrcode';
-import { useFocusTrap } from '../shared/lib/focusTrap';
 interface QRGeneratorModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -52,19 +52,6 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
       cancelled = true;
     };
   }, [isOpen, code]);
-  const modalRef = useFocusTrap(isOpen);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
-
   useEffect(() => {
     if (!isOpen) {
       setGenerationError(null);
@@ -127,125 +114,83 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
       }, 1000);
     }, 300);
   };
-  if (!isOpen) {
-    return null;
-  }
+
   return (
-    <div
-      className=" fixed inset-0 z-50 bg-slate-950/50 backdrop-blur-sm flex items-center justify-center p-4 "
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
-      }}
-    >
-      {' '}
-      <div
-        ref={modalRef}
-        tabIndex={-1}
-        className=" w-full max-w-sm bg-white rounded-2xl border border-[var(--color-idea-border)] shadow-2xl overflow-hidden focus:outline-none "
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="qr-generator-title"
-      >
-        {' '}
-        {/* Header */}{' '}
-        <div className=" px-5 py-4 border-b border-[var(--color-idea-border)] flex items-center justify-between ">
-          {' '}
-          <div className="min-w-0">
-            {' '}
-            <h2 id="qr-generator-title" className=" text-base font-semibold text-[var(--color-idea-text)] ">
-              {' '}
-              QR Label{' '}
-            </h2>{' '}
-            <p className=" mt-0.5 text-xs text-[var(--color-idea-muted)] "> Generate or print this label. </p>{' '}
-          </div>{' '}
-          <button
-            type="button"
-            onClick={onClose}
-            className=" w-9 h-9 shrink-0 flex items-center justify-center rounded-lg text-[var(--color-idea-muted)] hover:bg-[var(--color-idea-light-grey)] hover:text-[var(--color-idea-text)] transition-colors "
-            aria-label="Close QR label"
-          >
-            {' '}
-            <X className="w-4 h-4" />{' '}
-          </button>{' '}
-        </div>{' '}
-        {/* Label Preview */}{' '}
-        <div className="p-6">
-          {' '}
-          <div className=" bg-white border border-[var(--color-idea-border)] rounded-xl p-5 flex flex-col items-center text-center ">
-            {' '}
-            <p className=" text-[8px] font-semibold uppercase tracking-[0.15em] text-[var(--color-idea-deep-blue)] ">
-              {' '}
-              AICTE IDEA LAB{' '}
-            </p>{' '}
-            {typeBadge && (
-              <p className=" mt-1 text-[9px] font-medium uppercase tracking-wider text-[var(--color-idea-muted)] ">
-                {' '}
-                {typeBadge}{' '}
-              </p>
-            )}{' '}
-            <h3
-              className=" w-full mt-2 text-sm font-semibold text-[var(--color-idea-text)] leading-tight truncate "
-              title={title}
-            >
-              {' '}
-              {title}{' '}
-            </h3>{' '}
-            <div className=" mt-4 w-[220px] h-[220px] flex items-center justify-center ">
-              {' '}
-              {generationError ? (
-                <div className="flex flex-col items-center gap-2">
-                  {' '}
-                  <AlertCircle className=" w-7 h-7 text-[var(--color-idea-red)] " />{' '}
-                  <p className=" text-xs text-[var(--color-idea-muted)] "> QR generation failed </p>{' '}
-                </div>
-              ) : (
-                <canvas
-                  ref={canvasRef}
-                  className={` w-[220px] h-[220px] transition-opacity ${generating ? 'opacity-40' : 'opacity-100'} `}
-                  aria-label={`QR code for ${code}`}
-                />
-              )}{' '}
-            </div>{' '}
-            {subtitle && (
-              <p className=" w-full mt-3 text-xs text-[var(--color-idea-muted)] truncate " title={subtitle}>
-                {' '}
-                {subtitle}{' '}
-              </p>
-            )}{' '}
-            <p
-              className=" max-w-full mt-1.5 px-2 text-[10px] font-mono font-medium text-[var(--color-idea-deep-blue)] truncate "
-              title={code}
-            >
-              {' '}
-              {code}{' '}
-            </p>{' '}
-          </div>{' '}
-        </div>{' '}
-        {/* Actions */}{' '}
-        <div className=" px-5 py-4 border-t border-[var(--color-idea-border)] flex items-center gap-2 ">
-          {' '}
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      title="QR Label"
+      subtitle="Generate or print this label."
+      category="Label Generator"
+      closeOnOutsideClick={true}
+      closeOnEscape={true}
+      maxWidth="sm"
+      bodyClassName="p-5"
+      footer={
+        <div className="flex items-center gap-2">
           <button
             type="button"
             onClick={handleDownload}
             disabled={generating || !!generationError}
-            className=" flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[var(--color-idea-border)] bg-white text-[var(--color-idea-text)] text-xs font-semibold hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed "
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl border border-[var(--color-idea-border)] bg-white text-[var(--color-idea-text)] text-xs font-semibold hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            {' '}
-            <Download className="w-4 h-4" /> Download{' '}
-          </button>{' '}
+            <Download className="w-4 h-4" />
+            <span>Download</span>
+          </button>
           <button
             type="button"
             onClick={handlePrint}
             disabled={generating || !!generationError}
-            className=" flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--color-idea-blue)] text-white text-xs font-semibold hover:brightness-95 transition disabled:opacity-50 disabled:cursor-not-allowed "
+            className="flex-1 inline-flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-xl bg-[var(--color-idea-blue)] text-white text-xs font-semibold hover:brightness-95 transition disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
           >
-            {' '}
-            <Printer className="w-4 h-4" /> Print Label{' '}
-          </button>{' '}
-        </div>{' '}
-      </div>{' '}
-    </div>
+            <Printer className="w-4 h-4" />
+            <span>Print Label</span>
+            <KeyboardBadge>↵ Enter</KeyboardBadge>
+          </button>
+        </div>
+      }
+    >
+      <div className="bg-white border border-[var(--color-idea-border)] rounded-xl p-5 flex flex-col items-center text-center">
+        <p className="text-[8px] font-semibold uppercase tracking-[0.15em] text-[var(--color-idea-deep-blue)]">
+          AICTE IDEA LAB
+        </p>
+        {typeBadge && (
+          <p className="mt-1 text-[9px] font-medium uppercase tracking-wider text-[var(--color-idea-muted)]">
+            {typeBadge}
+          </p>
+        )}
+        <h3
+          className="w-full mt-2 text-sm font-semibold text-[var(--color-idea-text)] leading-tight truncate"
+          title={title}
+        >
+          {title}
+        </h3>
+        <div className="mt-4 w-[220px] h-[220px] flex items-center justify-center">
+          {generationError ? (
+            <div className="flex flex-col items-center gap-2">
+              <AlertCircle className="w-7 h-7 text-[var(--color-idea-red)]" />
+              <p className="text-xs text-[var(--color-idea-muted)]">QR generation failed</p>
+            </div>
+          ) : (
+            <canvas
+              ref={canvasRef}
+              className={`w-[220px] h-[220px] transition-opacity ${generating ? 'opacity-40' : 'opacity-100'}`}
+              aria-label={`QR code for ${code}`}
+            />
+          )}
+        </div>
+        {subtitle && (
+          <p className="w-full mt-3 text-xs text-[var(--color-idea-muted)] truncate" title={subtitle}>
+            {subtitle}
+          </p>
+        )}
+        <p
+          className="max-w-full mt-1.5 px-2 text-[10px] font-mono font-medium text-[var(--color-idea-deep-blue)] truncate"
+          title={code}
+        >
+          {code}
+        </p>
+      </div>
+    </Modal>
   );
 };

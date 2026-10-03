@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, QrCode } from 'lucide-react';
+import { Modal, KeyboardBadge } from './Modal';
 import {
   Asset,
   CatalogItem,
@@ -13,7 +14,6 @@ import {
 import { InventoryStorage } from '../services/storage';
 import { canIssueInventory, canReturnOrRepairItems, isStudent } from '../services/authRoles';
 import confetti from 'canvas-confetti';
-import { useFocusTrap } from '../shared/lib/focusTrap';
 
 interface QuickActionModalProps {
   isOpen: boolean;
@@ -54,7 +54,6 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const [qtyInput, setQtyInput] = useState(1);
   const [remarksInput, setRemarksInput] = useState('');
   const [statusInput, setStatusInput] = useState<AssetStatus>('DAMAGED');
-  const modalRef = useFocusTrap(isOpen);
 
   const role = activeUser?.role;
   const quickStatusOptions: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST', 'RETIRED'];
@@ -1056,77 +1055,43 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs animate-in fade-in duration-150"
-      role="dialog"
-      aria-modal="true"
-      aria-label="QR action panel"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          handleClose();
-        }
-      }}
+    <Modal
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="QR Action"
+      subtitle={qrData.rawCode}
+      category="Quick Scan"
+      icon={<QrCode className="h-4 w-4" />}
+      closeOnOutsideClick={true}
+      closeOnEscape={true}
+      maxWidth="lg"
+      bodyClassName="p-6 overflow-y-auto"
     >
-      <div
-        ref={modalRef}
-        tabIndex={-1}
-        className="idea-card relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden focus:outline-none"
-      >
-        <div className="h-1 w-full bg-[var(--color-idea-blue)]" />
+      {qrData.type === 'asset' && renderAssetActions(qrData.entity)}
 
-        <div className="flex items-center justify-between border-b border-[var(--color-idea-border)] bg-white px-6 py-4">
-          <div className="flex min-w-0 items-center gap-3">
-            <div className="rounded-xl bg-[var(--color-idea-light-grey)] p-2.5">
-              <QrCode className="h-4 w-4 text-[var(--color-idea-blue)]" />
-            </div>
+      {qrData.type === 'catalog' && renderCatalogActions(qrData.entity)}
 
-            <div className="min-w-0">
-              <h3 className="truncate text-lg font-bold text-[var(--color-idea-text)]">QR Action</h3>
+      {qrData.type === 'location' && renderLocationActions(qrData.entity)}
 
-              <p className="truncate text-[10px] font-mono uppercase tracking-widest text-[var(--color-idea-muted)]">
-                {qrData.rawCode}
-              </p>
-            </div>
+      {qrData.type === 'request' && renderRequestActions(qrData.entity)}
+
+      {qrData.type === 'unknown' && (
+        <div className="space-y-4 py-10 text-center">
+          <AlertTriangle className="mx-auto h-12 w-12 text-[var(--color-idea-blue)]" />
+
+          <div>
+            <h4 className="text-lg font-bold text-[var(--color-idea-text)]">Code Not Found</h4>
+
+            <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-[var(--color-idea-muted)]">
+              No matching item, equipment, or location was found for this code.
+            </p>
+
+            <p className="mt-3 break-all rounded-lg bg-[var(--color-idea-light-grey)] px-3 py-2 font-mono text-xs font-semibold text-[var(--color-idea-text)]">
+              {qrData.rawCode}
+            </p>
           </div>
-
-          <button
-            type="button"
-            onClick={handleClose}
-            aria-label="Close QR action panel"
-            className="shrink-0 rounded-lg p-2 text-[var(--color-idea-muted)] transition-colors hover:bg-[var(--color-idea-light-grey)] hover:text-[var(--color-idea-text)]"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
-
-        <div className="overflow-y-auto p-6">
-          {qrData.type === 'asset' && renderAssetActions(qrData.entity)}
-
-          {qrData.type === 'catalog' && renderCatalogActions(qrData.entity)}
-
-          {qrData.type === 'location' && renderLocationActions(qrData.entity)}
-
-          {qrData.type === 'request' && renderRequestActions(qrData.entity)}
-
-          {qrData.type === 'unknown' && (
-            <div className="space-y-4 py-10 text-center">
-              <AlertTriangle className="mx-auto h-12 w-12 text-[var(--color-idea-blue)]" />
-
-              <div>
-                <h4 className="text-lg font-bold text-[var(--color-idea-text)]">Code Not Found</h4>
-
-                <p className="mx-auto mt-1 max-w-sm text-xs leading-relaxed text-[var(--color-idea-muted)]">
-                  No matching item, equipment, or location was found for this code.
-                </p>
-
-                <p className="mt-3 break-all rounded-lg bg-[var(--color-idea-light-grey)] px-3 py-2 font-mono text-xs font-semibold text-[var(--color-idea-text)]">
-                  {qrData.rawCode}
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 };

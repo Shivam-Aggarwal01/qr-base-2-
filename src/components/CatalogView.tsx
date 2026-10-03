@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Search, QrCode, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
+import { Modal, KeyboardBadge } from './Modal';
 import { CatalogItem, Location, StockLevel, UserRole } from '../types/inventory';
 import {
   createCatalogItemInFirestore,
@@ -534,290 +535,302 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
         {/* ============================================================
           EDIT ITEM MODAL
           ============================================================ */}
-        {showEditModal && editingItem && (
-          <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
-              <div className="border-b border-[var(--color-idea-border)] pb-2">
-                <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Edit Item</h3>
+        <Modal
+          isOpen={showEditModal && !!editingItem}
+          onClose={() => {
+            setShowEditModal(false);
+            setEditingItem(null);
+          }}
+          title="Edit Item"
+          subtitle={editingItem ? `Code: ${editingItem.item_code}` : undefined}
+          category="Catalog Specification"
+          preventClose={editSaving}
+          closeOnOutsideClick={true}
+          closeOnEscape={true}
+          maxWidth="md"
+          bodyClassName="p-6"
+        >
+          {editingItem && (
+            <form onSubmit={handleEditSubmit} className="space-y-4">
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Item Name
+                </label>
 
-                <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5 font-mono">{editingItem.item_code}</p>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs"
+                />
               </div>
 
-              <form onSubmit={handleEditSubmit} className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Item Name
-                  </label>
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Unit
+                </label>
 
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs"
-                  />
-                </div>
+                <input
+                  type="text"
+                  value={editUnit}
+                  onChange={(e) => setEditUnit(e.target.value)}
+                  placeholder="pcs, packs, meters"
+                  className="idea-input mt-1 p-2.5 text-xs w-full"
+                />
+              </div>
 
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Unit
-                  </label>
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Description
+                </label>
 
-                  <input
-                    type="text"
-                    value={editUnit}
-                    onChange={(e) => setEditUnit(e.target.value)}
-                    placeholder="pcs, packs, meters"
-                    className="idea-input mt-1 p-2.5 text-xs w-full"
-                  />
-                </div>
+                <textarea
+                  rows={2}
+                  value={editDesc}
+                  onChange={(e) => setEditDesc(e.target.value)}
+                  placeholder="Detailed technical specifications..."
+                  className="idea-input mt-1 p-2.5 text-xs resize-none"
+                />
+              </div>
 
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Description
-                  </label>
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Min Stock Threshold
+                </label>
 
-                  <textarea
-                    rows={2}
-                    value={editDesc}
-                    onChange={(e) => setEditDesc(e.target.value)}
-                    placeholder="Detailed technical specifications..."
-                    className="idea-input mt-1 p-2.5 text-xs resize-none"
-                  />
-                </div>
+                <input
+                  type="number"
+                  min="1"
+                  value={editMinStock}
+                  onChange={(e) => setEditMinStock(Number(e.target.value))}
+                  className="idea-input mt-1 p-2.5 text-xs font-mono"
+                />
+              </div>
 
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Min Stock Threshold
-                  </label>
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowEditModal(false);
+                    setEditingItem(null);
+                  }}
+                  disabled={editSaving}
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <span>Cancel</span>
+                  <KeyboardBadge>Esc</KeyboardBadge>
+                </button>
 
-                  <input
-                    type="number"
-                    min="1"
-                    value={editMinStock}
-                    onChange={(e) => setEditMinStock(Number(e.target.value))}
-                    className="idea-input mt-1 p-2.5 text-xs font-mono"
-                  />
-                </div>
-
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEditModal(false);
-                      setEditingItem(null);
-                    }}
-                    disabled={editSaving}
-                    className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    disabled={editSaving}
-                    className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50"
-                  >
-                    {editSaving ? 'Saving…' : 'Save Changes'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+                <button
+                  type="submit"
+                  disabled={editSaving}
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  <span>{editSaving ? 'Saving…' : 'Save Changes'}</span>
+                  <KeyboardBadge>↵ Enter</KeyboardBadge>
+                </button>
+              </div>
+            </form>
+          )}
+        </Modal>
 
         {/* ============================================================
           ADD ITEM MODAL
           ============================================================ */}
-        {showAddModal && (
-          <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-md overflow-hidden p-6 space-y-4">
-              <div className="border-b border-[var(--color-idea-border)] pb-2">
-                <h3 className="font-bold text-[var(--color-idea-text)] text-lg">Add Item</h3>
+        <Modal
+          isOpen={showAddModal}
+          onClose={() => setShowAddModal(false)}
+          title="Add Item"
+          subtitle="A unique item code will be generated automatically."
+          category="Catalog Specification"
+          closeOnOutsideClick={true}
+          closeOnEscape={true}
+          maxWidth="md"
+          bodyClassName="p-6"
+        >
+          <form onSubmit={handleCreateCatalogItem} className="space-y-4">
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Item Name
+              </label>
 
-                <p className="text-[10px] text-[var(--color-idea-muted)] mt-0.5">
-                  A unique item code will be generated automatically.
-                </p>
-              </div>
-
-              <form onSubmit={handleCreateCatalogItem} className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Item Name
-                  </label>
-
-                  <input
-                    type="text"
-                    required
-                    autoFocus
-                    placeholder="e.g. 100k Ohm 1/4W Metal Film Resistors"
-                    value={newItemName}
-                    onChange={(e) => setNewItemName(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Unit
-                  </label>
-
-                  <input
-                    type="text"
-                    value={newItemUnit}
-                    onChange={(e) => setNewItemUnit(e.target.value)}
-                    placeholder="pcs, packs, meters"
-                    className="idea-input mt-1 p-2.5 text-xs w-full"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Description
-                  </label>
-
-                  <textarea
-                    rows={2}
-                    value={newItemDesc}
-                    onChange={(e) => setNewItemDesc(e.target.value)}
-                    placeholder="Detailed technical specifications..."
-                    className="idea-input mt-1 p-2.5 text-xs resize-none"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Min Stock Threshold
-                  </label>
-
-                  <input
-                    type="number"
-                    min="1"
-                    value={newItemMinStock}
-                    onChange={(e) => setNewItemMinStock(Number(e.target.value))}
-                    className="idea-input mt-1 p-2.5 text-xs font-mono"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Storage Place
-                  </label>
-
-                  <select
-                    value={newLocationId}
-                    onChange={(e) => setNewLocationId(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs w-full"
-                    required
-                  >
-                    <option value="" disabled>
-                      Select Storage Location
-                    </option>
-
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddModal(false)}
-                    className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
-                  >
-                    Add Item
-                  </button>
-                </div>
-              </form>
+              <input
+                type="text"
+                required
+                autoFocus
+                placeholder="e.g. 100k Ohm 1/4W Metal Film Resistors"
+                value={newItemName}
+                onChange={(e) => setNewItemName(e.target.value)}
+                className="idea-input mt-1 p-2.5 text-xs"
+              />
             </div>
-          </div>
-        )}
+
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Unit
+              </label>
+
+              <input
+                type="text"
+                value={newItemUnit}
+                onChange={(e) => setNewItemUnit(e.target.value)}
+                placeholder="pcs, packs, meters"
+                className="idea-input mt-1 p-2.5 text-xs w-full"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Description
+              </label>
+
+              <textarea
+                rows={2}
+                value={newItemDesc}
+                onChange={(e) => setNewItemDesc(e.target.value)}
+                placeholder="Detailed technical specifications..."
+                className="idea-input mt-1 p-2.5 text-xs resize-none"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Min Stock Threshold
+              </label>
+
+              <input
+                type="number"
+                min="1"
+                value={newItemMinStock}
+                onChange={(e) => setNewItemMinStock(Number(e.target.value))}
+                className="idea-input mt-1 p-2.5 text-xs font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Storage Place
+              </label>
+
+              <select
+                value={newLocationId}
+                onChange={(e) => setNewLocationId(e.target.value)}
+                className="idea-input mt-1 p-2.5 text-xs w-full"
+                required
+              >
+                <option value="" disabled>
+                  Select Storage Location
+                </option>
+
+                {locations.map((location) => (
+                  <option key={location.id} value={location.id}>
+                    {location.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="pt-2 flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => setShowAddModal(false)}
+                className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>Cancel</span>
+                <KeyboardBadge>Esc</KeyboardBadge>
+              </button>
+
+              <button
+                type="submit"
+                className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <span>Add Item</span>
+                <KeyboardBadge>↵ Enter</KeyboardBadge>
+              </button>
+            </div>
+          </form>
+        </Modal>
 
         {/* ============================================================
           RESTOCK MODAL
           ============================================================ */}
-        {showRestockModal && selectedCatalogItem && (
-          <div className="fixed inset-0 bg-[var(--color-idea-text)]/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-            <div className="bg-white border border-[var(--color-idea-border)] shadow-2xl rounded-2xl w-full max-w-sm overflow-hidden p-6 space-y-4">
-              <h3 className="font-bold text-[var(--color-idea-text)] text-base border-b border-[var(--color-idea-border)] pb-2">
-                Receive Shipment / Add Stock
-              </h3>
+        <Modal
+          isOpen={showRestockModal && !!selectedCatalogItem}
+          onClose={() => {
+            setShowRestockModal(false);
+            setSelectedCatalogItem(null);
+          }}
+          title="Receive Shipment / Add Stock"
+          subtitle={selectedCatalogItem ? `Item: ${selectedCatalogItem.name}` : undefined}
+          category="Inventory Restock"
+          closeOnOutsideClick={true}
+          closeOnEscape={true}
+          maxWidth="sm"
+          bodyClassName="p-6"
+        >
+          {selectedCatalogItem && (
+            <form onSubmit={handleRestockSubmit} className="space-y-4">
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Storage Bin
+                </label>
 
-              <p className="text-xs text-[var(--color-idea-muted)]">
-                Adding stock to catalog item:{' '}
-                <span className="font-bold text-[var(--color-idea-text)]">{selectedCatalogItem.name}</span>
-              </p>
+                <select
+                  value={targetLocId}
+                  onChange={(e) => setTargetLocId(e.target.value)}
+                  className="idea-input mt-1 p-2.5 text-xs"
+                  required
+                >
+                  <option value="">-- Choose Storage Location --</option>
 
-              <form onSubmit={handleRestockSubmit} className="space-y-3">
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Storage Bin
-                  </label>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-                  <select
-                    value={targetLocId}
-                    onChange={(e) => setTargetLocId(e.target.value)}
-                    className="idea-input mt-1 p-2.5 text-xs"
-                    required
-                  >
-                    <option value="">-- Choose Storage Location --</option>
+              <div>
+                <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                  Quantity ({selectedCatalogItem.unit})
+                </label>
 
-                    {locations.map((location) => (
-                      <option key={location.id} value={location.id}>
-                        {location.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <input
+                  type="number"
+                  min="1"
+                  value={restockQty}
+                  onChange={(e) => setRestockQty(Number(e.target.value))}
+                  className="idea-input mt-1 p-2.5 text-xs font-mono"
+                />
+              </div>
 
-                <div>
-                  <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
-                    Quantity ({selectedCatalogItem.unit})
-                  </label>
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowRestockModal(false);
+                    setSelectedCatalogItem(null);
+                  }}
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span>Cancel</span>
+                  <KeyboardBadge>Esc</KeyboardBadge>
+                </button>
 
-                  <input
-                    type="number"
-                    min="1"
-                    value={restockQty}
-                    onChange={(e) => setRestockQty(Number(e.target.value))}
-                    className="idea-input mt-1 p-2.5 text-xs font-mono"
-                  />
-                </div>
-
-                <div className="pt-2 flex gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowRestockModal(false);
-                      setSelectedCatalogItem(null);
-                    }}
-                    className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer"
-                  >
-                    Cancel
-                  </button>
-
-                  <button
-                    type="submit"
-                    className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer"
-                  >
-                    Confirm Restock
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        )}
+                <button
+                  type="submit"
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <span>Confirm Restock</span>
+                  <KeyboardBadge>↵ Enter</KeyboardBadge>
+                </button>
+              </div>
+            </form>
+          )}
+        </Modal>
       </div>
     </div>
   );

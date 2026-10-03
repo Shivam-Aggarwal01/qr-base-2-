@@ -1,9 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
+import { KeyboardBadge } from './Modal';
 import QRCode from 'qrcode';
 import { Asset, CatalogItem, Location } from '../types/inventory';
-import { useFocusTrap } from '../shared/lib/focusTrap';
 
 interface BatchQRLabelsModalProps {
   isOpen?: boolean;
@@ -85,18 +85,6 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
   const [size, setSize] = useState<LabelSize>('medium');
   const [guides, setGuides] = useState(true);
   const [readyItems, setReadyItems] = useState<PrintItem[] | null>(null);
-  const modalRef = useFocusTrap(!!isOpen);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && onClose) {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose]);
 
   const printItems = useMemo<PrintItem[]>(() => {
     switch (filterType) {
@@ -117,6 +105,18 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
         return [];
     }
   }, [filterType, assets, catalogItems, locations]);
+
+  // Handle Escape key
+  useEffect(() => {
+    if (!isOpen || !onClose) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, onClose]);
 
   // Build every QR image up front so printing never races the canvas/async work.
   useEffect(() => {
@@ -199,12 +199,10 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
         onMouseDown={(e) => e.target === e.currentTarget && onClose?.()}
       >
         <div
-          ref={modalRef}
-          tabIndex={-1}
           role="dialog"
           aria-modal="true"
           aria-labelledby="qr-modal-title"
-          className="flex w-full max-w-4xl max-h-[94vh] max-h-[94dvh] flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)] focus:outline-none"
+          className="flex w-full max-w-4xl max-h-[94vh] max-h-[94dvh] flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl bg-white shadow-[0_24px_80px_-12px_rgba(0,0,0,0.35)]"
         >
           <div className="mx-auto mt-2 h-1 w-9 shrink-0 rounded-full bg-black/15 sm:hidden" aria-hidden="true" />
 
@@ -220,14 +218,17 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
               <p className="mt-0.5 text-[13px] text-[var(--color-idea-muted)]">{subtitle}</p>
             </div>
             {onClose && (
-              <button
-                type="button"
-                onClick={onClose}
-                aria-label="Close"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/5 sm:h-8 sm:w-8 text-[var(--color-idea-muted)] transition-colors hover:bg-black/10 hover:text-[var(--color-idea-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)]"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <div className="flex items-center gap-2">
+                <KeyboardBadge>Esc</KeyboardBadge>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  aria-label="Close"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/5 sm:h-8 sm:w-8 text-[var(--color-idea-muted)] transition-colors hover:bg-black/10 hover:text-[var(--color-idea-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)]"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
             )}
           </div>
 
