@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { Printer, X } from 'lucide-react';
-import { KeyboardBadge } from './Modal';
 import QRCode from 'qrcode';
 import { Asset, CatalogItem, Location } from '../types/inventory';
 
@@ -218,17 +217,14 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
               <p className="mt-0.5 text-[13px] text-[var(--color-idea-muted)]">{subtitle}</p>
             </div>
             {onClose && (
-              <div className="flex items-center gap-2">
-                <KeyboardBadge>Esc</KeyboardBadge>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  aria-label="Close"
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/5 sm:h-8 sm:w-8 text-[var(--color-idea-muted)] transition-colors hover:bg-black/10 hover:text-[var(--color-idea-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)]"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-black/5 sm:h-8 sm:w-8 text-[var(--color-idea-muted)] transition-colors hover:bg-black/10 hover:text-[var(--color-idea-text)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-idea-blue)]"
+              >
+                <X className="h-4 w-4" />
+              </button>
             )}
           </div>
 

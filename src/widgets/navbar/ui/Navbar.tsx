@@ -3,7 +3,6 @@ import { QrCode, ChevronDown, Menu, LogOut, UserCheck, Keyboard } from 'lucide-r
 import { isStudent } from '../../../shared/lib';
 import { User } from '../../../shared/types/inventory';
 import { Link } from 'react-router-dom';
-import { KbdBadge } from '../../../shared/ui/KbdBadge';
 
 export interface NavbarProps {
   activeUser: User;
@@ -127,12 +126,12 @@ export const Navbar: React.FC<NavbarProps> = ({
           <button
             type="button"
             onClick={onOpenShortcuts}
-            aria-label="Open keyboard shortcuts guide (?)"
-            title="Keyboard shortcuts (?)"
-            className="hidden sm:inline-flex items-center gap-1.5 h-10 px-2.5 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
+            aria-label="Open keyboard shortcuts guide"
+            title="Keyboard shortcuts"
+            className="hidden sm:inline-flex items-center gap-1.5 h-10 px-3 rounded-xl border border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 transition-colors cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
           >
             <Keyboard className="w-4 h-4 text-slate-500" />
-            <KbdBadge>?</KbdBadge>
+            <span className="text-xs font-medium">Shortcuts</span>
           </button>
         )}
 
@@ -141,14 +140,11 @@ export const Navbar: React.FC<NavbarProps> = ({
           type="button"
           onClick={onOpenScanner}
           className="inline-flex items-center justify-center gap-2 h-10 px-3.5 sm:px-4 rounded-xl bg-[var(--color-idea-blue)] text-white text-xs font-semibold shadow-sm hover:brightness-95 active:scale-[0.98] transition-all cursor-pointer focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:outline-none"
-          title="Scan QR Code (Press Q or ⌘K)"
+          title="Scan QR Code"
           aria-label="Scan QR Code"
         >
           <QrCode className="w-4 h-4" />
           <span className="hidden sm:inline">Scan QR</span>
-          <KbdBadge className="hidden md:inline-flex bg-white/20 text-white border-white/30 text-[9px] px-1 py-0">
-            Q
-          </KbdBadge>
         </button>
 
         {/* Divider */}
@@ -258,7 +254,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <Keyboard className="w-3.5 h-3.5 text-slate-400" />
                       Keyboard Shortcuts
                     </span>
-                    <KbdBadge>?</KbdBadge>
                   </button>
                 )}
 
@@ -280,7 +275,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       setShowUserDropdown(false);
                       onLogout();
                     }}
-                    className="w-full px-4 py-2 flex items-center gap-2.5 text-xs text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20 transition-colors text-left cursor-pointer focus-visible:bg-red-50 focus-visible:outline-none"
+                    className="w-full px-4 py-2 flex items-center gap-2.5 text-xs text-red-600 hover:bg-red-50 transition-colors text-left cursor-pointer focus-visible:bg-red-50 focus-visible:outline-none"
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Sign Out</span>

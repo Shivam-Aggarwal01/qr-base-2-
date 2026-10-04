@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Modal, KeyboardBadge } from './Modal';
+import { Modal } from './Modal';
 import { Asset, CatalogItem, RequestLineDraft, RequestUsage, User } from '../types/inventory';
 import { createRequestFirestore } from '../services/firebaseCollections';
 
@@ -323,18 +323,16 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="flex-1 py-3 bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] text-sm font-semibold rounded-2xl hover:bg-gray-100 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 py-3 bg-[var(--color-idea-light-grey)] text-[var(--color-idea-text)] text-sm font-semibold rounded-2xl hover:bg-gray-100 transition-colors flex items-center justify-center cursor-pointer"
             >
-              <span>Cancel</span>
-              <KeyboardBadge>Esc</KeyboardBadge>
+              Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 py-3 bg-[var(--color-idea-deep-blue)] text-white text-sm font-semibold rounded-2xl hover:bg-[var(--color-idea-blue)] transition-colors disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer"
+              className="flex-1 py-3 bg-[var(--color-idea-deep-blue)] text-white text-sm font-semibold rounded-2xl hover:bg-[var(--color-idea-blue)] transition-colors disabled:opacity-50 flex items-center justify-center cursor-pointer"
             >
-              <span>{isSubmitting ? 'Submitting...' : 'Submit'}</span>
-              <KeyboardBadge>↵ Enter</KeyboardBadge>
+              {isSubmitting ? 'Submitting...' : 'Submit'}
             </button>
           </div>
         </form>

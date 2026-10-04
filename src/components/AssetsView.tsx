@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Plus, Search, QrCode, Pencil, Trash2 } from 'lucide-react';
-import { Modal, KeyboardBadge } from './Modal';
+import { Modal } from './Modal';
 import { Asset, Location, User, AssetStatus, UserRole } from '../types/inventory';
 import {
   COLLECTIONS,
@@ -505,18 +505,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   type="button"
                   onClick={closeEditAssetModal}
                   disabled={editAssetSaving}
-                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
                 >
-                  <span>Cancel</span>
-                  <KeyboardBadge>Esc</KeyboardBadge>
+                  Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={editAssetSaving}
-                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50 flex items-center justify-center"
                 >
-                  <span>{editAssetSaving ? 'Saving…' : 'Save Changes'}</span>
-                  <KeyboardBadge>↵ Enter</KeyboardBadge>
+                  {editAssetSaving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -597,18 +595,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center"
               >
-                <span>Cancel</span>
-                <KeyboardBadge>Esc</KeyboardBadge>
+                Cancel
               </button>
 
               <button
                 type="submit"
-                className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center"
               >
-                <span>Add Asset</span>
-                <KeyboardBadge>↵ Enter</KeyboardBadge>
+                Add Asset
               </button>
             </div>
           </form>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Plus, Search, QrCode, AlertTriangle, Pencil, Trash2 } from 'lucide-react';
-import { Modal, KeyboardBadge } from './Modal';
+import { Modal } from './Modal';
 import { CatalogItem, Location, StockLevel, UserRole } from '../types/inventory';
 import {
   createCatalogItemInFirestore,
@@ -617,19 +617,17 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                     setEditingItem(null);
                   }}
                   disabled={editSaving}
-                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
                 >
-                  <span>Cancel</span>
-                  <KeyboardBadge>Esc</KeyboardBadge>
+                  Cancel
                 </button>
 
                 <button
                   type="submit"
                   disabled={editSaving}
-                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer disabled:opacity-50 flex items-center justify-center"
                 >
-                  <span>{editSaving ? 'Saving…' : 'Save Changes'}</span>
-                  <KeyboardBadge>↵ Enter</KeyboardBadge>
+                  {editSaving ? 'Saving…' : 'Save Changes'}
                 </button>
               </div>
             </form>
@@ -736,18 +734,16 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
               <button
                 type="button"
                 onClick={() => setShowAddModal(false)}
-                className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center"
               >
-                <span>Cancel</span>
-                <KeyboardBadge>Esc</KeyboardBadge>
+                Cancel
               </button>
 
               <button
                 type="submit"
-                className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center"
               >
-                <span>Add Item</span>
-                <KeyboardBadge>↵ Enter</KeyboardBadge>
+                Add Item
               </button>
             </div>
           </form>
@@ -814,18 +810,16 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                     setShowRestockModal(false);
                     setSelectedCatalogItem(null);
                   }}
-                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer flex items-center justify-center"
                 >
-                  <span>Cancel</span>
-                  <KeyboardBadge>Esc</KeyboardBadge>
+                  Cancel
                 </button>
 
                 <button
                   type="submit"
-                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center gap-1.5"
+                  className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl cursor-pointer flex items-center justify-center"
                 >
-                  <span>Confirm Restock</span>
-                  <KeyboardBadge>↵ Enter</KeyboardBadge>
+                  Confirm Restock
                 </button>
               </div>
             </form>

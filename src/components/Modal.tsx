@@ -74,7 +74,7 @@ export const Modal: React.FC<ModalProps> = ({
   closeOnEscape = true,
   preventClose = false,
   showCloseButton = true,
-  showKeyboardHints = true,
+  showKeyboardHints = false,
   className = '',
   bodyClassName = 'p-6',
   ariaLabel,
@@ -182,9 +182,6 @@ export const Modal: React.FC<ModalProps> = ({
 
             <div className="flex items-center gap-2 shrink-0">
               {headerActions}
-              {showKeyboardHints && showCloseButton && (
-                <KeyboardBadge title="Press Escape to close modal">Esc</KeyboardBadge>
-              )}
               {showCloseButton && (
                 <button
                   type="button"

@@ -3,7 +3,6 @@ import { LayoutDashboard, Box, Layers, ClipboardList, MapPin, History, Users, X 
 import { User, ViewMode } from '../../../shared/types/inventory';
 import { isStudent } from '../../../shared/lib';
 import { Link } from 'react-router-dom';
-import { KbdBadge } from '../../../shared/ui/KbdBadge';
 
 export interface SidebarProps {
   currentView: ViewMode;
@@ -183,11 +182,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {item.shortcutNumber && (
-            <KbdBadge className="hidden xl:inline-flex bg-white/10 text-white/70 border-white/20 text-[9px] px-1 py-0 font-mono">
-              {item.shortcutNumber}
-            </KbdBadge>
-          )}
           {item.badge !== undefined && item.badge > 0 && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-[var(--color-idea-amber)] text-white animate-pulse">
               {item.badge}

@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Plus, MapPin, QrCode, Box, Layers, Search, X, ChevronRight, Pencil, Trash2 } from 'lucide-react';
-import { Modal, KeyboardBadge } from './Modal';
+import { Modal } from './Modal';
 import { Location, CatalogItem, Asset, StockLevel, UserRole } from '../types/inventory';
 import {
   createLocationInFirestore,
@@ -504,18 +504,16 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
                 setEditingLoc(null);
               }}
               disabled={editSaving}
-              className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center"
             >
-              <span>Cancel</span>
-              <KeyboardBadge>Esc</KeyboardBadge>
+              Cancel
             </button>
             <button
               type="submit"
               disabled={editSaving}
-              className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center justify-center"
             >
-              <span>{editSaving ? 'Saving…' : 'Save Changes'}</span>
-              <KeyboardBadge>↵ Enter</KeyboardBadge>
+              {editSaving ? 'Saving…' : 'Save Changes'}
             </button>
           </div>
         </form>
@@ -578,18 +576,16 @@ export const LocationsView: React.FC<LocationsViewProps> = ({
               type="button"
               onClick={closeAddModal}
               disabled={saving}
-              className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 border border-[var(--color-idea-border)] text-[var(--color-idea-text)] text-xs font-semibold rounded-xl hover:bg-[var(--color-idea-light-grey)] transition-colors disabled:opacity-50 cursor-pointer flex items-center justify-center"
             >
-              <span>Cancel</span>
-              <KeyboardBadge>Esc</KeyboardBadge>
+              Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center justify-center gap-1.5"
+              className="flex-1 py-2.5 idea-button text-xs font-semibold rounded-xl disabled:opacity-50 cursor-pointer flex items-center justify-center"
             >
-              <span>{saving ? 'Creating...' : 'Create Location'}</span>
-              <KeyboardBadge>↵ Enter</KeyboardBadge>
+              {saving ? 'Creating...' : 'Create Location'}
             </button>
           </div>
         </form>

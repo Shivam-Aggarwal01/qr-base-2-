@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Modal, KeyboardBadge } from './Modal';
+import { Modal } from './Modal';
 import {
   Plus,
   ClipboardList,
@@ -615,10 +615,9 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               type="button"
               onClick={closeModal}
               disabled={isProcessing}
-              className="flex-1 px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-1.5"
+              className="flex-1 px-4 py-2.5 text-xs font-semibold rounded-xl border border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center"
             >
-              <span>Cancel</span>
-              <KeyboardBadge>Esc</KeyboardBadge>
+              Cancel
             </button>
 
             {modalMode === 'review' && (
@@ -636,7 +635,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               type="button"
               onClick={handleAction}
               disabled={isProcessing}
-              className="py-2.5 flex-1 px-4 idea-button rounded-xl text-xs font-bold cursor-pointer disabled:opacity-60 flex items-center justify-center gap-1.5"
+              className="py-2.5 flex-1 px-4 idea-button rounded-xl text-xs font-bold cursor-pointer disabled:opacity-60 flex items-center justify-center"
             >
               <span>
                 {isProcessing
@@ -649,7 +648,6 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                       ? 'Accept Return'
                       : 'Complete Request'}
               </span>
-              <KeyboardBadge>↵ Enter</KeyboardBadge>
             </button>
           </div>
         }

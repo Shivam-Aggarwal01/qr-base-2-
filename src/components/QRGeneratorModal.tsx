@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Download, Printer, AlertCircle } from 'lucide-react';
-import { Modal, KeyboardBadge } from './Modal';
+import { Modal } from './Modal';
 import QRCode from 'qrcode';
 interface QRGeneratorModalProps {
   isOpen: boolean;
@@ -145,7 +145,6 @@ export const QRGeneratorModal: React.FC<QRGeneratorModalProps> = ({
           >
             <Printer className="w-4 h-4" />
             <span>Print Label</span>
-            <KeyboardBadge>↵ Enter</KeyboardBadge>
           </button>
         </div>
       }
