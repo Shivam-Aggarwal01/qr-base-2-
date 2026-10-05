@@ -584,7 +584,7 @@ export function App() {
   // Authenticated Main Workspace
   // ---------------------------------------------------------------------------
   return (
-    <div className="min-h-screen bg-[var(--color-idea-bg)] flex flex-col antialiased">
+    <div className="h-full h-screen h-[100dvh] max-h-screen bg-[var(--color-idea-bg)] flex flex-col antialiased overflow-hidden">
       {renderHelmet()}
       <Navbar
         activeUser={currentUser}
@@ -600,7 +600,7 @@ export function App() {
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
       />
 
-      <div className="flex flex-col-reverse md:flex-row flex-1 overflow-hidden">
+      <div className="flex flex-col-reverse md:flex-row flex-1 min-h-0 overflow-hidden">
         <Sidebar
           currentView={currentView}
           onSelectView={setCurrentView}
@@ -611,7 +611,7 @@ export function App() {
           onCloseMobile={() => setMobileMenuOpen(false)}
         />
 
-        <main className="flex-1 flex flex-col overflow-hidden relative" id="main-content" tabIndex={-1}>
+        <main className="flex-1 min-h-0 flex flex-col overflow-hidden relative" id="main-content" tabIndex={-1}>
           {currentView === 'dashboard' && (
             <DashboardPage
               assets={assets}

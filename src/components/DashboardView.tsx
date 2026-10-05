@@ -127,7 +127,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     const currentlyHeldCount = issuedAssets.length + reusableItems.reduce((total, item) => total + item.quantity, 0);
 
     return (
-      <div className="flex-1 overflow-y-auto idea-bg">
+      <div className="flex-1 min-h-0 overflow-y-auto idea-bg">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
           {/* Header */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">
@@ -295,7 +295,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const totalTrackedAssets = assets.length;
 
   return (
-    <div className="flex-1 overflow-y-auto idea-bg">
+    <div className="flex-1 min-h-0 overflow-y-auto idea-bg">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-200/80 pb-5">

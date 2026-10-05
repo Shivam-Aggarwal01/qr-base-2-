@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { X, Camera, Upload, AlertCircle, RefreshCw, KeyRound, ArrowRight } from 'lucide-react';
-import { Modal, KeyboardBadge } from './Modal';
+import { Modal } from './Modal';
 import jsQR from 'jsqr';
 
 interface QRScannerModalProps {

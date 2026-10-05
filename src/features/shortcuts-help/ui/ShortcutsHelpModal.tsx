@@ -80,7 +80,7 @@ export const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({ isOpen, 
         tabIndex={-1}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center">
               <Keyboard className="w-4 h-4" />
@@ -103,7 +103,7 @@ export const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({ isOpen, 
         </div>
 
         {/* Content */}
-        <div className="px-6 py-4 overflow-y-auto space-y-6">
+        <div className="px-6 py-4 overflow-y-auto space-y-6 flex-1 min-h-0">
           {sections.map((section) => (
             <div key={section.title} className="space-y-2.5">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">
@@ -129,7 +129,7 @@ export const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({ isOpen, 
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+        <div className="px-6 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 shrink-0">
           <div className="flex items-center gap-1.5">
             <Command className="w-3.5 h-3.5" />
             <span>Press <KbdBadge>?</KbdBadge> anytime to open this guide</span>

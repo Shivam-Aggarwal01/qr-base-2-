@@ -260,7 +260,7 @@ export const LegalPage: React.FC<LegalPageProps> = ({ kind, inAppShell = false }
   const navigate = useNavigate();
 
   return (
-    <div className={`flex-1 bg-white ${inAppShell ? 'overflow-y-auto' : 'min-h-screen'}`}>
+    <div className={`flex-1 min-h-0 bg-white ${inAppShell ? 'overflow-y-auto' : 'min-h-screen'}`}>
       <Helmet>
         <title>{content.title} | AICTE IDEA Lab Inventory Management</title>
         <meta name="description" content={content.description} />

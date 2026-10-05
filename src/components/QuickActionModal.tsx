@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, QrCode } from 'lucide-react';
-import { Modal, KeyboardBadge } from './Modal';
+import { Modal } from './Modal';
 import {
   Asset,
   CatalogItem,
