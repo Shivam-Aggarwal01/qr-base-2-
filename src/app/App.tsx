@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useCallback } from 'react';
 import { onAuthStateChanged, signOut, type User as FirebaseUser } from 'firebase/auth';
 import { Helmet } from 'react-helmet-async';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 
 // Shared layer
 import { auth } from '../shared/api';
@@ -544,21 +544,9 @@ export function App() {
   // ---------------------------------------------------------------------------
   if (!authReady) {
     return (
-      <div className="min-h-screen bg-[var(--color-idea-bg)] flex items-center justify-center p-4">
+      <div className="h-[100vh] h-[100dvh] max-h-[100dvh] bg-[var(--color-idea-bg)] flex flex-col overflow-hidden">
         {renderHelmet()}
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-3 border-[var(--color-idea-blue)] border-t-transparent rounded-full animate-spin" />
-          <p className="text-xs text-[var(--color-idea-muted)] font-medium">Connecting to AICTE IDEA Lab...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-[var(--color-idea-bg)] flex flex-col">
-        {renderHelmet()}
-        <header className="h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-[var(--color-idea-border)] bg-white">
+        <header className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-[var(--color-idea-border)] bg-white z-30">
           <div className="flex items-center gap-2.5">
             <img src="/logo.png" alt="AICTE IDEA Lab" className="h-9 w-auto object-contain" />
             <div>
@@ -569,13 +557,117 @@ export function App() {
             </div>
           </div>
         </header>
-        <main className="flex-1 flex items-center justify-center p-4">
-          <FirebaseAuthPanel
-            accessNotice={accessNotice}
-            pendingNewUser={pendingNewUser}
-            onClearPendingNewUser={() => setPendingNewUser(null)}
-          />
+
+        <main className="flex-1 min-h-0 flex items-center justify-center p-4">
+          <div className="flex flex-col items-center gap-3">
+            <div className="w-10 h-10 border-3 border-[var(--color-idea-blue)] border-t-transparent rounded-full animate-spin" />
+            <p className="text-xs text-[var(--color-idea-muted)] font-medium">Connecting to AICTE IDEA Lab...</p>
+          </div>
         </main>
+
+        <footer className="shrink-0 z-30 w-full border-t border-[var(--color-idea-border)] bg-white px-4 py-2 sm:px-6 sm:py-2.5 flex items-center justify-between text-xs text-[var(--color-idea-muted)] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] select-none">
+          <span>© {new Date().getFullYear()} AICTE IDEA LAB</span>
+        </footer>
+      </div>
+    );
+  }
+
+  if (!currentUser && isLegalRoute) {
+    return (
+      <div className="h-[100vh] h-[100dvh] max-h-[100dvh] bg-white flex flex-col overflow-hidden">
+        {renderHelmet()}
+        <header className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-[var(--color-idea-border)] bg-white z-30">
+          <Link to="/" className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="AICTE IDEA Lab" className="h-9 w-auto object-contain" />
+            <div>
+              <p className="text-xs font-bold tracking-tight text-[var(--color-idea-text)]">AICTE IDEA LAB</p>
+              <p className="text-[9px] text-[var(--color-idea-muted)] tracking-wider uppercase font-medium">
+                Inventory Management System
+              </p>
+            </div>
+          </Link>
+          <div className="flex items-center gap-3 sm:gap-4">
+            <Link
+              to="/privacy"
+              className={`text-xs transition-colors ${location.pathname === '/privacy' ? 'text-[var(--color-idea-blue)] font-bold' : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'}`}
+            >
+              Privacy
+            </Link>
+            <Link
+              to="/terms"
+              className={`text-xs transition-colors ${location.pathname === '/terms' ? 'text-[var(--color-idea-blue)] font-bold' : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'}`}
+            >
+              Terms
+            </Link>
+            <Link
+              to="/"
+              className="idea-button px-3 py-1.5 text-xs font-semibold rounded-lg text-white"
+            >
+              Sign In
+            </Link>
+          </div>
+        </header>
+
+        <main className="flex-1 min-h-0 overflow-y-auto bg-white" id="main-content">
+          <LegalPage kind={location.pathname === '/terms' ? 'terms' : 'privacy'} inAppShell={true} />
+        </main>
+
+        <footer className="shrink-0 z-30 w-full border-t border-[var(--color-idea-border)] bg-white px-4 py-2 sm:px-6 sm:py-2.5 flex items-center justify-between text-xs text-[var(--color-idea-muted)] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] select-none">
+          <span>© {new Date().getFullYear()} AICTE IDEA LAB</span>
+        </footer>
+      </div>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <div className="h-[100vh] h-[100dvh] max-h-[100dvh] bg-[var(--color-idea-bg)] flex flex-col overflow-hidden">
+        {renderHelmet()}
+        {/* Fixed Top Navbar */}
+        <header className="h-16 shrink-0 flex items-center justify-between px-4 sm:px-6 lg:px-8 border-b border-[var(--color-idea-border)] bg-white z-30">
+          <div className="flex items-center gap-2.5">
+            <img src="/logo.png" alt="AICTE IDEA Lab" className="h-9 w-auto object-contain" />
+            <div>
+              <p className="text-xs font-bold tracking-tight text-[var(--color-idea-text)]">AICTE IDEA LAB</p>
+              <p className="text-[9px] text-[var(--color-idea-muted)] tracking-wider uppercase font-medium">
+                Inventory Management System
+              </p>
+            </div>
+          </div>
+        </header>
+
+        {/* Scrollable Middle Content Area */}
+        <main
+          className="flex-1 min-h-0 overflow-y-auto w-full idea-bg flex flex-col items-center px-4 py-4 sm:px-6 sm:py-6 overscroll-contain"
+          id="main-content"
+          tabIndex={-1}
+        >
+          <div className="my-auto w-full flex justify-center py-2 sm:py-4">
+            <FirebaseAuthPanel
+              accessNotice={accessNotice}
+              pendingNewUser={pendingNewUser}
+              onClearPendingNewUser={() => setPendingNewUser(null)}
+            />
+          </div>
+        </main>
+
+        {/* Fixed Bottom Bar */}
+        <footer className="shrink-0 z-30 w-full border-t border-[var(--color-idea-border)] bg-white px-4 py-2 sm:px-6 sm:py-2.5 flex flex-col sm:flex-row items-center justify-between gap-1.5 sm:gap-2 text-xs text-[var(--color-idea-muted)] pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] select-none">
+          <div className="flex items-center gap-2 text-[11px] sm:text-xs">
+            <span>© {new Date().getFullYear()} AICTE IDEA LAB</span>
+            <span className="hidden sm:inline text-slate-300">•</span>
+            <span className="hidden sm:inline">Inventory Management Portal</span>
+          </div>
+          <div className="flex items-center gap-3 sm:gap-4 text-[11px] sm:text-xs">
+            <Link to="/privacy" className="text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors">
+              Privacy Policy
+            </Link>
+            <span className="text-slate-300">•</span>
+            <Link to="/terms" className="text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)] transition-colors">
+              Terms of Service
+            </Link>
+          </div>
+        </footer>
       </div>
     );
   }
@@ -584,7 +676,7 @@ export function App() {
   // Authenticated Main Workspace
   // ---------------------------------------------------------------------------
   return (
-    <div className="h-full h-screen h-[100dvh] max-h-screen bg-[var(--color-idea-bg)] flex flex-col antialiased overflow-hidden">
+    <div className="h-[100vh] h-[100dvh] max-h-[100dvh] bg-[var(--color-idea-bg)] flex flex-col antialiased overflow-hidden">
       {renderHelmet()}
       <Navbar
         activeUser={currentUser}
@@ -600,8 +692,9 @@ export function App() {
         onOpenShortcuts={() => setIsShortcutsOpen(true)}
       />
 
-      <div className="flex flex-col-reverse md:flex-row flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden relative">
         <Sidebar
+          mode="desktop"
           currentView={currentView}
           onSelectView={setCurrentView}
           pendingRequestsCount={pendingRequestsCount}
@@ -626,6 +719,7 @@ export function App() {
               onOpenQRGenerator={handleOpenQRGenerator}
               onRefreshData={refreshAllData}
               onOpenNewRequest={() => openNewRequest()}
+              onOpenBatchLabels={() => setIsBatchLabelsOpen(true)}
             />
           )}
 
@@ -660,7 +754,6 @@ export function App() {
               userRole={effectiveRole ?? currentUser.role}
               onRefreshData={refreshAllData}
               onOpenQRGenerator={handleOpenQRGenerator}
-              onOpenBatchLabels={() => setIsBatchLabelsOpen(true)}
             />
           )}
 
@@ -721,6 +814,16 @@ export function App() {
           )}
         </main>
       </div>
+
+      {/* Fixed Bottom Navigation Bar on Mobile */}
+      <Sidebar
+        mode="bottom-bar"
+        currentView={currentView}
+        onSelectView={setCurrentView}
+        pendingRequestsCount={pendingRequestsCount}
+        pendingAccountCount={pendingAccountCount}
+        userRole={effectiveRole ?? currentUser.role}
+      />
 
       {/* Global Modals & Dialogs */}
       <ShortcutsHelpModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />

@@ -20,7 +20,6 @@ interface AssetsViewProps {
   userRole?: UserRole;
   onRefreshData: () => void;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
-  onOpenBatchLabels?: () => void;
 }
 
 const EDITABLE_STATUSES: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST'];
@@ -32,7 +31,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   userRole,
   onRefreshData,
   onOpenQRGenerator,
-  onOpenBatchLabels,
 }) => {
   const [statusFilter, setStatusFilter] = useState<AssetStatus | 'ALL'>('ALL');
   const [searchFilter, setSearchFilter] = useState('');
@@ -255,18 +253,6 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           </div>
 
           <div className="flex items-center gap-2">
-            {onOpenBatchLabels && (
-              <button
-                type="button"
-                onClick={onOpenBatchLabels}
-                className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 text-xs sm:text-sm font-semibold rounded-xl border border-[var(--color-idea-border)] bg-white text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] shadow-2xs cursor-pointer shrink-0 transition-all min-h-[42px]"
-                title="Print batch QR label stickers"
-              >
-                <QrCode className="w-4 h-4 text-[var(--color-idea-blue)]" />
-                <span className="hidden sm:inline">Print Labels</span>
-              </button>
-            )}
-
             <button
               onClick={() => setShowAddModal(true)}
               className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl cursor-pointer shrink-0 min-h-[42px]"

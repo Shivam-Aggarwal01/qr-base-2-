@@ -169,9 +169,8 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
   const showSuccess = Boolean(success) && !currentNotice;
 
   return (
-    <div className="min-h-screen min-h-[100dvh] w-full idea-bg flex items-center justify-center px-4 py-8 sm:px-6 sm:py-12">
-      <div className="w-full max-w-[440px]">
-        <div className="idea-card bg-white border border-[var(--color-idea-border)] rounded-3xl shadow-[0_20px_60px_-20px_rgba(15,40,60,0.25)] overflow-hidden">
+    <div className="w-full max-w-[440px] mx-auto py-2">
+      <div className="idea-card bg-white border border-[var(--color-idea-border)] rounded-3xl shadow-[0_20px_60px_-20px_rgba(15,40,60,0.25)] overflow-hidden">
           <div className="idea-accent-bar" />
 
           <div className="px-6 pt-8 pb-7 sm:px-10 sm:pt-10 sm:pb-9">
@@ -356,6 +355,5 @@ export const FirebaseAuthPanel: React.FC<FirebaseAuthPanelProps> = ({
           </p>
         </div>
       </div>
-    </div>
-  );
+    );
 };

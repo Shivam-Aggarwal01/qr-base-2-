@@ -260,27 +260,33 @@ export const LegalPage: React.FC<LegalPageProps> = ({ kind, inAppShell = false }
   const navigate = useNavigate();
 
   return (
-    <div className={`flex-1 min-h-0 bg-white ${inAppShell ? 'overflow-y-auto' : 'min-h-screen'}`}>
+    <div
+      className={`bg-white ${
+        inAppShell
+          ? 'flex-1 min-h-0 overflow-y-auto'
+          : 'h-[100vh] h-[100dvh] max-h-[100dvh] flex flex-col overflow-hidden'
+      }`}
+    >
       <Helmet>
         <title>{content.title} | AICTE IDEA Lab Inventory Management</title>
         <meta name="description" content={content.description} />
       </Helmet>
 
       {!inAppShell && (
-        <header className="px-6 py-5 border-b border-[var(--color-idea-border)] flex items-center justify-between sticky top-0 bg-white/80 backdrop-blur-md z-10">
+        <header className="px-6 py-4 border-b border-[var(--color-idea-border)] flex items-center justify-between shrink-0 bg-white/95 backdrop-blur-md z-20 select-none">
           <Link to="/" className="text-[13px] font-semibold tracking-tight text-[var(--color-idea-text)] uppercase">
             Inventory Portal
           </Link>
-          <div className="flex gap-6">
+          <div className="flex gap-4 sm:gap-6">
             <button
               onClick={() => navigate('/privacy')}
-              className={`text-xs transition-colors ${kind === 'privacy' ? 'text-[var(--color-idea-text)] font-semibold' : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'}`}
+              className={`text-xs transition-colors cursor-pointer ${kind === 'privacy' ? 'text-[var(--color-idea-blue)] font-bold' : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'}`}
             >
               Privacy
             </button>
             <button
               onClick={() => navigate('/terms')}
-              className={`text-xs transition-colors ${kind === 'terms' ? 'text-[var(--color-idea-text)] font-semibold' : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'}`}
+              className={`text-xs transition-colors cursor-pointer ${kind === 'terms' ? 'text-[var(--color-idea-blue)] font-bold' : 'text-[var(--color-idea-muted)] hover:text-[var(--color-idea-text)]'}`}
             >
               Terms
             </button>
@@ -288,51 +294,53 @@ export const LegalPage: React.FC<LegalPageProps> = ({ kind, inAppShell = false }
         </header>
       )}
 
-      <main className="max-w-3xl mx-auto w-full px-6 py-12 md:py-24 space-y-16">
-        <header className="space-y-6">
-          <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-[var(--color-idea-text)] leading-tight">
-            {content.title}
-          </h1>
-          <p className="text-sm md:text-base text-[var(--color-idea-muted)] leading-relaxed max-w-xl">
-            {content.description}
-          </p>
-          <p className="text-xs font-mono text-[var(--color-idea-muted)]">Effective Date: {EFFECTIVE_DATE}</p>
-        </header>
+      <main className={`w-full ${inAppShell ? '' : 'flex-1 min-h-0 overflow-y-auto overscroll-contain'}`}>
+        <div className="max-w-3xl mx-auto w-full px-6 py-10 md:py-16 space-y-12 sm:space-y-16">
+          <header className="space-y-4 sm:space-y-6">
+            <h1 className="text-3xl md:text-5xl font-semibold tracking-tight text-[var(--color-idea-text)] leading-tight">
+              {content.title}
+            </h1>
+            <p className="text-sm md:text-base text-[var(--color-idea-muted)] leading-relaxed max-w-xl">
+              {content.description}
+            </p>
+            <p className="text-xs font-mono text-[var(--color-idea-muted)]">Effective Date: {EFFECTIVE_DATE}</p>
+          </header>
 
-        <div className="space-y-12">
-          {content.sections.map((section, idx) => (
-            <section key={idx} className="space-y-4">
-              <h2 className="text-sm font-semibold tracking-wider text-[var(--color-idea-text)] uppercase">
-                {section.heading}
-              </h2>
-              {section.paragraphs && (
-                <div className="space-y-4">
-                  {section.paragraphs.map((p, pIdx) => (
-                    <p key={pIdx} className="text-[13px] md:text-sm text-[var(--color-idea-muted)] leading-relaxed">
-                      {p}
-                    </p>
-                  ))}
-                </div>
-              )}
-              {section.bullets && (
-                <ul className="list-disc list-inside space-y-2 mt-4">
-                  {section.bullets.map((b, bIdx) => (
-                    <li
-                      key={bIdx}
-                      className="text-[13px] md:text-sm text-[var(--color-idea-muted)] leading-relaxed marker:text-[var(--color-idea-border)]"
-                    >
-                      {b}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-          ))}
+          <div className="space-y-10 sm:space-y-12">
+            {content.sections.map((section, idx) => (
+              <section key={idx} className="space-y-3 sm:space-y-4">
+                <h2 className="text-sm font-semibold tracking-wider text-[var(--color-idea-text)] uppercase">
+                  {section.heading}
+                </h2>
+                {section.paragraphs && (
+                  <div className="space-y-3 sm:space-y-4">
+                    {section.paragraphs.map((p, pIdx) => (
+                      <p key={pIdx} className="text-[13px] md:text-sm text-[var(--color-idea-muted)] leading-relaxed">
+                        {p}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {section.bullets && (
+                  <ul className="list-disc list-inside space-y-2 mt-4">
+                    {section.bullets.map((b, bIdx) => (
+                      <li
+                        key={bIdx}
+                        className="text-[13px] md:text-sm text-[var(--color-idea-muted)] leading-relaxed marker:text-[var(--color-idea-border)]"
+                      >
+                        {b}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            ))}
+          </div>
         </div>
       </main>
 
       {!inAppShell && (
-        <footer className="border-t border-[var(--color-idea-border)] py-8 px-6 text-center">
+        <footer className="shrink-0 border-t border-[var(--color-idea-border)] py-3 px-6 text-center bg-white z-20 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] select-none">
           <p className="text-[11px] text-[var(--color-idea-muted)] uppercase tracking-widest">
             © {new Date().getFullYear()} AICTE IDEA Lab
           </p>

@@ -1,2 +1,2 @@
-export { Sidebar } from './ui/Sidebar';
-export type { SidebarProps } from './ui/Sidebar';
+export { Sidebar, BottomBar, getMenuItems } from './ui/Sidebar';
+export type { SidebarProps, BottomBarProps, MenuItem } from './ui/Sidebar';

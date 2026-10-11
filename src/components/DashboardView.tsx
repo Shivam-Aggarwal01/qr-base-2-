@@ -9,6 +9,8 @@ import {
   ScrollText,
   Users,
   Plus,
+  QrCode,
+  Printer,
 } from 'lucide-react';
 
 import {
@@ -37,6 +39,7 @@ interface DashboardViewProps {
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
   onRefreshData: () => void;
   onOpenNewRequest?: () => void;
+  onOpenBatchLabels?: () => void;
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -89,6 +92,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   onSelectView,
   onOpenNewRequest,
+  onOpenBatchLabels,
 }) => {
   const studentMode = isStudent(currentUser?.role);
 
@@ -308,6 +312,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               A live look at equipment, stock, and current requests.
             </p>
           </div>
+
+          {onOpenBatchLabels && (
+            <button
+              type="button"
+              onClick={onOpenBatchLabels}
+              className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl cursor-pointer shrink-0 shadow-2xs hover:brightness-95 transition-all text-white"
+              title="Print batch QR label stickers"
+            >
+              <Printer className="w-4 h-4" />
+              <span>Batch QR Labels</span>
+            </button>
+          )}
         </div>
 
         {/* 4 Main Metrics */}
@@ -365,6 +381,70 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             );
           })}
         </div>
+
+        {/* Batch QR Code Labeling Widget */}
+        {onOpenBatchLabels && (
+          <div className="idea-card relative overflow-hidden p-5 sm:p-6 bg-gradient-to-br from-white via-white to-blue-50/40 border border-slate-200/90 shadow-2xs">
+            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-48 h-48 bg-blue-100/30 rounded-full blur-2xl pointer-events-none" />
+
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+              <div className="flex items-start gap-4 sm:gap-5 min-w-0">
+                <div className="w-12 h-12 rounded-2xl bg-[var(--color-idea-light-grey)] border border-[var(--color-idea-border)] flex items-center justify-center text-[var(--color-idea-blue)] shrink-0 shadow-2xs">
+                  <QrCode className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#0071e3]">
+                      Lab Tagging & Logistics
+                    </span>
+                    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
+                      {assets.length} Equipment Ready
+                    </span>
+                  </div>
+                  <h2 className="mt-1 text-base sm:text-lg font-bold text-slate-900 tracking-tight">
+                    Batch QR Label Generator
+                  </h2>
+                  <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
+                    Generate and print high-density adhesive QR code stickers for tools, instruments, and hardware storage bins. Compatible with standard sticker sheet layouts and barcode scanners.
+                  </p>
+
+                  <div className="mt-3 flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] text-slate-600 font-medium">
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      {assets.filter((a) => a.status === 'AVAILABLE').length} Available to Tag
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
+                      Multi-Sheet Grid
+                    </span>
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700">
+                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                      Avery & Custom Sticker Sheets
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => onSelectView('assets')}
+                  className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer text-center"
+                >
+                  Manage Equipment
+                </button>
+                <button
+                  type="button"
+                  onClick={onOpenBatchLabels}
+                  className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl cursor-pointer shadow-xs hover:brightness-95 transition-all text-white"
+                >
+                  <Printer className="w-4 h-4" />
+                  <span>Print Batch Labels</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Equipment Status Donut & Location Distribution */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">

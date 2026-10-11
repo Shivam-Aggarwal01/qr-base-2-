@@ -12,6 +12,7 @@ export interface SidebarProps {
   userRole?: User['role'];
   mobileOpen?: boolean;
   onCloseMobile?: () => void;
+  mode?: 'all' | 'desktop' | 'bottom-bar';
 }
 
 interface MenuItem {
@@ -30,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   userRole = 'STUDENT',
   mobileOpen = false,
   onCloseMobile,
+  mode = 'all',
 }) => {
   const studentMode = isStudent(userRole);
   const mobileDrawerRef = useRef<HTMLDivElement | null>(null);
@@ -192,46 +194,52 @@ export const Sidebar: React.FC<SidebarProps> = ({
     );
   };
 
+  const showDesktop = mode === 'all' || mode === 'desktop';
+  const showBottomBar = mode === 'all' || mode === 'bottom-bar';
+
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside
-        aria-label="Desktop Navigation"
-        className="
-          hidden md:flex flex-col
-          w-60 lg:w-64 shrink-0
-          bg-[var(--color-idea-deep-blue)]
-          text-white
-          border-r border-white/10
-          relative select-none
-        "
-      >
-        <div className="idea-accent-bar absolute top-0 left-0 w-full" />
+      {showDesktop && (
+        <aside
+          aria-label="Desktop Navigation"
+          className="
+            hidden md:flex flex-col
+            w-60 lg:w-64 shrink-0
+            bg-[var(--color-idea-deep-blue)]
+            text-white
+            border-r border-white/10
+            relative select-none
+            h-full min-h-0
+          "
+        >
+          <div className="idea-accent-bar absolute top-0 left-0 w-full" />
 
-        <div className="p-4 border-b border-white/10">
-          <p className="text-[10px] uppercase font-bold tracking-wider text-white/50">Navigation</p>
-        </div>
-
-        <nav aria-label="Main Menu" className="flex-1 overflow-y-auto p-3 space-y-1">
-          {menuItems.map((item) => renderMenuItem(item))}
-        </nav>
-
-        <div className="shrink-0 p-4 border-t border-white/10">
-          <p className="text-[10px] text-white/40 mb-2">© {new Date().getFullYear()} AICTE IDEA LAB</p>
-          <div className="flex items-center gap-2 text-[10px]">
-            <Link to="/privacy" className="text-white/60 hover:text-white transition-colors focus-visible:underline">
-              Privacy
-            </Link>
-            <span className="text-white/20">•</span>
-            <Link to="/terms" className="text-white/60 hover:text-white transition-colors focus-visible:underline">
-              Terms
-            </Link>
+          <div className="p-4 border-b border-white/10 shrink-0">
+            <p className="text-[10px] uppercase font-bold tracking-wider text-white/50">Navigation</p>
           </div>
-        </div>
-      </aside>
+
+          <nav aria-label="Main Menu" className="flex-1 min-h-0 overflow-y-auto p-3 space-y-1">
+            {menuItems.map((item) => renderMenuItem(item))}
+          </nav>
+
+          <div className="shrink-0 p-4 border-t border-white/10">
+            <p className="text-[10px] text-white/40 mb-2">© {new Date().getFullYear()} AICTE IDEA LAB</p>
+            <div className="flex items-center gap-2 text-[10px]">
+              <Link to="/privacy" className="text-white/60 hover:text-white transition-colors focus-visible:underline">
+                Privacy
+              </Link>
+              <span className="text-white/20">•</span>
+              <Link to="/terms" className="text-white/60 hover:text-white transition-colors focus-visible:underline">
+                Terms
+              </Link>
+            </div>
+          </div>
+        </aside>
+      )}
 
       {/* Mobile Drawer */}
-      {mobileOpen && (
+      {showDesktop && mobileOpen && (
         <div
           className="md:hidden fixed inset-0 z-50 flex animate-in fade-in duration-150"
           role="dialog"
@@ -257,12 +265,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
               animate-in
               slide-in-from-left
               duration-200
+              h-full
             "
           >
             <div className="idea-accent-bar absolute top-0 left-0 w-full" />
 
             {/* Drawer Header */}
-            <div className="h-16 px-5 flex items-center justify-between border-b border-white/10">
+            <div className="h-16 px-5 flex items-center justify-between border-b border-white/10 shrink-0">
               <div className="flex items-center gap-2.5">
                 <img src="/logo.png" alt="AICTE IDEA Lab" className="h-8 w-auto object-contain" />
                 <div>
@@ -282,10 +291,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
 
             {/* Navigation */}
-            <nav className="flex-1 overflow-y-auto p-4 space-y-1">{menuItems.map((item) => renderMenuItem(item))}</nav>
+            <nav className="flex-1 min-h-0 overflow-y-auto p-4 space-y-1">{menuItems.map((item) => renderMenuItem(item))}</nav>
 
             {/* Mobile Footer */}
-            <div className="shrink-0 px-5 py-4 border-t border-white/10">
+            <div className="shrink-0 px-5 py-4 border-t border-white/10 pb-[calc(1rem+env(safe-area-inset-bottom,0px))]">
               <p className="text-[10px] text-white/50 mb-2.5">© {new Date().getFullYear()} AICTE IDEA LAB</p>
               <div className="flex items-center gap-3 text-[10px]">
                 <Link to="/privacy" onClick={onCloseMobile} className="text-white/60 hover:text-white transition-colors">
@@ -302,28 +311,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
       )}
 
       {/* Mobile Bottom Navigation */}
-      <nav
-        aria-label="Mobile Navigation"
-        className="
-          md:hidden
-          shrink-0
-          z-40
-          bg-[var(--color-idea-deep-blue)]
-          text-white
-          border-t border-white/10
-          overflow-x-auto
-          overscroll-x-contain
-          scrollbar-none
-        "
-      >
-        <div className="flex items-center gap-1 px-2 py-1.5 min-w-max">
-          {menuItems.map((item) => (
-            <div key={item.id} className="relative">
-              {renderMenuItem(item, true)}
-            </div>
-          ))}
-        </div>
-      </nav>
+      {showBottomBar && (
+        <nav
+          aria-label="Mobile Navigation"
+          className="
+            md:hidden
+            shrink-0
+            z-40
+            bg-[var(--color-idea-deep-blue)]
+            text-white
+            border-t border-white/10
+            overflow-x-auto
+            overscroll-x-contain
+            scrollbar-none
+            pb-[env(safe-area-inset-bottom,0px)]
+          "
+        >
+          <div className="flex items-center justify-around gap-1 px-2 py-1.5 min-w-max mx-auto">
+            {menuItems.map((item) => (
+              <div key={item.id} className="relative">
+                {renderMenuItem(item, true)}
+              </div>
+            ))}
+          </div>
+        </nav>
+      )}
     </>
   );
 };

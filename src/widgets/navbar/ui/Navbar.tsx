@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { QrCode, ChevronDown, Menu, LogOut, UserCheck, Keyboard } from 'lucide-react';
+import { QrCode, ChevronDown, Menu, LogOut, Keyboard } from 'lucide-react';
 import { isStudent } from '../../../shared/lib';
 import { User } from '../../../shared/types/inventory';
 import { Link } from 'react-router-dom';
@@ -238,36 +238,9 @@ export const Navbar: React.FC<NavbarProps> = ({
                 </div>
               )}
 
-              {/* Links and Actions */}
-              <div className="py-1">
-                {onOpenShortcuts && (
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setShowUserDropdown(false);
-                      onOpenShortcuts();
-                    }}
-                    className="w-full px-4 py-2 flex items-center justify-between text-xs text-slate-700 hover:bg-slate-50 transition-colors text-left cursor-pointer focus-visible:bg-slate-50 focus-visible:outline-none"
-                  >
-                    <span className="flex items-center gap-2">
-                      <Keyboard className="w-3.5 h-3.5 text-slate-400" />
-                      Keyboard Shortcuts
-                    </span>
-                  </button>
-                )}
-
-                <Link
-                  to="/privacy"
-                  role="menuitem"
-                  onClick={() => setShowUserDropdown(false)}
-                  className="w-full px-4 py-2 flex items-center gap-2.5 text-xs text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)] transition-colors text-left cursor-pointer focus-visible:bg-[var(--color-idea-light-grey)] focus-visible:outline-none"
-                >
-                  <UserCheck className="w-3.5 h-3.5 text-[var(--color-idea-muted)]" />
-                  <span>Policies & Governance</span>
-                </Link>
-
-                {onLogout && (
+              {/* Actions */}
+              {onLogout && (
+                <div className="py-1">
                   <button
                     type="button"
                     role="menuitem"
@@ -280,8 +253,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <LogOut className="w-3.5 h-3.5" />
                     <span>Sign Out</span>
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Status Footer */}
               <div className="px-4 py-2 bg-[var(--color-idea-light-grey)]/60 border-t border-[var(--color-idea-border)] flex items-center justify-between text-[10px] text-[var(--color-idea-muted)]">
