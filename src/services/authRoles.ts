@@ -13,11 +13,19 @@ export function hasMinimumRole(currentRole: UserRole | null | undefined, minimum
 }
 
 export function isStudent(role: UserRole | null | undefined): boolean {
-  return role === 'STUDENT' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
+  return role === 'STUDENT';
+}
+
+export function isStaff(role: UserRole | null | undefined): boolean {
+  return role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
 }
 
 export function isAmbassador(role: UserRole | null | undefined): boolean {
   return role === 'STUDENT_AMBASSADOR';
+}
+
+export function isLead(role: UserRole | null | undefined): boolean {
+  return role === 'STUDENT_LEAD';
 }
 
 export function isAdmin(role: UserRole | null | undefined): boolean {
@@ -25,8 +33,7 @@ export function isAdmin(role: UserRole | null | undefined): boolean {
 }
 
 export function canIssueInventory(role: UserRole | null | undefined): boolean {
-  // Students can browse/scan and request items, but they must not issue inventory.
-  return hasMinimumRole(role, 'STUDENT_LEAD');
+  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
 }
 
 export function canApproveRequests(role: UserRole | null | undefined): boolean {
@@ -37,8 +44,20 @@ export function canManageCatalog(role: UserRole | null | undefined): boolean {
   return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
 }
 
+export function canManageLocations(role: UserRole | null | undefined): boolean {
+  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
+}
+
+export function canManageEquipment(role: UserRole | null | undefined): boolean {
+  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
+}
+
 export function canManageUsers(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'ADMIN');
+  return role === 'ADMIN';
+}
+
+export function canApproveNewUsers(role: UserRole | null | undefined): boolean {
+  return role === 'ADMIN';
 }
 
 export function canReturnOrRepairItems(role: UserRole | null | undefined): boolean {

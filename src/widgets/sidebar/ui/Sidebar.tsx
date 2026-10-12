@@ -108,13 +108,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
           icon: History,
           shortcutNumber: '6',
         },
-        {
-          id: 'users',
-          label: 'Directory',
-          icon: Users,
-          badge: pendingAccountCount > 0 ? pendingAccountCount : undefined,
-          shortcutNumber: '7',
-        },
+        ...(userRole === 'ADMIN'
+          ? [
+              {
+                id: 'users' as ViewMode,
+                label: 'Directory',
+                icon: Users,
+                badge: pendingAccountCount > 0 ? pendingAccountCount : undefined,
+                shortcutNumber: '7',
+              },
+            ]
+          : []),
       ];
 
   const handleItemClick = (id: ViewMode) => {

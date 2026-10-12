@@ -16,7 +16,7 @@ import {
   reviewAccountRequest,
 } from '../shared/api';
 import { readFirestoreState } from '../shared/api';
-import { isStudent, InventoryStorage, parseQRCodeFromEntities } from '../shared/lib';
+import { isStudent, isAdmin, InventoryStorage, parseQRCodeFromEntities } from '../shared/lib';
 import { useKeyboardShortcuts, type ShortcutConfig } from '../shared/lib/useKeyboardShortcuts';
 import type {
   User,
@@ -361,6 +361,7 @@ export function App() {
   }, [assets, catalogItems, locations, users]);
 
   const handleUpdateUserRole = async (userId: string, newRole: User['role']) => {
+    if (!currentUser || !isAdmin(effectiveRole)) return;
     try {
       await updateFirestoreDocument(COLLECTIONS.USERS, userId, { role: newRole });
       await refreshAllData();
@@ -370,6 +371,7 @@ export function App() {
   };
 
   const handleDeleteUser = async (userId: string) => {
+    if (!currentUser || !isAdmin(effectiveRole)) return;
     try {
       await deleteFirestoreDocument(COLLECTIONS.USERS, userId);
       await refreshAllData();
@@ -379,7 +381,7 @@ export function App() {
   };
 
   const handleReviewAccountRequest = async (requestId: string, status: 'APPROVED' | 'REJECTED') => {
-    if (!currentUser) return;
+    if (!currentUser || !isAdmin(effectiveRole)) return;
     try {
       await reviewAccountRequest(requestId, status, currentUser);
       await refreshAllData();
@@ -530,7 +532,7 @@ export function App() {
         description: 'Navigate to Directory',
         category: 'Navigation',
         handler: () => {
-          if (!isStudentUser) setCurrentView('users');
+          if (isAdmin(effectiveRole)) setCurrentView('users');
         },
       },
     ],
@@ -793,21 +795,38 @@ export function App() {
             />
           )}
 
-          {currentView === 'users' && (
-            <UsersPage
-              users={users}
-              assets={assets}
-              catalogItems={catalogItems}
-              requests={requests}
-              activeUser={currentUser}
-              userRole={currentUser?.role}
-              onUpdateUserRole={handleUpdateUserRole}
-              onDeleteUser={handleDeleteUser}
-              accountRequests={accountRequests}
-              onReviewAccountRequest={handleReviewAccountRequest}
-              onRefreshData={refreshAllData}
-            />
-          )}
+          {currentView === 'users' &&
+            (isAdmin(effectiveRole) ? (
+              <UsersPage
+                users={users}
+                assets={assets}
+                catalogItems={catalogItems}
+                requests={requests}
+                activeUser={currentUser}
+                userRole={currentUser?.role}
+                onUpdateUserRole={handleUpdateUserRole}
+                onDeleteUser={handleDeleteUser}
+                accountRequests={accountRequests}
+                onReviewAccountRequest={handleReviewAccountRequest}
+                onRefreshData={refreshAllData}
+              />
+            ) : (
+              <DashboardPage
+                assets={assets}
+                catalogItems={catalogItems}
+                locations={locations}
+                requests={requests}
+                transactions={transactions}
+                users={users}
+                stockLevels={stockLevels}
+                currentUser={currentUser}
+                onSelectView={setCurrentView}
+                onOpenQRGenerator={handleOpenQRGenerator}
+                onRefreshData={refreshAllData}
+                onOpenNewRequest={() => openNewRequest()}
+                onOpenBatchLabels={() => setIsBatchLabelsOpen(true)}
+              />
+            ))}
 
           {currentView === 'legal' && (
             <LegalPage kind={location.pathname === '/terms' ? 'terms' : 'privacy'} inAppShell={true} />

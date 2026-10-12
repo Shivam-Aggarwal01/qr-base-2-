@@ -1,4 +1,5 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
+import QRCode from 'qrcode';
 import {
   Boxes,
   MapPin,
@@ -81,6 +82,8 @@ const getTimeAgo = (dateString: string) => {
   return `${Math.floor(diff / 86400)}d ago`;
 };
 
+const miniQrCache = new Map<string, string>();
+
 export const DashboardView: React.FC<DashboardViewProps> = ({
   assets,
   catalogItems,
@@ -95,6 +98,86 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenBatchLabels,
 }) => {
   const studentMode = isStudent(currentUser?.role);
+
+  const totalStock = useMemo(
+    () => stockLevels.reduce((total, stock) => total + Number(stock.quantity || 0), 0),
+    [stockLevels]
+  );
+
+  const issuedAssets = useMemo(() => assets.filter((asset) => asset.status === 'ISSUED'), [assets]);
+  const availableAssets = useMemo(() => assets.filter((asset) => asset.status === 'AVAILABLE'), [assets]);
+  const damagedAssets = useMemo(() => assets.filter((asset) => asset.status === 'DAMAGED'), [assets]);
+  const repairAssets = useMemo(() => assets.filter((asset) => asset.status === 'UNDER_REPAIR'), [assets]);
+
+  const lowStockItems = useMemo(
+    () =>
+      catalogItems
+        .map((item) => {
+          const quantity = stockLevels
+            .filter((stock) => stock.catalog_item_id === item.id)
+            .reduce((total, stock) => total + Number(stock.quantity || 0), 0);
+          return { item, quantity, threshold: item.min_stock_alert ?? 10 };
+        })
+        .filter(({ threshold, quantity }) => quantity <= threshold),
+    [catalogItems, stockLevels]
+  );
+
+  const stockByLocation = useMemo(
+    () =>
+      locations
+        .map((location) => ({
+          name: location.name,
+          qty: stockLevels
+            .filter((stock) => stock.location_id === location.id)
+            .reduce((total, stock) => total + Number(stock.quantity || 0), 0),
+        }))
+        .filter((l) => l.qty > 0)
+        .sort((a, b) => b.qty - a.qty)
+        .slice(0, 5),
+    [locations, stockLevels]
+  );
+
+  const maxLocationQty = useMemo(() => Math.max(1, ...stockByLocation.map((l) => l.qty)), [stockByLocation]);
+  const totalTrackedAssets = assets.length;
+
+  const catalogMap = useMemo(() => new Map(catalogItems.map((c) => [c.id, c])), [catalogItems]);
+  const locationMap = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
+  const previewAssets = useMemo(() => assets.slice(0, 6), [assets]);
+  const [previewQrCodes, setPreviewQrCodes] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    let active = true;
+    Promise.all(
+      previewAssets.map(async (asset) => {
+        const code = asset.asset_code || asset.id;
+        if (miniQrCache.has(code)) {
+          return { code, dataUrl: miniQrCache.get(code)! };
+        }
+        try {
+          const dataUrl = await QRCode.toDataURL(code, {
+            width: 120,
+            margin: 1,
+            errorCorrectionLevel: 'M',
+          });
+          miniQrCache.set(code, dataUrl);
+          return { code, dataUrl };
+        } catch {
+          return { code, dataUrl: '' };
+        }
+      })
+    ).then((results) => {
+      if (!active) return;
+      const mapping: Record<string, string> = {};
+      results.forEach((r) => {
+        if (r.dataUrl) mapping[r.code] = r.dataUrl;
+      });
+      setPreviewQrCodes(mapping);
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [previewAssets]);
 
   // ---------------------------------------------------------------------------
   // STUDENT VIEW
@@ -256,48 +339,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // ---------------------------------------------------------------------------
   // STAFF / ADMIN DASHBOARD
   // ---------------------------------------------------------------------------
-  const totalStock = useMemo(
-    () => stockLevels.reduce((total, stock) => total + Number(stock.quantity || 0), 0),
-    [stockLevels]
-  );
-
-  const issuedAssets = useMemo(() => assets.filter((asset) => asset.status === 'ISSUED'), [assets]);
-  const availableAssets = useMemo(() => assets.filter((asset) => asset.status === 'AVAILABLE'), [assets]);
-  const damagedAssets = useMemo(() => assets.filter((asset) => asset.status === 'DAMAGED'), [assets]);
-  const repairAssets = useMemo(() => assets.filter((asset) => asset.status === 'UNDER_REPAIR'), [assets]);
-
-  const lowStockItems = useMemo(
-    () =>
-      catalogItems
-        .map((item) => {
-          const quantity = stockLevels
-            .filter((stock) => stock.catalog_item_id === item.id)
-            .reduce((total, stock) => total + Number(stock.quantity || 0), 0);
-          return { item, quantity, threshold: item.min_stock_alert ?? 10 };
-        })
-        .filter(({ threshold, quantity }) => quantity <= threshold),
-    [catalogItems, stockLevels]
-  );
-
-  const stockByLocation = useMemo(
-    () =>
-      locations
-        .map((location) => ({
-          name: location.name,
-          qty: stockLevels
-            .filter((stock) => stock.location_id === location.id)
-            .reduce((total, stock) => total + Number(stock.quantity || 0), 0),
-        }))
-        .filter((l) => l.qty > 0)
-        .sort((a, b) => b.qty - a.qty)
-        .slice(0, 5),
-    [locations, stockLevels]
-  );
-
-  const maxLocationQty = useMemo(() => Math.max(1, ...stockByLocation.map((l) => l.qty)), [stockByLocation]);
-
-  const totalTrackedAssets = assets.length;
-
   return (
     <div className="flex-1 min-h-0 overflow-y-auto idea-bg">
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8 space-y-6 sm:space-y-8">
@@ -312,18 +353,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               A live look at equipment, stock, and current requests.
             </p>
           </div>
-
-          {onOpenBatchLabels && (
-            <button
-              type="button"
-              onClick={onOpenBatchLabels}
-              className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl cursor-pointer shrink-0 shadow-2xs hover:brightness-95 transition-all text-white"
-              title="Print batch QR label stickers"
-            >
-              <Printer className="w-4 h-4" />
-              <span>Batch QR Labels</span>
-            </button>
-          )}
         </div>
 
         {/* 4 Main Metrics */}
@@ -382,67 +411,113 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           })}
         </div>
 
-        {/* Batch QR Code Labeling Widget */}
+        {/* QR Stickers Dashboard Widget */}
         {onOpenBatchLabels && (
-          <div className="idea-card relative overflow-hidden p-5 sm:p-6 bg-gradient-to-br from-white via-white to-blue-50/40 border border-slate-200/90 shadow-2xs">
-            <div className="absolute right-0 top-0 translate-x-8 -translate-y-8 w-48 h-48 bg-blue-100/30 rounded-full blur-2xl pointer-events-none" />
-
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-              <div className="flex items-start gap-4 sm:gap-5 min-w-0">
-                <div className="w-12 h-12 rounded-2xl bg-[var(--color-idea-light-grey)] border border-[var(--color-idea-border)] flex items-center justify-center text-[var(--color-idea-blue)] shrink-0 shadow-2xs">
-                  <QrCode className="w-6 h-6" />
+          <div className="idea-card overflow-hidden p-4 sm:p-5 border border-slate-200/90 shadow-2xs">
+            {/* Widget Header */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3.5">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-blue-50 border border-blue-200/70 flex items-center justify-center text-[#0071e3] shrink-0">
+                  <QrCode className="w-5 h-5" />
                 </div>
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-[#0071e3]">
-                      Lab Tagging & Logistics
-                    </span>
-                    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200/60">
-                      {assets.length} Equipment Ready
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">QR Stickers</h2>
+                    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200/50">
+                      {assets.length} Equipment Available
                     </span>
                   </div>
-                  <h2 className="mt-1 text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                    Batch QR Label Generator
-                  </h2>
-                  <p className="mt-1 text-xs text-slate-500 max-w-2xl leading-relaxed">
-                    Generate and print high-density adhesive QR code stickers for tools, instruments, and hardware storage bins. Compatible with standard sticker sheet layouts and barcode scanners.
+                  <p className="text-[11px] text-slate-500">
+                    Physical adhesive barcode stickers for equipment, tools, and storage bins.
                   </p>
-
-                  <div className="mt-3 flex flex-wrap items-center gap-2 sm:gap-3 text-[11px] text-slate-600 font-medium">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                      {assets.filter((a) => a.status === 'AVAILABLE').length} Available to Tag
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700">
-                      <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                      Multi-Sheet Grid
-                    </span>
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/80 text-slate-700">
-                      <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                      Avery & Custom Sticker Sheets
-                    </span>
-                  </div>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => onSelectView('assets')}
-                  className="px-3.5 py-2.5 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold transition-colors cursor-pointer text-center"
-                >
-                  Manage Equipment
-                </button>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={onOpenBatchLabels}
-                  className="idea-button flex items-center justify-center gap-2 px-4 py-2.5 text-xs sm:text-sm font-semibold rounded-xl cursor-pointer shadow-xs hover:brightness-95 transition-all text-white"
+                  disabled={assets.length === 0 && catalogItems.length === 0 && locations.length === 0}
+                  className="idea-button flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl text-white shadow-2xs hover:brightness-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+                  title="Choose and print QR stickers"
                 >
-                  <Printer className="w-4 h-4" />
-                  <span>Print Batch Labels</span>
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Print</span>
                 </button>
               </div>
             </div>
+
+            {/* Sticker Previews Grid or Empty State */}
+            {assets.length === 0 ? (
+              <div className="py-8 text-center">
+                <QrCode className="mx-auto w-8 h-8 text-slate-300" />
+                <p className="mt-2 text-xs font-semibold text-slate-700">No equipment items available for tagging</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">Add equipment in the lab to generate and print QR stickers.</p>
+              </div>
+            ) : (
+              <div className="pt-3.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
+                  {previewAssets.map((asset) => {
+                    const catalogItem = catalogMap.get(asset.catalog_item_id);
+                    const loc = asset.location_id ? locationMap.get(asset.location_id) : undefined;
+                    const name = catalogItem?.name || asset.asset_code || 'Equipment Item';
+                    const code = asset.asset_code || asset.id;
+                    const locName = loc?.name || (asset.serial_number ? `SN ${asset.serial_number}` : 'IDEA Lab');
+                    const qrUrl = previewQrCodes[code];
+
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={onOpenBatchLabels}
+                        className="group relative flex flex-col items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 text-center shadow-2xs hover:border-[#0071e3] hover:shadow-xs hover:scale-[1.01] transition-all cursor-pointer overflow-hidden"
+                        title={`Click to select & print: ${name}`}
+                      >
+                        {/* Miniature physical sticker cut guide boundary */}
+                        <div className="absolute inset-0 border border-dashed border-slate-200/90 rounded-xl pointer-events-none group-hover:border-blue-300 transition-colors" />
+
+                        {/* Top Org Banner */}
+                        <div className="w-full text-[7.5px] font-bold tracking-wider uppercase text-slate-400 truncate">
+                          AICTE IDEA LAB
+                        </div>
+
+                        {/* Mini QR Code */}
+                        <div className="my-1.5 w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center bg-slate-50/70 rounded-md border border-slate-100 overflow-hidden">
+                          {qrUrl ? (
+                            <img src={qrUrl} alt={code} className="w-full h-full object-contain" />
+                          ) : (
+                            <QrCode className="w-7 h-7 text-slate-300" />
+                          )}
+                        </div>
+
+                        {/* Mini Labels */}
+                        <div className="w-full min-w-0">
+                          <p className="text-[10.5px] font-bold text-slate-800 truncate" title={name}>
+                            {name}
+                          </p>
+                          <p className="text-[8.5px] font-mono text-slate-500 bg-slate-100/80 rounded px-1 py-0.5 mt-0.5 truncate">
+                            {code.length > 14 ? `…${code.slice(-8)}` : code}
+                          </p>
+                          <p className="text-[8px] text-slate-400 truncate mt-0.5" title={locName}>
+                            {locName}
+                          </p>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-slate-500">
+                  <div className="flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                    <span>Physical sticker preview layout · Click any label or Print to customize selection</span>
+                  </div>
+                  <span className="font-medium text-slate-600">
+                    {assets.filter((a) => a.status === 'AVAILABLE').length} Available to tag
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
