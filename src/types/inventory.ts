@@ -75,20 +75,52 @@ export interface CatalogItem {
 }
 
 // ---------------------------------------------------------------------------
-// Location
-// code is auto-generated as LOC-<docId prefix> after creation
+// Location & Hierarchy
+// Supports real-world laboratory arrangements:
+// Room -> Almirah -> Shelf -> Box, Rack -> Shelf, Table -> Drawer, Spot, etc.
 // ---------------------------------------------------------------------------
+
+export type LocationType =
+  | 'ROOM'
+  | 'ALMIRAH'
+  | 'RACK'
+  | 'SHELF'
+  | 'DRAWER'
+  | 'BOX'
+  | 'TABLE'
+  | 'CABINET'
+  | 'WORKBENCH'
+  | 'SPOT'
+  | 'CUSTOM';
+
+export type LocationStatus = 'ACTIVE' | 'INACTIVE' | 'TEMPORARY';
 
 export interface Location {
   id: string;
   name: string;
   /** Auto-generated from Firestore doc ID — never entered manually. */
   code?: string;
+  /** Storage spot category, e.g. ROOM, ALMIRAH, RACK, SHELF, DRAWER, BOX, TABLE, CABINET */
+  type?: LocationType;
+  /** Custom category name when type === 'CUSTOM' */
+  custom_type?: string | null;
+  /** Pointer to parent location, enabling arbitrary nested hierarchies. null for top-level. */
+  parent_id?: string | null;
   /**
-   * Describes physical placement in the lab, dynamically.
-   * e.g. "Main Lab > Almirah 1 > Rack 2"
+   * Describes physical placement in the lab, dynamically or cached.
+   * e.g. "Main Lab > Electronics Room > Almirah 1 > Shelf 2 > Box B04"
    */
   storage_path?: string | null;
+  building?: string | null;
+  room?: string | null;
+  department?: string | null;
+  description?: string | null;
+  capacity?: number | null;
+  notes?: string | null;
+  status?: LocationStatus;
+  is_active?: boolean;
+  is_temporary?: boolean;
+  is_container?: boolean;
   created_at: string;
   updated_at: string;
 }

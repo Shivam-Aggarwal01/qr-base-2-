@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CalendarClock, Package, Search, Plus } from 'lucide-react';
 import { Asset, CatalogItem, Location, Request, StockLevel, User } from '../types/inventory';
+import { getLocationFullPathString } from '../utils/locationHierarchy';
+import { LocationPathBreadcrumb } from './LocationsView';
 
 interface StudentInventoryViewProps {
   catalogItems: CatalogItem[];
@@ -94,7 +96,21 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
       return true;
     }
 
-    return `${item.name} ${item.item_code} ${item.description || ''}`.toLowerCase().includes(query);
+    const itemStockLevels = stockLevels.filter((s) => s.catalog_item_id === item.id && (s.quantity ?? 0) > 0);
+    const locMatch = itemStockLevels.some((s) => {
+      const loc = locations.find((l) => l.id === s.location_id);
+      if (!loc) return false;
+      return (
+        loc.name.toLowerCase().includes(query) ||
+        (loc.code || '').toLowerCase().includes(query) ||
+        getLocationFullPathString(loc, locations).toLowerCase().includes(query)
+      );
+    });
+
+    return (
+      `${item.name} ${item.item_code} ${item.description || ''}`.toLowerCase().includes(query) ||
+      locMatch
+    );
   });
 
   const visibleAssets = assets.filter((asset) => {
@@ -104,7 +120,11 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
       return true;
     }
 
-    return `${asset.name || ''} ${asset.asset_code} ${asset.serial_number || ''} ${catalog?.name || ''}`
+    const assetLoc = locations.find((l) => l.id === asset.location_id);
+    const locPath = assetLoc ? getLocationFullPathString(assetLoc, locations).toLowerCase() : '';
+    const locName = assetLoc ? assetLoc.name.toLowerCase() : '';
+
+    return `${asset.name || ''} ${asset.asset_code} ${asset.serial_number || ''} ${catalog?.name || ''} ${locName} ${locPath}`
       .toLowerCase()
       .includes(query);
   });
@@ -225,7 +245,10 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
 
                   const itemLocations = stockLevels
                     .filter((stock) => stock.catalog_item_id === catalogItemId && Number(stock.quantity) > 0)
-                    .map((stock) => locations.find((location) => location.id === stock.location_id)?.name)
+                    .map((stock) => {
+                      const loc = locations.find((location) => location.id === stock.location_id);
+                      return loc ? getLocationFullPathString(loc, locations) : null;
+                    })
                     .filter((name): name is string => Boolean(name));
 
                   return (
@@ -241,7 +264,15 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
                       </td>
 
                       <td className="px-4 py-3 text-[var(--color-idea-muted)] sm:px-6">
-                        {item.storage_place || itemLocations.join(', ') || 'Lab store'}
+                        {itemLocations.length > 0 ? (
+                          <div className="space-y-1">
+                            {itemLocations.map((p, idx) => (
+                              <LocationPathBreadcrumb key={idx} path={p} />
+                            ))}
+                          </div>
+                        ) : (
+                          <span>{item.storage_place || 'Position not set'}</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -276,7 +307,7 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
 
               const available = asset.status === 'AVAILABLE';
 
-              const location = locations.find((item) => item.id === asset.location_id)?.name;
+              const assetLoc = locations.find((item) => item.id === asset.location_id);
 
               return (
                 <article
@@ -315,12 +346,16 @@ export const StudentInventoryView: React.FC<StudentInventoryViewProps> = ({
                     </div>
 
                     {available ? (
-                      <div className="flex justify-between gap-3">
+                      <div className="flex justify-between items-start gap-3">
                         <span>Location</span>
 
-                        <span className="text-right font-medium text-[var(--color-idea-text)]">
-                          {asset.storage_location || location || 'Lab store'}
-                        </span>
+                        <div className="text-right font-medium text-[var(--color-idea-text)]">
+                          {assetLoc ? (
+                            <LocationPathBreadcrumb path={getLocationFullPathString(assetLoc, locations)} />
+                          ) : (
+                            <span>{asset.storage_location || 'Position not set'}</span>
+                          )}
+                        </div>
                       </div>
                     ) : (
                       <div className="flex justify-between gap-3">

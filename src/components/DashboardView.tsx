@@ -424,11 +424,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <div className="flex items-center gap-2">
                     <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">QR Stickers</h2>
                     <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200/50">
-                      {assets.length} Equipment Available
+                      {assets.length} Items
                     </span>
                   </div>
                   <p className="text-[11px] text-slate-500">
-                    Physical adhesive barcode stickers for equipment, tools, and storage bins.
+                    Preview and print QR stickers for equipment and storage locations.
                   </p>
                 </div>
               </div>
@@ -439,7 +439,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   onClick={onOpenBatchLabels}
                   disabled={assets.length === 0 && catalogItems.length === 0 && locations.length === 0}
                   className="idea-button flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl text-white shadow-2xs hover:brightness-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
-                  title="Choose and print QR stickers"
+                  title="Print QR stickers"
                 >
                   <Printer className="w-3.5 h-3.5" />
                   <span>Print</span>
@@ -451,8 +451,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             {assets.length === 0 ? (
               <div className="py-8 text-center">
                 <QrCode className="mx-auto w-8 h-8 text-slate-300" />
-                <p className="mt-2 text-xs font-semibold text-slate-700">No equipment items available for tagging</p>
-                <p className="mt-0.5 text-[11px] text-slate-400">Add equipment in the lab to generate and print QR stickers.</p>
+                <p className="mt-2 text-xs font-semibold text-slate-700">No items available for tagging</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">Add equipment or locations to generate QR stickers.</p>
               </div>
             ) : (
               <div className="pt-3.5">
@@ -471,7 +471,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                         type="button"
                         onClick={onOpenBatchLabels}
                         className="group relative flex flex-col items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 text-center shadow-2xs hover:border-[#0071e3] hover:shadow-xs hover:scale-[1.01] transition-all cursor-pointer overflow-hidden"
-                        title={`Click to select & print: ${name}`}
+                        title={`Select & print: ${name}`}
                       >
                         {/* Miniature physical sticker cut guide boundary */}
                         <div className="absolute inset-0 border border-dashed border-slate-200/90 rounded-xl pointer-events-none group-hover:border-blue-300 transition-colors" />
@@ -507,13 +507,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   })}
                 </div>
 
-                <div className="mt-3 pt-2.5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px] text-slate-500">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    <span>Physical sticker preview layout · Click any label or Print to customize selection</span>
-                  </div>
+                <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                  <span>{assets.length} items ready for printing</span>
                   <span className="font-medium text-slate-600">
-                    {assets.filter((a) => a.status === 'AVAILABLE').length} Available to tag
+                    {assets.filter((a) => a.status === 'AVAILABLE').length} Available
                   </span>
                 </div>
               </div>

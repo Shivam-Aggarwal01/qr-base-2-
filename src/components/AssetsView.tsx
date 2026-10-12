@@ -9,6 +9,8 @@ import {
   deleteFirestoreDocument,
 } from '../services/firebaseInventory';
 import { InventoryStorage } from '../services/storage';
+import { getLocationFullPathString } from '../utils/locationHierarchy';
+import { LocationPathBreadcrumb } from './LocationsView';
 
 // Mirrors Firestore rule: isStaff = ADMIN | STUDENT_LEAD | STUDENT_AMBASSADOR
 const isStaff = (role?: UserRole) => role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
@@ -63,11 +65,21 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
 
     if (searchFilter) {
       const q = searchFilter.toLowerCase();
-      if (
-        !asset.asset_code.toLowerCase().includes(q) &&
-        !asset.storage_location?.toLowerCase().includes(q) &&
-        !asset.name?.toLowerCase().includes(q)
-      ) {
+      const loc = locations.find((l) => l.id === asset.location_id);
+      const locPath = loc ? getLocationFullPathString(loc, locations).toLowerCase() : '';
+      const locName = loc ? loc.name.toLowerCase() : '';
+      const locCode = loc?.code ? loc.code.toLowerCase() : '';
+
+      const matches =
+        asset.asset_code.toLowerCase().includes(q) ||
+        (asset.name || '').toLowerCase().includes(q) ||
+        (asset.serial_number || '').toLowerCase().includes(q) ||
+        (asset.storage_location || '').toLowerCase().includes(q) ||
+        locName.includes(q) ||
+        locCode.includes(q) ||
+        locPath.includes(q);
+
+      if (!matches) {
         return false;
       }
     }
@@ -332,11 +344,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                         )}
                       </td>
                       <td className="px-6 py-4 text-xs font-medium text-[var(--color-idea-text)]">
-                        <div className="space-y-1">
-                          <div className="font-bold text-[var(--color-idea-text)]">
-                            {loc?.name || 'Location not set'}
-                          </div>
-                        </div>
+                        <LocationPathBreadcrumb path={loc ? getLocationFullPathString(loc, locations) : null} />
                       </td>
                       <td className="px-6 py-4 text-xs font-medium">
                         <div
@@ -462,7 +470,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                   </option>
                   {locations.map((l) => (
                     <option key={l.id} value={l.id}>
-                      {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
+                      {getLocationFullPathString(l, locations)}
                     </option>
                   ))}
                 </select>
@@ -558,7 +566,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 </option>
                 {locations.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.name} {l.storage_path ? `(${l.storage_path.replace(/>|\//g, ' › ')})` : ''}
+                    {getLocationFullPathString(l, locations)}
                   </option>
                 ))}
               </select>

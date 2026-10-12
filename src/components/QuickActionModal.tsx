@@ -14,6 +14,8 @@ import {
 import { InventoryStorage } from '../services/storage';
 import { canIssueInventory, canReturnOrRepairItems, isStudent } from '../services/authRoles';
 import confetti from 'canvas-confetti';
+import { getLocationFullPathString, inferLocationType } from '../utils/locationHierarchy';
+import { LocationPathBreadcrumb } from './LocationsView';
 
 interface QuickActionModalProps {
   isOpen: boolean;
@@ -54,6 +56,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const [qtyInput, setQtyInput] = useState(1);
   const [remarksInput, setRemarksInput] = useState('');
   const [statusInput, setStatusInput] = useState<AssetStatus>('DAMAGED');
+  const [activeLocationId, setActiveLocationId] = useState<string | null>(null);
+  const [locActionTab, setLocActionTab] = useState<'VIEW' | 'ADD_STOCK' | 'MOVE_ASSET'>('VIEW');
+  const [targetCatalogItemId, setTargetCatalogItemId] = useState('');
+  const [targetStockQty, setTargetStockQty] = useState(1);
+  const [targetMoveAssetId, setTargetMoveAssetId] = useState('');
 
   const role = activeUser?.role;
   const quickStatusOptions: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST', 'RETIRED'];
@@ -143,6 +150,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     setQtyInput(1);
     setRemarksInput('');
     setStatusInput('DAMAGED');
+    setActiveLocationId(null);
+    setLocActionTab('VIEW');
+    setTargetCatalogItemId('');
+    setTargetStockQty(1);
+    setTargetMoveAssetId('');
   };
 
   const handleClose = () => {
@@ -214,11 +226,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                   {asset.status.replace('_', ' ')}
                 </span>
 
-                <p className="mt-2 text-xs font-medium text-[var(--color-idea-muted)]">
-                  {asset.status === 'ISSUED'
-                    ? `Assigned to: ${assignedUser?.name || 'User'}`
-                    : `Location: ${location?.name || 'Not assigned'}`}
-                </p>
+                <div className="mt-2 text-xs font-medium text-[var(--color-idea-muted)] flex flex-col items-end">
+                  {asset.status === 'ISSUED' ? (
+                    <span>Assigned to: {assignedUser?.name || 'User'}</span>
+                  ) : (
+                    <LocationPathBreadcrumb path={location ? getLocationFullPathString(location, locations) : null} />
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -324,11 +338,13 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 {asset.status.replace('_', ' ')}
               </span>
 
-              <p className="mt-2 text-xs font-medium text-[var(--color-idea-muted)]">
-                {asset.status === 'ISSUED'
-                  ? `Assigned to: ${assignedUser?.name || 'User'}`
-                  : `Location: ${location?.name || 'Not assigned'}`}
-              </p>
+              <div className="mt-2 text-xs font-medium text-[var(--color-idea-muted)] flex flex-col items-end">
+                {asset.status === 'ISSUED' ? (
+                  <span>Assigned to: {assignedUser?.name || 'User'}</span>
+                ) : (
+                  <LocationPathBreadcrumb path={location ? getLocationFullPathString(location, locations) : null} />
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -481,9 +497,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               >
                 <option value="">Select location</option>
 
-                {locations.map((location) => (
-                  <option key={location.id} value={location.id}>
-                    {location.name} ({location.code})
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    {getLocationFullPathString(loc, locations)}
                   </option>
                 ))}
               </select>
@@ -561,9 +577,9 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 >
                   <option value="">Keep current location</option>
 
-                  {locations.map((location) => (
-                    <option key={location.id} value={location.id}>
-                      {location.name}
+                  {locations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {getLocationFullPathString(loc, locations)}
                     </option>
                   ))}
                 </select>
@@ -655,9 +671,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                       key={stock.id}
                       className="flex items-center justify-between border-b border-[var(--color-idea-border)] py-2 last:border-0"
                     >
-                      <span className="text-xs font-medium text-[var(--color-idea-text)]">
-                        {location?.name || 'Unknown location'}
-                      </span>
+                      <div className="min-w-0 pr-3">
+                        <LocationPathBreadcrumb
+                          path={location ? getLocationFullPathString(location, locations) : 'Storage place'}
+                        />
+                      </div>
 
                       <span className="font-mono text-xs font-bold text-[var(--color-idea-text)]">
                         {stock.quantity} {item.unit}
@@ -840,20 +858,23 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     );
   };
 
-  const renderLocationActions = (location: Location) => {
+  const renderLocationActions = (initialLocation: Location) => {
+    const location = activeLocationId
+      ? locations.find((l) => l.id === activeLocationId) || initialLocation
+      : initialLocation;
     const assetsInLocation = assets.filter((asset) => asset.location_id === location.id);
-
-    const stockInLocation = stockLevels.filter((stock) => stock.location_id === location.id);
+    const stockInLocation = stockLevels.filter(
+      (stock) => stock.location_id === location.id && (stock.quantity ?? 0) > 0
+    );
+    const childLocations = locations.filter((l) => l.parent_id === location.id);
+    const fullPath = getLocationFullPathString(location, locations);
+    const locTypeName = location.type || inferLocationType(location.name);
 
     const itemsInLocation = stockInLocation
-      .map((stock) => {
-        const catalogItem = findCatalogItem(stock.catalog_item_id);
-
-        return {
-          stock,
-          catalogItem,
-        };
-      })
+      .map((stock) => ({
+        stock,
+        catalogItem: findCatalogItem(stock.catalog_item_id),
+      }))
       .filter(
         (
           entry
@@ -863,41 +884,269 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
         } => Boolean(entry.catalogItem)
       );
 
+    const handleAddStockHere = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!targetCatalogItemId) return alert('Select an item to add.');
+      if (targetStockQty <= 0) return alert('Quantity must be greater than 0.');
+      InventoryStorage.adjustStock(
+        targetCatalogItemId,
+        location.id,
+        targetStockQty,
+        'RECEIVE',
+        'Added via location QR scan'
+      );
+      triggerSuccess();
+    };
+
+    const handleMoveAssetHere = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!targetMoveAssetId) return alert('Select an asset to move.');
+      const movingAsset = assets.find((a) => a.id === targetMoveAssetId);
+      if (!movingAsset) return;
+      InventoryStorage.updateAssetStatus(
+        movingAsset.id,
+        movingAsset.status,
+        location.id,
+        `Moved to ${location.name} via location QR scan`
+      );
+      triggerSuccess();
+    };
+
     return (
-      <div className="space-y-5">
-        <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-5">
+      <div className="space-y-4">
+        {/* Location Header Card */}
+        <div className="relative overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-4 sm:p-5">
           <div className="absolute left-0 top-0 h-1 w-full bg-[var(--color-idea-blue)]" />
 
+          {activeLocationId && activeLocationId !== initialLocation.id && (
+            <button
+              type="button"
+              onClick={() => setActiveLocationId(null)}
+              className="text-[11px] text-[var(--color-idea-blue)] font-semibold mb-2 flex items-center gap-1 hover:underline cursor-pointer"
+            >
+              ← Back to scanned location ({initialLocation.name})
+            </button>
+          )}
+
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <span className="text-[10px] font-mono uppercase tracking-[0.2em] text-[var(--color-idea-muted)]">
                 LOCATION
               </span>
 
-              <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">{location.name}</h4>
+              <div className="mt-1 flex items-center gap-2 flex-wrap">
+                <h4 className="text-xl font-bold text-[var(--color-idea-text)]">{location.name}</h4>
+                <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-slate-100 text-slate-700 border border-slate-200/60">
+                  {locTypeName}
+                </span>
+              </div>
 
-              <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
+              <div className="mt-1">
+                <LocationPathBreadcrumb path={fullPath} />
+              </div>
+
+              <p className="mt-1 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
                 {location.code || location.id}
               </p>
             </div>
 
             <button
               type="button"
-              onClick={() => onOpenQRGenerator(location.id, location.name, 'Storage Location')}
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--color-idea-border)] px-3 py-2 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-white"
+              onClick={() => onOpenQRGenerator(location.id, location.name, fullPath)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--color-idea-border)] px-3 py-2 text-xs font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-white shrink-0 cursor-pointer"
             >
               <QrCode className="h-4 w-4" />
-              Print QR
+              <span>Print QR</span>
             </button>
           </div>
         </div>
 
-        <div>
-          <h5 className="mb-2 text-sm font-semibold text-[var(--color-idea-text)]">Items in this Location</h5>
+        {/* Staff Action Tabs */}
+        {!studentMode && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setLocActionTab(locActionTab === 'ADD_STOCK' ? 'VIEW' : 'ADD_STOCK')}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer border ${
+                locActionTab === 'ADD_STOCK'
+                  ? 'bg-[var(--color-idea-blue)] text-white border-[var(--color-idea-blue)]'
+                  : 'bg-white border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)]'
+              }`}
+            >
+              {locActionTab === 'ADD_STOCK' ? 'Cancel Add' : '+ Add Stock Here'}
+            </button>
+            <button
+              type="button"
+              onClick={() => setLocActionTab(locActionTab === 'MOVE_ASSET' ? 'VIEW' : 'MOVE_ASSET')}
+              className={`flex-1 py-2 px-3 rounded-xl text-xs font-semibold transition-colors cursor-pointer border ${
+                locActionTab === 'MOVE_ASSET'
+                  ? 'bg-[var(--color-idea-blue)] text-white border-[var(--color-idea-blue)]'
+                  : 'bg-white border-[var(--color-idea-border)] text-[var(--color-idea-text)] hover:bg-[var(--color-idea-light-grey)]'
+              }`}
+            >
+              {locActionTab === 'MOVE_ASSET' ? 'Cancel Move' : 'Move Asset Here'}
+            </button>
+          </div>
+        )}
 
-          <div className="max-h-52 space-y-2 overflow-y-auto">
+        {/* Add Stock Form */}
+        {locActionTab === 'ADD_STOCK' && (
+          <form
+            onSubmit={handleAddStockHere}
+            className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4 space-y-3"
+          >
+            <h5 className="text-xs font-bold uppercase tracking-wider text-[var(--color-idea-text)]">
+              Add Item Stock into {location.name}
+            </h5>
+            <div>
+              <label className="text-[10px] font-semibold text-[var(--color-idea-muted)] uppercase block mb-1">
+                Item
+              </label>
+              <select
+                required
+                value={targetCatalogItemId}
+                onChange={(e) => setTargetCatalogItemId(e.target.value)}
+                className="idea-input w-full p-2 text-xs"
+              >
+                <option value="">Select item…</option>
+                {catalogItems.map((ci) => (
+                  <option key={ci.id} value={ci.id}>
+                    {ci.name} ({ci.item_code})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="text-[10px] font-semibold text-[var(--color-idea-muted)] uppercase block mb-1">
+                Quantity
+              </label>
+              <input
+                type="number"
+                min={1}
+                required
+                value={targetStockQty}
+                onChange={(e) => setTargetStockQty(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                className="idea-input w-full p-2 text-xs"
+              />
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setLocActionTab('VIEW')}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold border border-[var(--color-idea-border)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="idea-button flex-1 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
+              >
+                Confirm Add
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Move Asset Form */}
+        {locActionTab === 'MOVE_ASSET' && (
+          <form
+            onSubmit={handleMoveAssetHere}
+            className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4 space-y-3"
+          >
+            <h5 className="text-xs font-bold uppercase tracking-wider text-[var(--color-idea-text)]">
+              Move Asset into {location.name}
+            </h5>
+            <div>
+              <label className="text-[10px] font-semibold text-[var(--color-idea-muted)] uppercase block mb-1">
+                Asset
+              </label>
+              <select
+                required
+                value={targetMoveAssetId}
+                onChange={(e) => setTargetMoveAssetId(e.target.value)}
+                className="idea-input w-full p-2 text-xs"
+              >
+                <option value="">Select equipment asset to move…</option>
+                {assets
+                  .filter((a) => a.location_id !== location.id && a.status !== 'ISSUED')
+                  .map((a) => {
+                    const currentLoc = locations.find((l) => l.id === a.location_id);
+                    return (
+                      <option key={a.id} value={a.id}>
+                        {a.name || a.asset_code} ({a.asset_code}) — Currently:{' '}
+                        {currentLoc ? currentLoc.name : 'Unassigned'}
+                      </option>
+                    );
+                  })}
+              </select>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setLocActionTab('VIEW')}
+                className="flex-1 py-2 rounded-xl text-xs font-semibold border border-[var(--color-idea-border)] cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="idea-button flex-1 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer"
+              >
+                Confirm Move
+              </button>
+            </div>
+          </form>
+        )}
+
+        {/* Child Containers / Sub-locations */}
+        {childLocations.length > 0 && (
+          <div className="rounded-2xl border border-[var(--color-idea-border)] bg-white p-4">
+            <h5 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--color-idea-muted)]">
+              Containers & Sub-locations ({childLocations.length})
+            </h5>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {childLocations.map((child) => {
+                const childAssets = assets.filter((a) => a.location_id === child.id).length;
+                const childStock = stockLevels
+                  .filter((s) => s.location_id === child.id)
+                  .reduce((sum, s) => sum + (s.quantity || 0), 0);
+                const childType = child.type || inferLocationType(child.name);
+
+                return (
+                  <button
+                    key={child.id}
+                    type="button"
+                    onClick={() => setActiveLocationId(child.id)}
+                    className="flex flex-col text-left p-2.5 rounded-xl border border-[var(--color-idea-border)] bg-slate-50/60 hover:bg-white hover:border-[var(--color-idea-blue)] transition-all cursor-pointer"
+                    title={`Inspect ${child.name}`}
+                  >
+                    <div className="flex items-center justify-between gap-1 w-full">
+                      <span className="text-xs font-bold text-[var(--color-idea-text)] truncate">{child.name}</span>
+                      <span className="text-[9px] px-1.5 py-0.2 rounded bg-white text-slate-600 border border-slate-200/60 shrink-0">
+                        {childType}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[var(--color-idea-muted)] mt-1">
+                      {childAssets} assets · {childStock} items
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Consumable Items directly here */}
+        <div>
+          <h5 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--color-idea-muted)]">
+            Items in this Location ({itemsInLocation.length})
+          </h5>
+
+          <div className="max-h-48 space-y-2 overflow-y-auto">
             {itemsInLocation.length === 0 ? (
-              <p className="text-xs italic text-[var(--color-idea-muted)]">No item stock is currently stored here.</p>
+              <p className="text-xs italic text-[var(--color-idea-muted)] p-2">
+                No inventory items are stored directly in this spot.
+              </p>
             ) : (
               itemsInLocation.map(({ stock, catalogItem }) => (
                 <div
@@ -906,7 +1155,6 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 >
                   <div className="min-w-0">
                     <p className="truncate text-xs font-semibold text-[var(--color-idea-text)]">{catalogItem.name}</p>
-
                     <p className="mt-0.5 text-[10px] font-mono text-[var(--color-idea-muted)]">
                       {stock.quantity} {catalogItem.unit}
                     </p>
@@ -916,7 +1164,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                     <button
                       type="button"
                       onClick={() => openRequestForCatalogItem(catalogItem.id, 1)}
-                      className="shrink-0 rounded-lg border border-[var(--color-idea-border)] px-3 py-2 text-[10px] font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)]"
+                      className="shrink-0 rounded-lg border border-[var(--color-idea-border)] px-3 py-1.5 text-[10px] font-semibold text-[var(--color-idea-text)] transition-colors hover:bg-[var(--color-idea-light-grey)] cursor-pointer"
                     >
                       Request
                     </button>
@@ -927,12 +1175,17 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
           </div>
         </div>
 
+        {/* Tracked Assets directly here */}
         <div>
-          <h5 className="mb-2 text-sm font-semibold text-[var(--color-idea-text)]">Assets in this Location</h5>
+          <h5 className="mb-2 text-xs font-bold uppercase tracking-wider text-[var(--color-idea-muted)]">
+            Assets in this Location ({assetsInLocation.length})
+          </h5>
 
-          <div className="max-h-52 space-y-2 overflow-y-auto">
+          <div className="max-h-48 space-y-2 overflow-y-auto">
             {assetsInLocation.length === 0 ? (
-              <p className="text-xs italic text-[var(--color-idea-muted)]">No assets are currently stored here.</p>
+              <p className="text-xs italic text-[var(--color-idea-muted)] p-2">
+                No equipment assets are stored directly in this spot.
+              </p>
             ) : (
               assetsInLocation.map((asset) => {
                 const catalogItem = findCatalogItem(asset.catalog_item_id);
@@ -946,7 +1199,6 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                       <p className="truncate text-xs font-semibold text-[var(--color-idea-text)]">
                         {asset.name || catalogItem?.name || asset.asset_code}
                       </p>
-
                       <p className="mt-0.5 text-[10px] font-mono text-[var(--color-idea-blue)]">{asset.asset_code}</p>
                     </div>
 

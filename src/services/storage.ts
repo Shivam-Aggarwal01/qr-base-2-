@@ -603,11 +603,11 @@ export class InventoryStorage {
   }
 
   // Add Location
-  static addLocation(name: string, code?: string): Location {
+  static addLocation(name: string, code?: string, extra?: Partial<Location>): Location {
     const locations = this.getLocations();
     const now = new Date().toISOString();
     const newLoc: Location = {
-      id: `loc-${Date.now()}`,
+      id: `loc-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       name,
       code:
         code ||
@@ -615,6 +615,20 @@ export class InventoryStorage {
           .replace(/[^a-zA-Z0-9]/g, '')
           .substring(0, 6)
           .toUpperCase()}`,
+      type: extra?.type || 'ROOM',
+      custom_type: extra?.custom_type || null,
+      parent_id: extra?.parent_id || null,
+      storage_path: extra?.storage_path || null,
+      building: extra?.building || null,
+      room: extra?.room || null,
+      department: extra?.department || null,
+      description: extra?.description || null,
+      capacity: extra?.capacity || null,
+      notes: extra?.notes || null,
+      status: extra?.status || (extra?.is_temporary ? 'TEMPORARY' : 'ACTIVE'),
+      is_active: extra?.is_active ?? true,
+      is_temporary: extra?.is_temporary ?? false,
+      is_container: extra?.is_container ?? false,
       created_at: now,
       updated_at: now,
     };
@@ -723,7 +737,28 @@ export type QRParseEntities = {
 // Overload-like helper: keeps existing call sites working, but allows
 // QR parsing to use the in-memory Firestore state.
 export function parseQRCodeFromEntities(qrData: string, entities: QRParseEntities) {
-  const cleanData = qrData.trim();
+  let cleanData = qrData.trim();
+  try {
+    if (cleanData.startsWith('http://') || cleanData.startsWith('https://')) {
+      const url = new URL(cleanData);
+      const param =
+        url.searchParams.get('code') ||
+        url.searchParams.get('id') ||
+        url.searchParams.get('asset') ||
+        url.searchParams.get('item');
+      if (param) {
+        cleanData = param.trim();
+      } else {
+        const parts = url.pathname.split('/').filter(Boolean);
+        if (parts.length > 0) {
+          cleanData = decodeURIComponent(parts[parts.length - 1]).trim();
+        }
+      }
+    }
+  } catch {
+    // Keep raw data
+  }
+
   const assets = entities.assets ?? InventoryStorage.getAssets();
   const catalog = entities.catalog ?? InventoryStorage.getCatalog();
   const locations = entities.locations ?? InventoryStorage.getLocations();

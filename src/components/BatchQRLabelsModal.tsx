@@ -319,14 +319,14 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h2 id="qr-modal-title" className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
-                    QR Sticker Studio
+                    QR Stickers
                   </h2>
                   <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200/50">
                     {selectedPrintItems.length} of {groupItems.length} Selected
                   </span>
                 </div>
                 <p className="text-xs text-slate-500">
-                  Select lab items, customize sheet size, and print high-density QR stickers.
+                  Select items to generate and print QR sticker sheets.
                 </p>
               </div>
             </div>

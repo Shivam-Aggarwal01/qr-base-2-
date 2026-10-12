@@ -10,6 +10,8 @@ import {
 } from '../services/firebaseInventory';
 import { receiveCatalogStock } from '../services/firebaseCollections';
 import { InventoryStorage } from '../services/storage';
+import { getLocationFullPathString } from '../utils/locationHierarchy';
+import { LocationPathBreadcrumb } from './LocationsView';
 
 // Mirrors Firestore rule: isStaff = ADMIN | STUDENT_LEAD | STUDENT_AMBASSADOR
 const isStaff = (role?: UserRole) => role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
@@ -80,8 +82,23 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
 
       const matchesName = (item.name || '').toLowerCase().includes(query);
       const matchesCode = (item.item_code || '').toLowerCase().includes(query);
+      const matchesDesc = (item.description || '').toLowerCase().includes(query);
 
-      if (!matchesName && !matchesCode) {
+      const itemStockLevels = stockLevels.filter(
+        (s) => s.catalog_item_id === item.id && (s.quantity ?? 0) > 0
+      );
+      const matchesLocation = itemStockLevels.some((s) => {
+        const loc = locations.find((l) => l.id === s.location_id);
+        if (!loc) return false;
+        const fullPath = getLocationFullPathString(loc, locations).toLowerCase();
+        return (
+          loc.name.toLowerCase().includes(query) ||
+          (loc.code || '').toLowerCase().includes(query) ||
+          fullPath.includes(query)
+        );
+      });
+
+      if (!matchesName && !matchesCode && !matchesDesc && !matchesLocation) {
         return false;
       }
     }
@@ -485,6 +502,43 @@ export const CatalogView: React.FC<CatalogViewProps> = ({
                       </span>
                     </div>
                   )}
+                </div>
+
+                {/* Storage Locations */}
+                <div className="space-y-1 text-left">
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)] block">
+                    Storage Location
+                  </span>
+                  {(() => {
+                    const itemLocs = stockLevels
+                      .filter((s) => s.catalog_item_id === item.id && (s.quantity ?? 0) > 0)
+                      .map((s) => ({
+                        loc: locations.find((l) => l.id === s.location_id),
+                        qty: s.quantity,
+                      }))
+                      .filter((entry): entry is { loc: Location; qty: number } => Boolean(entry.loc));
+
+                    if (itemLocs.length === 0) {
+                      return (
+                        <p className="text-[11px] text-[var(--color-idea-muted)] italic">
+                          Position not set
+                        </p>
+                      );
+                    }
+
+                    return (
+                      <div className="space-y-1 max-h-20 overflow-y-auto scrollbar-none">
+                        {itemLocs.map(({ loc, qty }) => (
+                          <div key={loc.id} className="flex items-center justify-between text-xs gap-2">
+                            <LocationPathBreadcrumb path={getLocationFullPathString(loc, locations)} />
+                            <span className="font-mono text-[10px] font-semibold text-[var(--color-idea-muted)] shrink-0">
+                              {qty} {item.unit}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })()}
                 </div>
 
                 {/* Actions */}

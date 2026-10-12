@@ -21,7 +21,7 @@ import {
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
-import type { AccountRequest, User, UserRole } from '../types/inventory';
+import type { AccountRequest, User, UserRole, LocationType, LocationStatus } from '../types/inventory';
 import { isAdminAccount, resolveRoleFromEmail } from './roleConfig';
 
 export const COLLECTIONS = {
@@ -404,11 +404,37 @@ export async function createCatalogItemInFirestore(payload: {
  */
 export async function createLocationInFirestore(payload: {
   name: string;
+  type?: LocationType;
+  custom_type?: string | null;
+  parent_id?: string | null;
   storage_path?: string | null;
+  building?: string | null;
+  room?: string | null;
+  department?: string | null;
+  description?: string | null;
+  capacity?: number | null;
+  notes?: string | null;
+  status?: LocationStatus;
+  is_active?: boolean;
+  is_temporary?: boolean;
+  is_container?: boolean;
 }): Promise<{ id: string; code: string }> {
   const docRef = await addDoc(collection(db, COLLECTIONS.LOCATIONS), {
     name: payload.name,
+    type: payload.type ?? 'ROOM',
+    custom_type: payload.custom_type ?? null,
+    parent_id: payload.parent_id ?? null,
     storage_path: payload.storage_path ?? null,
+    building: payload.building ?? null,
+    room: payload.room ?? null,
+    department: payload.department ?? null,
+    description: payload.description ?? null,
+    capacity: payload.capacity ?? null,
+    notes: payload.notes ?? null,
+    status: payload.status ?? (payload.is_temporary ? 'TEMPORARY' : 'ACTIVE'),
+    is_active: payload.is_active ?? true,
+    is_temporary: payload.is_temporary ?? false,
+    is_container: payload.is_container ?? false,
     created_at: serverTimestamp(),
     updated_at: serverTimestamp(),
   });
@@ -419,6 +445,41 @@ export async function createLocationInFirestore(payload: {
   });
 
   return { id: docRef.id, code };
+}
+
+/**
+ * Move an asset to a new location in Firestore and record the move in INVENTORY_TRANSACTIONS
+ */
+export async function moveAssetLocationInFirestore(payload: {
+  assetId: string;
+  catalogItemId: string;
+  toLocationId: string;
+  fromLocationId?: string | null;
+  processedByUserId?: string | null;
+  remarks?: string;
+  storageLocationDetails?: string | null;
+}): Promise<void> {
+  const now = new Date().toISOString();
+
+  // 1. Update Asset doc
+  await updateDoc(doc(db, COLLECTIONS.ASSETS, payload.assetId), {
+    location_id: payload.toLocationId,
+    storage_location: payload.storageLocationDetails ?? null,
+    updated_at: serverTimestamp(),
+  });
+
+  // 2. Record Transaction
+  await addDoc(collection(db, COLLECTIONS.INVENTORY_TRANSACTIONS), {
+    asset_id: payload.assetId,
+    catalog_item_id: payload.catalogItemId,
+    transaction_type: 'MOVE',
+    quantity: 1,
+    from_location_id: payload.fromLocationId ?? null,
+    to_location_id: payload.toLocationId,
+    processed_by_user_id: payload.processedByUserId ?? null,
+    remarks: payload.remarks ?? 'Moved to new location',
+    created_at: now,
+  });
 }
 
 /**
