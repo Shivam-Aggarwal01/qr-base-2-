@@ -14,7 +14,7 @@ interface UsersViewProps {
   onReviewAccountRequest?: (requestId: string, status: 'APPROVED' | 'REJECTED') => Promise<void>;
   onRefreshData: () => void;
 }
-type LoanGroup = { catalogItemId: string; quantity: number; assetCodes: string[] };
+type LoanItem = { id: string; name: string; quantity: number };
 const EDITABLE_ROLES: User['role'][] = ['STUDENT', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR'];
 const ACTIVE_ASSET_STATUSES = new Set([
   'ISSUED',
@@ -143,35 +143,45 @@ export const UsersView: React.FC<UsersViewProps> = ({
         .trim()
         .toUpperCase()
     );
-  const getUserLoans = (user: User): LoanGroup[] => {
-    const loanGroups = new Map<string, LoanGroup>();
-    const addLoan = (catalogItemId: string, quantity: number, assetCode?: string) => {
-      if (!catalogItemId || quantity <= 0) return;
-      const existing = loanGroups.get(catalogItemId);
-      if (existing) {
-        existing.quantity += quantity;
-        if (assetCode) {
-          existing.assetCodes.push(assetCode);
-        }
-        return;
-      }
-      loanGroups.set(catalogItemId, { catalogItemId, quantity, assetCodes: assetCode ? [assetCode] : [] });
-    };
+  const getUserLoans = (user: User): LoanItem[] => {
+    const loans: LoanItem[] = [];
+
+    // Tracked assets assigned to the user
     assets
       .filter(
         (asset) => String(asset.assigned_to_user_id ?? '').trim() === String(user.id).trim() && isActiveAsset(asset)
       )
-      .forEach((asset) =>
-        addLoan(String(asset.catalog_item_id ?? '').trim(), 1, asset.asset_code ? String(asset.asset_code) : undefined)
-      );
+      .forEach((asset) => {
+        const cat = asset.catalog_item_id ? getCatalogItem(asset.catalog_item_id) : undefined;
+        loans.push({
+          id: asset.id,
+          name: asset.name || cat?.name || 'Equipment Item',
+          quantity: 1,
+        });
+      });
+
+    // Reusable catalog items handed over to the user
     requests
       .filter((request) => request.user_id === user.id && request.status === 'HANDED_OVER')
       .forEach((request) => {
         (request.items ?? [])
           .filter((item) => !item.asset_id && item.usage === 'REUSABLE')
-          .forEach((item) => addLoan(String(item.catalog_item_id ?? '').trim(), Number(item.requested_qty) || 0));
+          .forEach((item) => {
+            const cat = item.catalog_item_id ? getCatalogItem(String(item.catalog_item_id).trim()) : undefined;
+            const existing = loans.find((l) => l.id === item.catalog_item_id);
+            if (existing) {
+              existing.quantity += Number(item.requested_qty) || 0;
+            } else {
+              loans.push({
+                id: String(item.catalog_item_id ?? '').trim(),
+                name: cat?.name ?? 'Lab Item',
+                quantity: Number(item.requested_qty) || 0,
+              });
+            }
+          });
       });
-    return Array.from(loanGroups.values());
+
+    return loans;
   };
   const getCatalogItem = (catalogItemId: string) =>
     catalogItems.find(
@@ -351,25 +361,19 @@ export const UsersView: React.FC<UsersViewProps> = ({
                     ) : (
                       <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                         {' '}
-                        {userLoans.map((loan) => {
-                          const catalogItem = getCatalogItem(loan.catalogItemId);
-                          return (
-                            <div
-                              key={loan.catalogItemId}
-                              className=" flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-[var(--color-idea-light-grey)]/50 "
-                            >
-                              {' '}
-                              <span className="text-xs font-medium text-[var(--color-idea-text)] truncate">
-                                {' '}
-                                {catalogItem?.name ?? 'Unknown Item'}{' '}
-                              </span>{' '}
-                              <span className="shrink-0 text-xs font-semibold text-[var(--color-idea-muted)]">
-                                {' '}
-                                {loan.quantity}×{' '}
-                              </span>{' '}
-                            </div>
-                          );
-                        })}{' '}
+                        {userLoans.map((loan) => (
+                          <div
+                            key={loan.id}
+                            className=" flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-[var(--color-idea-light-grey)]/50 "
+                          >
+                            <span className="text-xs font-medium text-[var(--color-idea-text)] truncate">
+                              {loan.name}
+                            </span>
+                            <span className="shrink-0 text-xs font-semibold text-[var(--color-idea-muted)]">
+                              {loan.quantity}×
+                            </span>
+                          </div>
+                        ))}
                       </div>
                     )}{' '}
                   </div>{' '}

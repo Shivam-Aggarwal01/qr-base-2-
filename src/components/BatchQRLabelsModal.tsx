@@ -103,7 +103,7 @@ export const BatchQRLabelsModal: React.FC<BatchQRLabelsModalProps> = ({
           return {
             id: asset.id,
             code: asset.asset_code || asset.id,
-            title: catalogItem?.name || asset.asset_code || 'Equipment Item',
+            title: asset.name || catalogItem?.name || 'Equipment Item',
             subtitle: asset.serial_number ? `SN: ${asset.serial_number}` : loc?.name,
             tag: loc?.name,
             status: asset.status,

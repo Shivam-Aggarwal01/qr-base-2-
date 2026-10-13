@@ -207,7 +207,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                 </span>
 
                 <h4 className="mt-1 truncate text-xl font-bold text-[var(--color-idea-text)]">
-                  {asset.name || catalogItem?.name || asset.asset_code}
+                  {asset.name || catalogItem?.name || 'Equipment'}
                 </h4>
 
                 <p className="mt-0.5 break-words text-xs font-mono font-semibold text-[var(--color-idea-blue)]">
@@ -262,7 +262,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               onClick={() =>
                 onOpenQRGenerator(
                   asset.id,
-                  asset.name || catalogItem?.name || asset.asset_code,
+                  asset.name || catalogItem?.name || 'Equipment',
                   `Serial: ${asset.serial_number || 'N/A'}`
                 )
               }
@@ -321,7 +321,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               </span>
 
               <h4 className="mt-1 text-xl font-bold text-[var(--color-idea-text)]">
-                {asset.name || catalogItem?.name || asset.asset_code}
+                {asset.name || catalogItem?.name || 'Equipment'}
               </h4>
 
               <p className="mt-0.5 text-xs font-mono font-semibold text-[var(--color-idea-blue)]">{asset.asset_code}</p>
@@ -1073,7 +1073,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                     const currentLoc = locations.find((l) => l.id === a.location_id);
                     return (
                       <option key={a.id} value={a.id}>
-                        {a.name || a.asset_code} ({a.asset_code}) — Currently:{' '}
+                        {a.name || 'Equipment'}{a.serial_number ? ` (SN: ${a.serial_number})` : ''} — Currently:{' '}
                         {currentLoc ? currentLoc.name : 'Unassigned'}
                       </option>
                     );
@@ -1197,7 +1197,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
                   >
                     <div className="min-w-0">
                       <p className="truncate text-xs font-semibold text-[var(--color-idea-text)]">
-                        {asset.name || catalogItem?.name || asset.asset_code}
+                        {asset.name || catalogItem?.name || 'Equipment'}
                       </p>
                       <p className="mt-0.5 text-[10px] font-mono text-[var(--color-idea-blue)]">{asset.asset_code}</p>
                     </div>
@@ -1280,10 +1280,11 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
             <div className="space-y-2">
               {request.items.map((item) => {
+                const assetObj = item.asset_id ? assets.find((asset) => asset.id === item.asset_id) : undefined;
                 const itemName = item.catalog_item_id
                   ? findCatalogItem(item.catalog_item_id)?.name || 'Catalog item'
                   : item.asset_id
-                    ? assets.find((asset) => asset.id === item.asset_id)?.asset_code || 'Asset'
+                    ? assetObj?.name || assetObj?.asset_code || 'Asset'
                     : 'Inventory item';
 
                 return (

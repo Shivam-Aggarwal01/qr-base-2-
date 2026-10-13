@@ -142,14 +142,86 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   const catalogMap = useMemo(() => new Map(catalogItems.map((c) => [c.id, c])), [catalogItems]);
   const locationMap = useMemo(() => new Map(locations.map((l) => [l.id, l])), [locations]);
-  const previewAssets = useMemo(() => assets.slice(0, 6), [assets]);
+
+  // Combined QR sticker items across all entity types: Equipment, Items, and Locations
+  const allStickerItems = useMemo(() => {
+    const list: Array<{
+      id: string;
+      type: 'EQUIPMENT' | 'ITEM' | 'LOCATION';
+      code: string;
+      name: string;
+      subtitle: string;
+      tag: string;
+    }> = [];
+
+    // 1. Equipment (Tracked Assets)
+    assets.forEach((asset) => {
+      const catalogItem = catalogMap.get(asset.catalog_item_id);
+      const loc = asset.location_id ? locationMap.get(asset.location_id) : undefined;
+      const name = asset.name || catalogItem?.name || 'Equipment Item';
+      const code = asset.asset_code || asset.id;
+      const subtitle = loc?.name || (asset.serial_number ? `SN ${asset.serial_number}` : 'IDEA Lab');
+      list.push({
+        id: `asset-${asset.id}`,
+        type: 'EQUIPMENT',
+        code,
+        name,
+        subtitle,
+        tag: 'Equipment',
+      });
+    });
+
+    // 2. Items (Consumable & Catalog Items)
+    catalogItems.forEach((item) => {
+      const code = item.item_code || item.id;
+      const subtitle = item.storage_place
+        ? `Storage: ${item.storage_place}`
+        : item.unit
+          ? `Unit: ${item.unit}`
+          : 'Inventory';
+      list.push({
+        id: `catalog-${item.id}`,
+        type: 'ITEM',
+        code,
+        name: item.name,
+        subtitle,
+        tag: 'Item',
+      });
+    });
+
+    // 3. Locations (Storage Spots, Rooms, Containers)
+    locations.forEach((loc) => {
+      const code = loc.code || loc.id;
+      const subtitle = loc.storage_path || loc.room || 'Lab Storage';
+      const typeLabel = loc.type
+        ? loc.type.charAt(0).toUpperCase() + loc.type.slice(1).toLowerCase()
+        : 'Location';
+      list.push({
+        id: `loc-${loc.id}`,
+        type: 'LOCATION',
+        code,
+        name: loc.name,
+        subtitle,
+        tag: typeLabel,
+      });
+    });
+
+    return list;
+  }, [assets, catalogItems, locations, catalogMap, locationMap]);
+
+  const [showAllQRs, setShowAllQRs] = useState(false);
+  const visibleStickerItems = useMemo(
+    () => (showAllQRs ? allStickerItems : allStickerItems.slice(0, 6)),
+    [allStickerItems, showAllQRs]
+  );
+
   const [previewQrCodes, setPreviewQrCodes] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let active = true;
     Promise.all(
-      previewAssets.map(async (asset) => {
-        const code = asset.asset_code || asset.id;
+      visibleStickerItems.map(async (item) => {
+        const code = item.code;
         if (miniQrCache.has(code)) {
           return { code, dataUrl: miniQrCache.get(code)! };
         }
@@ -171,13 +243,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       results.forEach((r) => {
         if (r.dataUrl) mapping[r.code] = r.dataUrl;
       });
-      setPreviewQrCodes(mapping);
+      setPreviewQrCodes((prev) => ({ ...prev, ...mapping }));
     });
 
     return () => {
       active = false;
     };
-  }, [previewAssets]);
+  }, [visibleStickerItems]);
 
   // ---------------------------------------------------------------------------
   // STUDENT VIEW
@@ -421,14 +493,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <QrCode className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">QR Stickers</h2>
-                    <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-blue-50 text-blue-700 border border-blue-200/50">
-                      {assets.length} Items
-                    </span>
-                  </div>
+                  <h2 className="text-sm sm:text-base font-bold text-slate-900 tracking-tight">QR Stickers</h2>
                   <p className="text-[11px] text-slate-500">
-                    Preview and print QR stickers for equipment and storage locations.
+                    Preview and print QR stickers for equipment, items, and locations.
                   </p>
                 </div>
               </div>
@@ -437,7 +504,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 <button
                   type="button"
                   onClick={onOpenBatchLabels}
-                  disabled={assets.length === 0 && catalogItems.length === 0 && locations.length === 0}
+                  disabled={allStickerItems.length === 0}
                   className="idea-button flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-semibold rounded-xl text-white shadow-2xs hover:brightness-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
                   title="Print QR stickers"
                 >
@@ -448,43 +515,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             {/* Sticker Previews Grid or Empty State */}
-            {assets.length === 0 ? (
+            {allStickerItems.length === 0 ? (
               <div className="py-8 text-center">
                 <QrCode className="mx-auto w-8 h-8 text-slate-300" />
                 <p className="mt-2 text-xs font-semibold text-slate-700">No items available for tagging</p>
-                <p className="mt-0.5 text-[11px] text-slate-400">Add equipment or locations to generate QR stickers.</p>
+                <p className="mt-0.5 text-[11px] text-slate-400">Add equipment, items, or locations to generate QR stickers.</p>
               </div>
             ) : (
               <div className="pt-3.5">
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5">
-                  {previewAssets.map((asset) => {
-                    const catalogItem = catalogMap.get(asset.catalog_item_id);
-                    const loc = asset.location_id ? locationMap.get(asset.location_id) : undefined;
-                    const name = catalogItem?.name || asset.asset_code || 'Equipment Item';
-                    const code = asset.asset_code || asset.id;
-                    const locName = loc?.name || (asset.serial_number ? `SN ${asset.serial_number}` : 'IDEA Lab');
-                    const qrUrl = previewQrCodes[code];
+                  {visibleStickerItems.map((item) => {
+                    const qrUrl = previewQrCodes[item.code];
 
                     return (
                       <button
-                        key={asset.id}
+                        key={item.id}
                         type="button"
                         onClick={onOpenBatchLabels}
                         className="group relative flex flex-col items-center justify-between rounded-xl border border-slate-200/80 bg-white p-2.5 text-center shadow-2xs hover:border-[#0071e3] hover:shadow-xs hover:scale-[1.01] transition-all cursor-pointer overflow-hidden"
-                        title={`Select & print: ${name}`}
+                        title={`Select & print: ${item.name}`}
                       >
                         {/* Miniature physical sticker cut guide boundary */}
                         <div className="absolute inset-0 border border-dashed border-slate-200/90 rounded-xl pointer-events-none group-hover:border-blue-300 transition-colors" />
 
-                        {/* Top Org Banner */}
-                        <div className="w-full text-[7.5px] font-bold tracking-wider uppercase text-slate-400 truncate">
-                          AICTE IDEA LAB
+                        {/* Top Org Banner with Entity Type Tag */}
+                        <div className="w-full flex items-center justify-between text-[7px] font-bold tracking-wider uppercase text-slate-400">
+                          <span className="truncate">AICTE IDEA LAB</span>
+                          <span className="text-[6.5px] px-1 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200/60 ml-1 shrink-0 font-medium lowercase first-letter:uppercase">
+                            {item.tag}
+                          </span>
                         </div>
 
                         {/* Mini QR Code */}
                         <div className="my-1.5 w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center bg-slate-50/70 rounded-md border border-slate-100 overflow-hidden">
                           {qrUrl ? (
-                            <img src={qrUrl} alt={code} className="w-full h-full object-contain" />
+                            <img src={qrUrl} alt={item.code} className="w-full h-full object-contain" />
                           ) : (
                             <QrCode className="w-7 h-7 text-slate-300" />
                           )}
@@ -492,14 +557,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
                         {/* Mini Labels */}
                         <div className="w-full min-w-0">
-                          <p className="text-[10.5px] font-bold text-slate-800 truncate" title={name}>
-                            {name}
+                          <p className="text-[10.5px] font-bold text-slate-800 truncate" title={item.name}>
+                            {item.name}
                           </p>
                           <p className="text-[8.5px] font-mono text-slate-500 bg-slate-100/80 rounded px-1 py-0.5 mt-0.5 truncate">
-                            {code.length > 14 ? `…${code.slice(-8)}` : code}
+                            {item.code.length > 14 ? `…${item.code.slice(-8)}` : item.code}
                           </p>
-                          <p className="text-[8px] text-slate-400 truncate mt-0.5" title={locName}>
-                            {locName}
+                          <p className="text-[8px] text-slate-400 truncate mt-0.5" title={item.subtitle}>
+                            {item.subtitle}
                           </p>
                         </div>
                       </button>
@@ -508,10 +573,18 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 </div>
 
                 <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
-                  <span>{assets.length} items ready for printing</span>
-                  <span className="font-medium text-slate-600">
-                    {assets.filter((a) => a.status === 'AVAILABLE').length} Available
+                  <span>
+                    Showing {visibleStickerItems.length} of {allStickerItems.length} stickers
                   </span>
+                  {allStickerItems.length > 6 && (
+                    <button
+                      type="button"
+                      onClick={() => setShowAllQRs(!showAllQRs)}
+                      className="font-semibold text-[var(--color-idea-blue)] hover:underline cursor-pointer"
+                    >
+                      {showAllQRs ? 'Show Less' : `View All (${allStickerItems.length})`}
+                    </button>
+                  )}
                 </div>
               </div>
             )}

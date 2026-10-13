@@ -148,7 +148,7 @@ export async function approveAndHandoverLabRequest(request: Request, staff: User
 
         const asset = assetSnapshot.data();
         if (asset.status && asset.status !== 'AVAILABLE') {
-          throw new Error(`${asset.asset_code || 'This asset'} is not available to hand over.`);
+          throw new Error(`${asset.name || asset.asset_code || 'This asset'} is not available to hand over.`);
         }
 
         assetIdsToHandOver.add(assetId);
@@ -174,7 +174,7 @@ export async function approveAndHandoverLabRequest(request: Request, staff: User
             issued_to_user_id: currentRequest.user_id,
             request_id: request.id,
             processed_by_user_id: staff.id,
-            remarks: `Handed over asset ${asset.asset_code || assetId} via ${currentRequest.request_number}`,
+            remarks: `Handed over asset ${asset.name || asset.asset_code || assetId} via ${currentRequest.request_number}`,
             created_at: serverTimestamp(),
           },
         });
@@ -313,7 +313,7 @@ export async function completeLabRequest(
         issued_to_user_id: request.user_id,
         request_id: request.id,
         processed_by_user_id: staff.id,
-        remarks: `Returned asset ${asset.asset_code || line.asset_id} via ${request.request_number}`,
+        remarks: `Returned asset ${asset.name || asset.asset_code || line.asset_id} via ${request.request_number}`,
         created_at: serverTimestamp(),
       });
     }

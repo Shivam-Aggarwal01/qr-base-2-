@@ -255,7 +255,7 @@ export const ActivityView: React.FC<ActivityViewProps> = ({ transactions, catalo
 
                   const isAssetTransaction = Boolean(tx.asset_id);
                   const displayName = isAssetTransaction
-                    ? asset?.name || asset?.asset_code || 'Unknown asset'
+                    ? asset?.name || 'Equipment'
                     : catalogItem?.name || 'Unknown item';
                   const config = TYPE_CONFIG[tx.transaction_type];
                   const { date, time } = formatDateTime(tx.created_at);

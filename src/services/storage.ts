@@ -347,7 +347,7 @@ export class InventoryStorage {
       issued_to_user_id: toUserId,
       request_id: requestId,
       processed_by_user_id: activeUser.id,
-      remarks: remarks || `Issued asset ${asset.asset_code}`,
+      remarks: remarks || `Issued asset ${asset.name || asset.asset_code}`,
       created_at: now,
     };
     this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...txs]);
@@ -400,7 +400,7 @@ export class InventoryStorage {
       to_location_id: toLocationId,
       issued_to_user_id: previousUser || undefined,
       processed_by_user_id: activeUser.id,
-      remarks: remarks || `Returned asset ${asset.asset_code}`,
+      remarks: remarks || `Returned asset ${asset.name || asset.asset_code}`,
       created_at: now,
     };
     this.save(STORAGE_KEYS.TRANSACTIONS, [newTx, ...txs]);
