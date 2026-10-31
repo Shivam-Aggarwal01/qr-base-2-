@@ -26,7 +26,15 @@ const STORAGE_KEYS = {
   ACTIVE_USER: 'lablogic_active_user_v1',
 };
 
-const VALID_ASSET_STATUSES: AssetStatus[] = ['AVAILABLE', 'ISSUED', 'UNDER_REPAIR', 'DAMAGED', 'LOST', 'RETIRED'];
+const VALID_ASSET_STATUSES: AssetStatus[] = [
+  'AVAILABLE',
+  'ISSUED',
+  'UNDER_REVIEW',
+  'UNDER_REPAIR',
+  'DAMAGED',
+  'LOST',
+  'RETIRED',
+];
 
 const BLOCKED_ISSUE_STATUSES = new Set<AssetStatus>(['DAMAGED', 'UNDER_REPAIR', 'LOST', 'RETIRED']);
 

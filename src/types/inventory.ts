@@ -5,14 +5,32 @@
 // Users never enter or see internal codes.
 // ============================================================
 
-export type UserRole = 'ADMIN' | 'STUDENT_AMBASSADOR' | 'STUDENT_LEAD' | 'STUDENT';
+export type UserRole =
+  | 'ADMIN'
+  | 'INSTITUTION_MANAGER'
+  | 'RESOURCE_OWNER'
+  | 'STUDENT_AMBASSADOR'
+  | 'STUDENT_LEAD'
+  | 'STUDENT';
 
 export type RequestUsage = 'CONSUMABLE' | 'REUSABLE';
 
-export type AssetStatus = 'AVAILABLE' | 'ISSUED' | 'UNDER_REPAIR' | 'DAMAGED' | 'LOST' | 'RETIRED';
+export type AssetStatus = 'AVAILABLE' | 'ISSUED' | 'UNDER_REVIEW' | 'UNDER_REPAIR' | 'DAMAGED' | 'LOST' | 'RETIRED';
 
 export type RequestStatus =
-  'PENDING' | 'APPROVED' | 'REJECTED' | 'HANDED_OVER' | 'RETURN_REQUESTED' | 'COMPLETED' | 'PARTIAL' | 'CANCELLED';
+  | 'PENDING'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'WAITLISTED'
+  | 'CHECKED_IN'
+  | 'HANDED_OVER'
+  | 'RETURNED'
+  | 'RETURN_REQUESTED'
+  | 'COMPLETED'
+  | 'OVERDUE'
+  | 'UNDER_REVIEW'
+  | 'PARTIAL'
+  | 'CANCELLED';
 
 export type RequestLineKind = 'CATALOG' | 'ASSET';
 
@@ -162,6 +180,23 @@ export interface Asset {
   box_capacity?: number;
   available_in_box?: number;
   notes?: string;
+  description?: string;
+  category?: string;
+  institution?: string;
+  owner_id?: string | null;
+  image_urls?: string[];
+  eligibility_requirements?: string;
+  eligible_user_ids?: string[];
+  training_requirements?: string;
+  trained_user_ids?: string[];
+  safety_instructions?: string;
+  usage_restrictions?: string;
+  approval_required?: boolean;
+  booking_slot_minutes?: number;
+  max_consecutive_bookings?: number;
+  booking_revision?: number;
+  last_booking_id?: string | null;
+  checkout_location_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -206,6 +241,16 @@ export interface Request {
   handed_over_by_user_id?: string | null;
   handed_over_at?: string | null;
   deadline_at?: string | null;
+  resource_asset_id?: string | null;
+  booking_start_at?: string | null;
+  booking_end_at?: string | null;
+  checked_in_at?: string | null;
+  checked_out_at?: string | null;
+  initial_condition?: string | null;
+  final_condition?: string | null;
+  damage_reported?: boolean;
+  return_verified_by_user_id?: string | null;
+  completed_at?: string | null;
   remarks?: string;
   created_at: string;
   updated_at: string;

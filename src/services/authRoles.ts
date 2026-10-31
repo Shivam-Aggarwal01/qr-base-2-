@@ -1,7 +1,9 @@
 import type { UserRole } from '../types/inventory';
 
 export const ROLE_PRIORITY: Record<UserRole, number> = {
-  ADMIN: 3,
+  ADMIN: 5,
+  INSTITUTION_MANAGER: 4,
+  RESOURCE_OWNER: 3,
   STUDENT_LEAD: 2,
   STUDENT_AMBASSADOR: 2,
   STUDENT: 1,
@@ -17,7 +19,12 @@ export function isStudent(role: UserRole | null | undefined): boolean {
 }
 
 export function isStaff(role: UserRole | null | undefined): boolean {
-  return role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
+  return (
+    role === 'ADMIN' ||
+    role === 'INSTITUTION_MANAGER' ||
+    role === 'STUDENT_LEAD' ||
+    role === 'STUDENT_AMBASSADOR'
+  );
 }
 
 export function isAmbassador(role: UserRole | null | undefined): boolean {
@@ -33,23 +40,23 @@ export function isAdmin(role: UserRole | null | undefined): boolean {
 }
 
 export function canIssueInventory(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
+  return isStaff(role);
 }
 
 export function canApproveRequests(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
+  return isStaff(role) || role === 'RESOURCE_OWNER';
 }
 
 export function canManageCatalog(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
+  return isStaff(role);
 }
 
 export function canManageLocations(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
+  return isStaff(role);
 }
 
 export function canManageEquipment(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
+  return isStaff(role) || role === 'RESOURCE_OWNER';
 }
 
 export function canManageUsers(role: UserRole | null | undefined): boolean {
@@ -61,5 +68,5 @@ export function canApproveNewUsers(role: UserRole | null | undefined): boolean {
 }
 
 export function canReturnOrRepairItems(role: UserRole | null | undefined): boolean {
-  return hasMinimumRole(role, 'STUDENT_AMBASSADOR');
+  return isStaff(role);
 }

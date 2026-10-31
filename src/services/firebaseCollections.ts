@@ -68,12 +68,29 @@ export async function getCollection<T>(name: string): Promise<T[]> {
   try {
     requireSignedInUser();
 
+    let requestDocuments: QueryDocumentSnapshot[] | undefined;
     let collectionRef: Query<DocumentData, DocumentData> = collection(db, name);
     if (name === 'requests' && auth.currentUser) {
       const userDoc = await getDoc(doc(db, 'users', auth.currentUser.uid));
       const userRole = userDoc.exists() ? (userDoc.data().role as string | undefined) : undefined;
       if (!userRole || userRole === 'STUDENT') {
         collectionRef = query(collectionRef, where('user_id', '==', auth.currentUser.uid));
+      } else if (userRole === 'RESOURCE_OWNER') {
+        const [ownRequests, ownedAssets] = await Promise.all([
+          getDocs(query(collectionRef, where('user_id', '==', auth.currentUser.uid))),
+          getDocs(query(collection(db, 'assets'), where('owner_id', '==', auth.currentUser.uid))),
+        ]);
+        const ownedAssetIds = ownedAssets.docs.map((asset) => asset.id);
+        const ownerRequests: QueryDocumentSnapshot[] = [];
+        for (let index = 0; index < ownedAssetIds.length; index += 30) {
+          const assetIds = ownedAssetIds.slice(index, index + 30);
+          if (assetIds.length === 0) continue;
+          const snapshot = await getDocs(query(collectionRef, where('resource_asset_id', 'in', assetIds)));
+          ownerRequests.push(...snapshot.docs);
+        }
+        requestDocuments = Array.from(
+          new Map([...ownRequests.docs, ...ownerRequests].map((document) => [document.id, document])).values()
+        );
       }
     }
 
@@ -85,10 +102,10 @@ export async function getCollection<T>(name: string): Promise<T[]> {
       }
     }
 
-    const snapshot = await getDocs(collectionRef);
-    console.log(`📂 Firestore read ${name}: ${snapshot.size} docs`);
+    const snapshotDocuments = requestDocuments ?? (await getDocs(collectionRef)).docs;
+    console.log(`📂 Firestore read ${name}: ${snapshotDocuments.length} docs`);
 
-    const items = snapshot.docs.map((document: QueryDocumentSnapshot) => {
+    const items = snapshotDocuments.map((document: QueryDocumentSnapshot) => {
       const raw = document.data();
 
       // Normalize: trim whitespace from all keys (fixes keys like 'name ')
@@ -102,6 +119,10 @@ export async function getCollection<T>(name: string): Promise<T[]> {
       if (cleaned.updated_at) cleaned.updated_at = tsToString(cleaned.updated_at);
       if (cleaned.assigned_at) cleaned.assigned_at = tsToString(cleaned.assigned_at);
       if (cleaned.returned_at) cleaned.returned_at = tsToString(cleaned.returned_at);
+      if (cleaned.booking_start_at) cleaned.booking_start_at = tsToString(cleaned.booking_start_at);
+      if (cleaned.booking_end_at) cleaned.booking_end_at = tsToString(cleaned.booking_end_at);
+      if (cleaned.checked_in_at) cleaned.checked_in_at = tsToString(cleaned.checked_in_at);
+      if (cleaned.checked_out_at) cleaned.checked_out_at = tsToString(cleaned.checked_out_at);
 
       return {
         ...cleaned,

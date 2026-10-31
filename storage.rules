@@ -1,0 +1,33 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isStaff() {
+      return signedIn() &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in [
+          'ADMIN',
+          'INSTITUTION_MANAGER',
+          'STUDENT_LEAD',
+          'STUDENT_AMBASSADOR'
+        ];
+    }
+
+    match /resources/{assetId}/{fileName} {
+      allow read: if signedIn();
+      allow write: if signedIn() &&
+        request.resource != null &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*') &&
+        (
+          isStaff() ||
+          firestore.get(
+            /databases/(default)/documents/assets/$(assetId)
+          ).data.owner_id == request.auth.uid
+        );
+    }
+  }
+}

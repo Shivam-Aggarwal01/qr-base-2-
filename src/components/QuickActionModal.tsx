@@ -16,6 +16,7 @@ import { canIssueInventory, canReturnOrRepairItems, isStudent } from '../service
 import confetti from 'canvas-confetti';
 import { getLocationFullPathString, inferLocationType } from '../utils/locationHierarchy';
 import { LocationPathBreadcrumb } from './LocationsView';
+import { recordResourceQrAction } from '../services/resourceSharing';
 
 interface QuickActionModalProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ interface QuickActionModalProps {
   locations: Location[];
   catalogItems: CatalogItem[];
   assets: Asset[];
+  requests: Request[];
   stockLevels: StockLevel[];
   activeUser: User;
   onOpenNewRequest: (items: RequestLineDraft[]) => void;
@@ -44,6 +46,7 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   locations,
   catalogItems,
   assets,
+  requests,
   stockLevels,
   activeUser,
   onOpenNewRequest,
@@ -61,6 +64,10 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
   const [targetCatalogItemId, setTargetCatalogItemId] = useState('');
   const [targetStockQty, setTargetStockQty] = useState(1);
   const [targetMoveAssetId, setTargetMoveAssetId] = useState('');
+  const [resourceCondition, setResourceCondition] = useState('');
+  const [resourceActionError, setResourceActionError] = useState<string | null>(null);
+  const [resourceActionBusy, setResourceActionBusy] = useState(false);
+  const [resourceDamageReported, setResourceDamageReported] = useState(false);
 
   const role = activeUser?.role;
   const quickStatusOptions: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST', 'RETIRED'];
@@ -155,6 +162,10 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
     setTargetCatalogItemId('');
     setTargetStockQty(1);
     setTargetMoveAssetId('');
+    setResourceCondition('');
+    setResourceActionError(null);
+    setResourceActionBusy(false);
+    setResourceDamageReported(false);
   };
 
   const handleClose = () => {
@@ -194,6 +205,27 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
 
     if (studentMode) {
       const requestBlockedByAssetStatus = asset.status !== 'AVAILABLE';
+      const booking = requests.find(
+        (request) =>
+          request.resource_asset_id === asset.id &&
+          request.user_id === activeUser.id &&
+          ['APPROVED', 'CHECKED_IN'].includes(request.status)
+      );
+      const handleResourceAction = async (action: 'CHECK_IN' | 'CHECK_OUT') => {
+        if (!booking) return;
+        setResourceActionBusy(true);
+        setResourceActionError(null);
+        try {
+          await recordResourceQrAction(booking, asset, activeUser, action, resourceCondition, resourceDamageReported);
+          setResourceCondition('');
+          setResourceDamageReported(false);
+          onRefreshData();
+        } catch (error) {
+          setResourceActionError(error instanceof Error ? error.message : 'QR transaction failed.');
+        } finally {
+          setResourceActionBusy(false);
+        }
+      };
 
       return (
         <div className="space-y-6">
@@ -236,6 +268,68 @@ export const QuickActionModal: React.FC<QuickActionModalProps> = ({
               </div>
             </div>
           </div>
+
+          {asset.description && <p className="text-xs leading-relaxed text-[var(--color-idea-muted)]">{asset.description}</p>}
+          {asset.safety_instructions && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+              <strong>Safety:</strong> {asset.safety_instructions}
+            </div>
+          )}
+          {asset.usage_restrictions && (
+            <p className="text-xs text-[var(--color-idea-muted)]"><strong>Usage restrictions:</strong> {asset.usage_restrictions}</p>
+          )}
+          {booking && (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleResourceAction(booking.status === 'APPROVED' ? 'CHECK_IN' : 'CHECK_OUT');
+              }}
+              className="space-y-3 rounded-xl border border-[var(--color-idea-border)] bg-white p-4"
+            >
+              <div>
+                <h5 className="text-xs font-bold text-[var(--color-idea-text)]">
+                  {booking.status === 'APPROVED' ? 'Booking approved · Check in' : 'Checked in · Check out'}
+                </h5>
+                <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
+                  Booking {booking.request_number} · {booking.booking_start_at ? new Date(booking.booking_start_at).toLocaleString() : 'Scheduled'}
+                </p>
+              </div>
+              <label className="block text-[10px] font-semibold uppercase tracking-wide text-[var(--color-idea-muted)]">
+                {booking.status === 'APPROVED' ? 'Before-use condition' : 'After-use condition'}
+                <textarea
+                  required
+                  value={resourceCondition}
+                  onChange={(event) => setResourceCondition(event.target.value)}
+                  rows={2}
+                  className="idea-input mt-1 w-full resize-y p-2.5 text-xs normal-case"
+                  placeholder="Describe the resource condition"
+                />
+              </label>
+              {booking.status === 'CHECKED_IN' && (
+                <label className="flex items-center gap-2 text-xs text-red-700">
+                  <input
+                    type="checkbox"
+                    checked={resourceDamageReported}
+                    onChange={(event) => setResourceDamageReported(event.target.checked)}
+                  />
+                  Report damage or an incident
+                </label>
+              )}
+              {resourceActionError && <p role="alert" className="text-xs text-red-700">{resourceActionError}</p>}
+              <button
+                type="submit"
+                disabled={resourceActionBusy}
+                className="w-full rounded-xl bg-[var(--color-idea-deep-blue)] px-3 py-2.5 text-xs font-semibold text-white disabled:opacity-50"
+              >
+                {resourceActionBusy ? 'Recording…' : booking.status === 'APPROVED' ? 'Check in with QR' : 'Check out with QR'}
+              </button>
+            </form>
+          )}
+          {!booking && asset.status === 'AVAILABLE' && (
+            <p className="rounded-xl border border-[var(--color-idea-border)] bg-white p-3 text-xs text-[var(--color-idea-muted)]">
+              Scan identifies this resource only. An approved booking and your verified account are required for check-in.
+            </p>
+          )}
 
           {requestBlockedByAssetStatus ? (
             <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs text-red-800">

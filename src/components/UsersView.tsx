@@ -12,10 +12,17 @@ interface UsersViewProps {
   onDeleteUser?: (userId: string) => Promise<void>;
   accountRequests?: AccountRequest[];
   onReviewAccountRequest?: (requestId: string, status: 'APPROVED' | 'REJECTED') => Promise<void>;
+  canReviewAccountRequests?: boolean;
   onRefreshData: () => void;
 }
 type LoanItem = { id: string; name: string; quantity: number };
-const EDITABLE_ROLES: User['role'][] = ['STUDENT', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR'];
+const EDITABLE_ROLES: User['role'][] = [
+  'STUDENT',
+  'RESOURCE_OWNER',
+  'INSTITUTION_MANAGER',
+  'STUDENT_LEAD',
+  'STUDENT_AMBASSADOR',
+];
 const ACTIVE_ASSET_STATUSES = new Set([
   'ISSUED',
   'CHECKED_OUT',
@@ -37,6 +44,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
   onDeleteUser,
   accountRequests = [],
   onReviewAccountRequest,
+  canReviewAccountRequests = false,
 }) => {
   const [searchFilter, setSearchFilter] = useState('');
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -54,6 +62,10 @@ export const UsersView: React.FC<UsersViewProps> = ({
     switch (role) {
       case 'ADMIN':
         return 'Administrator';
+      case 'INSTITUTION_MANAGER':
+        return 'Institution Manager';
+      case 'RESOURCE_OWNER':
+        return 'Resource Owner';
       case 'STUDENT_AMBASSADOR':
         return 'Student Ambassador';
       case 'STUDENT_LEAD':
@@ -218,7 +230,7 @@ export const UsersView: React.FC<UsersViewProps> = ({
           </div>{' '}
         </div>{' '}
         {/* Pending Account Requests */}{' '}
-        {isAdmin && pendingAccountRequests.length > 0 && (
+        {(isAdmin || canReviewAccountRequests) && pendingAccountRequests.length > 0 && (
           <section className=" bg-white border border-[var(--color-idea-border)] rounded-2xl overflow-hidden ">
             {' '}
             <div className="px-5 py-4 border-b border-[var(--color-idea-border)]">

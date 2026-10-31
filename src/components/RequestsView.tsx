@@ -20,6 +20,7 @@ import {
   requestLabReturn,
   reviewLabRequest,
 } from '../services/requestWorkflow';
+import { cancelResourceBooking } from '../services/resourceSharing';
 import confetti from 'canvas-confetti';
 
 interface RequestsViewProps {
@@ -37,7 +38,18 @@ interface RequestsViewProps {
 // The UI treats it as the same state as APPROVED / Issued.
 type FilterKey = RequestStatus | 'ALL';
 
-const FILTERS: FilterKey[] = ['ALL', 'PENDING', 'APPROVED', 'RETURN_REQUESTED', 'COMPLETED', 'REJECTED'];
+const FILTERS: FilterKey[] = [
+  'ALL',
+  'PENDING',
+  'WAITLISTED',
+  'APPROVED',
+  'CHECKED_IN',
+  'RETURNED',
+  'UNDER_REVIEW',
+  'OVERDUE',
+  'COMPLETED',
+  'REJECTED',
+];
 
 const STATUS_CFG: Record<
   string,
@@ -53,7 +65,7 @@ const STATUS_CFG: Record<
     icon: <Clock className="w-3 h-3" />,
   },
   APPROVED: {
-    label: 'Issued',
+    label: 'Approved',
     badge: 'idea-success',
     icon: <CheckCircle2 className="w-3 h-3" />,
   },
@@ -61,6 +73,31 @@ const STATUS_CFG: Record<
     label: 'Issued',
     badge: 'idea-success',
     icon: <CheckCircle2 className="w-3 h-3" />,
+  },
+  WAITLISTED: {
+    label: 'Waitlisted',
+    badge: 'idea-warning',
+    icon: <Clock className="w-3 h-3" />,
+  },
+  CHECKED_IN: {
+    label: 'Checked in',
+    badge: 'idea-info',
+    icon: <CheckCircle2 className="w-3 h-3" />,
+  },
+  RETURNED: {
+    label: 'Return pending verification',
+    badge: 'idea-warning',
+    icon: <RotateCcw className="w-3 h-3" />,
+  },
+  UNDER_REVIEW: {
+    label: 'Under review',
+    badge: 'idea-warning',
+    icon: <AlertTriangle className="w-3 h-3" />,
+  },
+  OVERDUE: {
+    label: 'Overdue',
+    badge: 'idea-error',
+    icon: <AlertTriangle className="w-3 h-3" />,
   },
   RETURN_REQUESTED: {
     label: 'Return requested',
@@ -117,6 +154,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const [processingReturnId, setProcessingReturnId] = useState<string | null>(null);
+  const [processingCancelId, setProcessingCancelId] = useState<string | null>(null);
 
   const canProcessRequests = canApproveRequests(activeUser?.role);
 
@@ -134,7 +172,9 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     }
 
     if (filter === 'APPROVED') {
-      return visibleRequests.filter((r) => r.status === 'APPROVED' || r.status === 'HANDED_OVER').length;
+      return visibleRequests.filter(
+        (r) => r.status === 'APPROVED' || r.status === 'HANDED_OVER' || r.status === 'CHECKED_IN'
+      ).length;
     }
 
     return visibleRequests.filter((r) => r.status === filter).length;
@@ -150,7 +190,7 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     }
 
     if (statusFilter === 'APPROVED') {
-      return r.status === 'APPROVED' || r.status === 'HANDED_OVER';
+      return r.status === 'APPROVED' || r.status === 'HANDED_OVER' || r.status === 'CHECKED_IN';
     }
 
     return r.status === statusFilter;
@@ -307,6 +347,21 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
     }
   };
 
+  const handleWaitlist = async () => {
+    if (!selectedRequest) return;
+    setProcessingError(null);
+    setIsProcessing(true);
+    try {
+      await reviewLabRequest(selectedRequest, 'WAITLISTED', activeUser, remarks.trim());
+      closeModal();
+      onRefreshData();
+    } catch (error) {
+      setProcessingError(error instanceof Error ? error.message : 'Failed to update the booking.');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleStudentReturnRequest = async (request: Request) => {
     setProcessingReturnId(request.id);
 
@@ -317,6 +372,19 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
       window.alert(error?.message || 'Failed to request a return.');
     } finally {
       setProcessingReturnId(null);
+    }
+  };
+
+  const handleCancelBooking = async (request: Request) => {
+    if (!window.confirm(`Cancel booking ${request.request_number}?`)) return;
+    setProcessingCancelId(request.id);
+    try {
+      await cancelResourceBooking(request, activeUser);
+      onRefreshData();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : 'Failed to cancel this booking.');
+    } finally {
+      setProcessingCancelId(null);
     }
   };
 
@@ -471,6 +539,21 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                           <span className="font-mono font-bold text-[var(--color-idea-blue)] text-xs tracking-wide">
                             {req.request_number}
                           </span>
+                          {req.booking_start_at && (
+                            <span className="mt-1 block max-w-40 text-[10px] leading-snug text-[var(--color-idea-muted)]">
+                              {new Date(req.booking_start_at).toLocaleString()}
+                            </span>
+                          )}
+                          {req.checked_in_at && (
+                            <span className="mt-1 block text-[9px] text-[var(--color-idea-muted)]">
+                              In {new Date(req.checked_in_at).toLocaleString()}
+                            </span>
+                          )}
+                          {req.checked_out_at && (
+                            <span className="mt-1 block text-[9px] text-[var(--color-idea-muted)]">
+                              Out {new Date(req.checked_out_at).toLocaleString()}
+                            </span>
+                          )}
                         </td>
 
                         <td className="px-4 py-3">
@@ -529,18 +612,20 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                         </td>
 
                         <td className="px-4 py-3 text-right">
-                          {req.status === 'PENDING' && canProcessRequests && (
+                          {(req.status === 'PENDING' || req.status === 'WAITLISTED') && canProcessRequests && (
                             <button
                               onClick={() => openModal(req, 'review')}
                               className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] hover:bg-[var(--color-idea-blue)] hover:text-white transition-colors cursor-pointer whitespace-nowrap"
                             >
-                              Review
+                              {req.status === 'WAITLISTED' ? 'Review waitlist' : 'Review'}
                             </button>
                           )}
 
                           {(req.status === 'APPROVED' ||
                             req.status === 'HANDED_OVER' ||
-                            req.status === 'RETURN_REQUESTED') &&
+                            req.status === 'RETURN_REQUESTED' ||
+                            req.status === 'RETURNED' ||
+                            req.status === 'UNDER_REVIEW') &&
                             canProcessRequests && (
                               <button
                                 onClick={() => openModal(req, 'complete')}
@@ -554,7 +639,8 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                               </button>
                             )}
 
-                          {(req.status === 'HANDED_OVER' || req.status === 'APPROVED') &&
+                          {!req.resource_asset_id &&
+                            (req.status === 'HANDED_OVER' || req.status === 'APPROVED') &&
                             activeUser.role === 'STUDENT' &&
                             req.items?.some(
                               (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
@@ -565,6 +651,18 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                                 className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-idea-blue)] text-[var(--color-idea-blue)] hover:bg-[var(--color-idea-blue)] hover:text-white transition-colors cursor-pointer whitespace-nowrap disabled:cursor-wait disabled:opacity-60"
                               >
                                 {processingReturnId === req.id ? 'Requesting…' : 'Request Return'}
+                              </button>
+                            )}
+                          {isStudent(activeUser.role) &&
+                            req.resource_asset_id &&
+                            ['PENDING', 'APPROVED', 'WAITLISTED'].includes(req.status) && (
+                              <button
+                                type="button"
+                                onClick={() => void handleCancelBooking(req)}
+                                disabled={processingCancelId === req.id}
+                                className="ml-1 rounded-lg border border-red-200 px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50 disabled:opacity-50"
+                              >
+                                {processingCancelId === req.id ? 'Cancelling…' : 'Cancel booking'}
                               </button>
                             )}
                         </td>
@@ -620,6 +718,17 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
               Cancel
             </button>
 
+            {modalMode === 'review' && selectedRequest?.resource_asset_id && selectedRequest.status === 'PENDING' && (
+              <button
+                type="button"
+                onClick={handleWaitlist}
+                disabled={isProcessing}
+                className="flex-1 rounded-xl border border-[var(--color-idea-border)] px-3 py-2.5 text-xs font-semibold text-[var(--color-idea-text)] disabled:opacity-50"
+              >
+                Waitlist
+              </button>
+            )}
+
             {modalMode === 'review' && (
               <button
                 type="button"
@@ -641,7 +750,9 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                 {isProcessing
                   ? 'Processing…'
                   : modalMode === 'review'
-                    ? 'Approve & Issue'
+                    ? selectedRequest?.resource_asset_id
+                      ? 'Approve booking'
+                      : 'Approve & Issue'
                     : selectedRequest?.items?.some(
                           (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
                         )
@@ -662,7 +773,9 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
             )}
 
             <p className="text-xs text-[var(--color-idea-muted)] leading-relaxed">
-              {modalMode === 'review'
+              {modalMode === 'review' && selectedRequest.resource_asset_id
+                ? `Approve this booking for ${selectedRequest.booking_start_at ? new Date(selectedRequest.booking_start_at).toLocaleString() : 'the requested time'}. The borrower must scan the resource QR code to check in.`
+                : modalMode === 'review'
                 ? 'Approving deducts stock and marks any assets issued immediately — there is no separate handover step.'
                 : selectedRequest.items?.some(
                       (item) => getRequestLineKind(item) === 'ASSET' || item.usage === 'REUSABLE'
@@ -670,6 +783,17 @@ export const RequestsView: React.FC<RequestsViewProps> = ({
                   ? 'Confirm the items have physically come back. Stock and asset status will be restored and the request closed.'
                   : 'Mark this request as completed. Consumables are already deducted.'}
             </p>
+
+            {selectedRequest.resource_asset_id && (
+              <div className="rounded-xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/40 p-3 text-xs">
+                <p><strong>Booking:</strong> {selectedRequest.booking_start_at ? new Date(selectedRequest.booking_start_at).toLocaleString() : '—'} to {selectedRequest.booking_end_at ? new Date(selectedRequest.booking_end_at).toLocaleString() : '—'}</p>
+                {selectedRequest.initial_condition && <p className="mt-2"><strong>Before:</strong> {selectedRequest.initial_condition}</p>}
+                {selectedRequest.final_condition && <p className="mt-2"><strong>After:</strong> {selectedRequest.final_condition}</p>}
+                {selectedRequest.damage_reported && (
+                  <p className="mt-2 font-semibold text-red-700">Damage or incident reported — review before closing this booking.</p>
+                )}
+              </div>
+            )}
 
             <div className="space-y-1.5">
               <p className="text-[9px] font-bold uppercase tracking-widest text-[var(--color-idea-muted)]">

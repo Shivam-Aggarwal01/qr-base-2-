@@ -83,7 +83,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           label: 'Activity',
           icon: History,
         },
-        ...(userRole === 'ADMIN'
+        ...(userRole === 'ADMIN' || userRole === 'INSTITUTION_MANAGER'
           ? [
               {
                 id: 'users' as ViewMode,

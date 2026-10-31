@@ -36,11 +36,43 @@ service cloud.firestore {
     function isStaff() {
       return role() in [
         'ADMIN',
+        'INSTITUTION_MANAGER',
         'STUDENT_LEAD',
         'STUDENT_AMBASSADOR'
       ];
     }
 
+    function isResourceOwner() {
+      return role() == 'RESOURCE_OWNER';
+    }
+
+    function ownsResource(assetId) {
+      return signedIn() &&
+        exists(/databases/$(database)/documents/assets/$(assetId)) &&
+        get(/databases/$(database)/documents/assets/$(assetId)).data.owner_id == request.auth.uid;
+    }
+
+    function meetsResourceRequirements(assetId) {
+      let resourceData = get(
+        /databases/$(database)/documents/assets/$(assetId)
+      ).data;
+      return (
+          !('eligibility_requirements' in resourceData) ||
+          resourceData.eligibility_requirements == '' ||
+          (
+            resourceData.eligible_user_ids is list &&
+            request.auth.uid in resourceData.eligible_user_ids
+          )
+        ) &&
+        (
+          !('training_requirements' in resourceData) ||
+          resourceData.training_requirements == '' ||
+          (
+            resourceData.trained_user_ids is list &&
+            request.auth.uid in resourceData.trained_user_ids
+          )
+        );
+    }
     function isStudent() {
       return role() == 'STUDENT';
     }
@@ -117,12 +149,13 @@ service cloud.firestore {
       allow read: if signedIn() &&
         (
           request.auth.uid == requestId ||
-          isAdmin()
+          isAdmin() ||
+          role() == 'INSTITUTION_MANAGER'
         );
 
       // Only admins can approve, reject, or otherwise modify
       // an account request.
-      allow update: if isAdmin();
+      allow update: if isAdmin() || role() == 'INSTITUTION_MANAGER';
 
       // Only admins can delete requests.
       allow delete: if isAdmin();
@@ -165,7 +198,118 @@ service cloud.firestore {
 
     match /assets/{assetId} {
       allow read: if signedIn();
-      allow create, update, delete: if isStaff();
+      allow create: if isStaff() ||
+        (isResourceOwner() && signedIn() && request.resource.data.owner_id == request.auth.uid);
+      allow update: if isStaff() ||
+        (
+          isResourceOwner() &&
+          resource.data.owner_id == request.auth.uid &&
+          request.resource.data.owner_id == resource.data.owner_id &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'name',
+            'description',
+            'category',
+            'institution',
+            'image_urls',
+            'eligibility_requirements',
+            'eligible_user_ids',
+            'training_requirements',
+            'trained_user_ids',
+            'safety_instructions',
+            'usage_restrictions',
+            'approval_required',
+            'booking_slot_minutes',
+            'max_consecutive_bookings',
+            'status',
+            'assigned_to_user_id',
+            'location_id',
+            'checkout_location_id',
+            'storage_location',
+            'notes',
+            'asset_code',
+            'qr_code',
+            'updated_at'
+          ])
+        ) ||
+        (
+          isResourceOwner() &&
+          resource.data.owner_id == request.auth.uid &&
+          request.resource.data.booking_revision ==
+            resource.data.get('booking_revision', 0) + 1 &&
+          request.resource.data.last_booking_id is string &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'booking_revision',
+            'last_booking_id',
+            'updated_at'
+          ]) &&
+          getAfter(
+            /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+          ).data.resource_asset_id == assetId &&
+          getAfter(
+            /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+          ).data.status == 'APPROVED' &&
+          getAfter(
+            /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+          ).data.approved_by_user_id == request.auth.uid
+        ) ||
+        (
+          signedIn() &&
+          role() == 'STUDENT' &&
+          request.resource.data.booking_revision ==
+            resource.data.get('booking_revision', 0) + 1 &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'booking_revision',
+            'last_booking_id',
+            'updated_at'
+          ]) &&
+          getAfter(
+            /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+          ).data.user_id == request.auth.uid &&
+          getAfter(
+            /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+          ).data.resource_asset_id == assetId &&
+          getAfter(
+            /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+          ).data.status in ['PENDING', 'WAITLISTED', 'APPROVED']
+        ) ||
+        (
+          signedIn() &&
+          role() == 'STUDENT' &&
+          request.resource.data.last_booking_id is string &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'status',
+            'assigned_to_user_id',
+            'location_id',
+            'checkout_location_id',
+            'last_booking_id',
+            'updated_at'
+          ]) &&
+          getAfter(
+            /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+          ).data.user_id == request.auth.uid &&
+          getAfter(
+            /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+          ).data.resource_asset_id == assetId &&
+          (
+            (
+              resource.data.status == 'AVAILABLE' &&
+              request.resource.data.status == 'ISSUED' &&
+              request.resource.data.assigned_to_user_id == request.auth.uid &&
+              getAfter(
+                /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+              ).data.status == 'CHECKED_IN'
+            ) ||
+            (
+              resource.data.status == 'ISSUED' &&
+              request.resource.data.status == 'ISSUED' &&
+              resource.data.assigned_to_user_id == request.auth.uid &&
+              getAfter(
+                /databases/$(database)/documents/requests/$(request.resource.data.last_booking_id)
+              ).data.status == 'RETURNED'
+            )
+          )
+        );
+      allow delete: if isStaff() || (isResourceOwner() && resource.data.owner_id == request.auth.uid);
     }
 
 
@@ -191,29 +335,156 @@ service cloud.firestore {
       allow read: if isStaff() ||
         (
           signedIn() &&
-          resource.data.user_id == request.auth.uid
+          (
+            resource.data.user_id == request.auth.uid ||
+            ownsResource(resource.data.resource_asset_id)
+          )
         );
 
       // A signed-in user can create only their own request.
       allow create: if signedIn() &&
-        request.auth.uid == request.resource.data.user_id;
+        request.auth.uid == request.resource.data.user_id &&
+        (
+          !('resource_asset_id' in request.resource.data) ||
+          (
+            request.resource.data.status in ['PENDING', 'WAITLISTED', 'APPROVED'] &&
+            request.resource.data.booking_start_at is timestamp &&
+            request.resource.data.booking_end_at is timestamp &&
+            request.time < request.resource.data.booking_start_at &&
+            request.resource.data.booking_end_at > request.resource.data.booking_start_at &&
+            exists(/databases/$(database)/documents/assets/$(request.resource.data.resource_asset_id)) &&
+            meetsResourceRequirements(request.resource.data.resource_asset_id) &&
+            getAfter(
+              /databases/$(database)/documents/assets/$(request.resource.data.resource_asset_id)
+            ).data.last_booking_id == requestId &&
+            getAfter(
+              /databases/$(database)/documents/assets/$(request.resource.data.resource_asset_id)
+            ).data.booking_revision ==
+              get(/databases/$(database)/documents/assets/$(request.resource.data.resource_asset_id)).data.get('booking_revision', 0) + 1
+          )
+        );
 
       // Students can request a return for their own issued request.
       // Staff must still confirm receipt and complete the return.
       allow update: if isStaff() ||
         (
-          isStudent() &&
-          resource.data.user_id == request.auth.uid &&
-          resource.data.status in ['HANDED_OVER', 'APPROVED'] &&
-          request.resource.data.status == 'RETURN_REQUESTED' &&
+          isResourceOwner() &&
+          ownsResource(resource.data.resource_asset_id) &&
           request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'status',
+            'approved_by_user_id',
+            'return_verified_by_user_id',
+            'completed_at',
+            'remarks',
             'updated_at'
-          ])
+          ]) &&
+          (
+            (
+              resource.data.status in ['PENDING', 'WAITLISTED'] &&
+              request.resource.data.status in ['APPROVED', 'REJECTED', 'WAITLISTED'] &&
+              request.resource.data.approved_by_user_id == request.auth.uid
+            ) ||
+            (
+              resource.data.status in ['RETURNED', 'UNDER_REVIEW'] &&
+              request.resource.data.status == 'COMPLETED' &&
+              request.resource.data.return_verified_by_user_id == request.auth.uid &&
+              getAfter(
+                /databases/$(database)/documents/assets/$(resource.data.resource_asset_id)
+              ).data.status == (resource.data.damage_reported == true ? 'DAMAGED' : 'AVAILABLE')
+            )
+          )
+        ) ||
+        (
+          isStudent() &&
+          resource.data.user_id == request.auth.uid &&
+          (
+            (
+              resource.data.resource_asset_id is string &&
+              resource.data.status == 'APPROVED' &&
+              request.time >= resource.data.booking_start_at - duration.value(15, 'm') &&
+              request.time <= resource.data.booking_end_at &&
+              meetsResourceRequirements(resource.data.resource_asset_id) &&
+              request.resource.data.status == 'CHECKED_IN' &&
+              request.resource.data.initial_condition is string &&
+              request.resource.data.initial_condition.size() > 0 &&
+              getAfter(
+                /databases/$(database)/documents/assets/$(resource.data.resource_asset_id)
+              ).data.status == 'ISSUED' &&
+              getAfter(
+                /databases/$(database)/documents/assets/$(resource.data.resource_asset_id)
+              ).data.assigned_to_user_id == request.auth.uid &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'checked_in_at',
+                'initial_condition',
+                'updated_at'
+              ])
+            ) ||
+            (
+              resource.data.resource_asset_id is string &&
+              resource.data.status == 'CHECKED_IN' &&
+              request.resource.data.status == 'RETURNED' &&
+              request.resource.data.final_condition is string &&
+              request.resource.data.final_condition.size() > 0 &&
+              request.resource.data.damage_reported is bool &&
+              getAfter(
+                /databases/$(database)/documents/assets/$(resource.data.resource_asset_id)
+              ).data.status == 'ISSUED' &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'checked_out_at',
+                'final_condition',
+                'damage_reported',
+                'updated_at'
+              ])
+            ) ||
+            (
+              resource.data.resource_asset_id == null &&
+              resource.data.status in ['HANDED_OVER', 'APPROVED'] &&
+              request.resource.data.status == 'RETURN_REQUESTED' &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'updated_at'
+              ])
+            ) ||
+            (
+              resource.data.status in ['PENDING', 'APPROVED', 'WAITLISTED'] &&
+              request.resource.data.status == 'CANCELLED' &&
+              request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'updated_at'
+              ])
+            )
+          )
         );
 
       // Only admins can delete requests.
       allow delete: if isAdmin();
+    }
+
+    match /resource_bookings/{bookingId} {
+      allow read: if signedIn();
+      allow create: if signedIn() &&
+        existsAfter(/databases/$(database)/documents/requests/$(bookingId)) &&
+        getAfter(/databases/$(database)/documents/requests/$(bookingId)).data.user_id == request.auth.uid &&
+        getAfter(/databases/$(database)/documents/requests/$(bookingId)).data.resource_asset_id == request.resource.data.resource_id &&
+        getAfter(/databases/$(database)/documents/requests/$(bookingId)).data.booking_start_at == request.resource.data.starts_at &&
+        getAfter(/databases/$(database)/documents/requests/$(bookingId)).data.booking_end_at == request.resource.data.ends_at &&
+        getAfter(/databases/$(database)/documents/requests/$(bookingId)).data.status == request.resource.data.status;
+      allow update: if signedIn() &&
+        request.resource.data.booking_id == resource.data.booking_id &&
+        request.resource.data.resource_id == resource.data.resource_id &&
+        request.resource.data.starts_at == resource.data.starts_at &&
+        request.resource.data.ends_at == resource.data.ends_at &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updated_at']) &&
+        existsAfter(/databases/$(database)/documents/requests/$(bookingId)) &&
+        getAfter(/databases/$(database)/documents/requests/$(bookingId)).data.status == request.resource.data.status &&
+        (
+          isStaff() ||
+          ownsResource(resource.data.resource_id) ||
+          getAfter(/databases/$(database)/documents/requests/$(bookingId)).data.user_id == request.auth.uid
+        );
+      allow delete: if false;
     }
 
 
@@ -273,6 +544,175 @@ service cloud.firestore {
 
       // Audit logs must be written by trusted backend code.
       allow create, update, delete: if false;
+    }
+
+    match /resource_events/{eventId} {
+      allow read: if isStaff() ||
+        (signedIn() && ownsResource(resource.data.resource_id)) ||
+        (
+            signedIn() &&
+            resource.data.booking_id is string &&
+            get(
+              /databases/$(database)/documents/requests/$(resource.data.booking_id)
+            ).data.user_id == request.auth.uid
+        );
+      allow create: if signedIn() &&
+        request.resource.data.actor_user_id == request.auth.uid &&
+        request.resource.data.resource_id is string &&
+        (
+            (
+              request.resource.data.action == 'RESOURCE_CREATED' &&
+              getAfter(
+                /databases/$(database)/documents/assets/$(request.resource.data.resource_id)
+              ).data.owner_id == request.auth.uid
+            ) ||
+            (
+              request.resource.data.booking_id is string &&
+              existsAfter(
+                /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+              ) &&
+              getAfter(
+                /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+              ).data.resource_asset_id == request.resource.data.resource_id &&
+              (
+                (
+                  request.resource.data.action == 'BOOKING_REQUESTED' &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.user_id == request.auth.uid &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.status in ['PENDING', 'WAITLISTED', 'APPROVED']
+                ) ||
+                (
+                  request.resource.data.action == 'BOOKING_APPROVED' &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.approved_by_user_id == request.auth.uid &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.status == 'APPROVED'
+                ) ||
+                (
+                  request.resource.data.action == 'BOOKING_REJECTED' &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.approved_by_user_id == request.auth.uid &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.status == 'REJECTED'
+                ) ||
+                (
+                  request.resource.data.action == 'BOOKING_WAITLISTED' &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.approved_by_user_id == request.auth.uid &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.status == 'WAITLISTED'
+                ) ||
+                (
+                  request.resource.data.action == 'BOOKING_CANCELLED' &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.user_id == request.auth.uid &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.status == 'CANCELLED'
+                ) ||
+                (
+                  request.resource.data.action == 'CHECK_IN' &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.user_id == request.auth.uid &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.status == 'CHECKED_IN'
+                ) ||
+                (
+                  request.resource.data.action == 'CHECK_OUT' &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.user_id == request.auth.uid &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.status == 'RETURNED'
+                ) ||
+                (
+                  request.resource.data.action == 'RETURN_VERIFIED' &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.return_verified_by_user_id == request.auth.uid &&
+                  getAfter(
+                    /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+                  ).data.status == 'COMPLETED'
+                )
+            )
+          )
+        );
+      allow update, delete: if false;
+    }
+
+    match /notifications/{notificationId} {
+      allow read: if signedIn() && resource.data.user_id == request.auth.uid;
+      allow create: if signedIn() &&
+        request.resource.data.actor_user_id == request.auth.uid &&
+        request.resource.data.booking_id is string &&
+        request.resource.data.resource_id is string &&
+        existsAfter(
+          /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+        ) &&
+        getAfter(
+          /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+        ).data.resource_asset_id == request.resource.data.resource_id &&
+        (
+          (
+            request.resource.data.type == 'BOOKING_REQUEST' &&
+            getAfter(
+              /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+            ).data.user_id == request.auth.uid &&
+            getAfter(
+              /databases/$(database)/documents/assets/$(request.resource.data.resource_id)
+            ).data.owner_id == request.resource.data.user_id
+          ) ||
+          (
+            request.resource.data.type in ['BOOKING_APPROVED', 'BOOKING_REJECTED', 'BOOKING_WAITLISTED', 'RETURN_VERIFIED'] &&
+            getAfter(
+              /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+            ).data.user_id == request.resource.data.user_id &&
+            (
+              getAfter(
+                /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+              ).data.approved_by_user_id == request.auth.uid ||
+              getAfter(
+                /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+              ).data.return_verified_by_user_id == request.auth.uid
+            )
+          ) ||
+          (
+            request.resource.data.type in ['CHECK_IN', 'CHECK_OUT'] &&
+            getAfter(
+              /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+            ).data.user_id == request.auth.uid &&
+            getAfter(
+              /databases/$(database)/documents/assets/$(request.resource.data.resource_id)
+            ).data.owner_id == request.resource.data.user_id
+          ) ||
+          (
+            request.resource.data.type == 'BOOKING_CANCELLED' &&
+            getAfter(
+              /databases/$(database)/documents/assets/$(request.resource.data.resource_id)
+            ).data.owner_id == request.resource.data.user_id &&
+            getAfter(
+              /databases/$(database)/documents/requests/$(request.resource.data.booking_id)
+            ).data.user_id == request.auth.uid
+          )
+        );
+      allow update: if signedIn() &&
+        resource.data.user_id == request.auth.uid &&
+        request.resource.data.user_id == resource.data.user_id &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read']);
+      allow delete: if false;
     }
   }
 }

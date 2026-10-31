@@ -488,6 +488,18 @@ export async function moveAssetLocationInFirestore(payload: {
  */
 export async function createAssetInFirestore(payload: {
   name: string;
+  description?: string;
+  category?: string;
+  institution?: string;
+  owner_id?: string | null;
+  image_urls?: string[];
+  eligibility_requirements?: string;
+  training_requirements?: string;
+  safety_instructions?: string;
+  usage_restrictions?: string;
+  approval_required?: boolean;
+  booking_slot_minutes?: number;
+  max_consecutive_bookings?: number;
   serial_number?: string;
   status?: string;
   location_id?: string | null;
@@ -501,6 +513,22 @@ export async function createAssetInFirestore(payload: {
 }): Promise<{ id: string; asset_code: string }> {
   const docRef = await addDoc(collection(db, COLLECTIONS.ASSETS), {
     name: payload.name,
+    description: payload.description ?? '',
+    category: payload.category ?? 'Equipment',
+    institution: payload.institution ?? '',
+    owner_id: payload.owner_id ?? null,
+    image_urls: payload.image_urls ?? [],
+    eligibility_requirements: payload.eligibility_requirements ?? '',
+    eligible_user_ids: [],
+    training_requirements: payload.training_requirements ?? '',
+    trained_user_ids: [],
+    safety_instructions: payload.safety_instructions ?? '',
+    usage_restrictions: payload.usage_restrictions ?? '',
+    approval_required: payload.approval_required ?? true,
+    booking_slot_minutes: payload.booking_slot_minutes ?? 60,
+    max_consecutive_bookings: payload.max_consecutive_bookings ?? 4,
+    booking_revision: 0,
+    last_booking_id: null,
     serial_number: payload.serial_number ?? null,
     status: payload.status ?? 'AVAILABLE',
     location_id: payload.location_id ?? null,
@@ -519,7 +547,16 @@ export async function createAssetInFirestore(payload: {
   const asset_code = assetCodeFromId(docRef.id);
   await updateDoc(doc(db, COLLECTIONS.ASSETS, docRef.id), {
     asset_code,
+    qr_code: asset_code,
   });
+  if (auth.currentUser) {
+    await addDoc(collection(db, 'resource_events'), {
+      action: 'RESOURCE_CREATED',
+      actor_user_id: auth.currentUser.uid,
+      resource_id: docRef.id,
+      created_at: serverTimestamp(),
+    });
+  }
 
   return { id: docRef.id, asset_code };
 }

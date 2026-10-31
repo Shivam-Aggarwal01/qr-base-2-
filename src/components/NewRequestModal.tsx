@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Modal } from './Modal';
 import { Asset, CatalogItem, RequestLineDraft, RequestUsage, User } from '../types/inventory';
 import { createRequestFirestore } from '../services/firebaseCollections';
+import { createResourceBooking } from '../services/resourceSharing';
 
 interface NewRequestModalProps {
   isOpen: boolean;
@@ -12,6 +13,9 @@ interface NewRequestModalProps {
   onRefreshData: () => void;
   initialItems?: RequestLineDraft[];
 }
+
+const resourceAssetSlotMinutes = (assets: Asset[], assetId?: string) =>
+  assets.find((asset) => asset.id === assetId)?.booking_slot_minutes ?? 60;
 
 export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   isOpen,
@@ -25,6 +29,8 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const [purpose, setPurpose] = useState('');
   const [remarks, setRemarks] = useState('');
   const [deadlineAt, setDeadlineAt] = useState('');
+  const [bookingStartAt, setBookingStartAt] = useState('');
+  const [bookingEndAt, setBookingEndAt] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const availableAssets = assets.filter((asset) => asset.status === 'AVAILABLE');
@@ -41,12 +47,15 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   };
 
   const [requestItems, setRequestItems] = useState<RequestLineDraft[]>(getInitialItems());
+  const isResourceBooking = requestItems.length === 1 && requestItems[0].kind === 'ASSET';
 
   useEffect(() => {
     if (!isOpen) return;
     setPurpose('');
     setRemarks('');
     setDeadlineAt('');
+    setBookingStartAt('');
+    setBookingEndAt('');
     setIsSubmitting(false);
     setRequestItems(getInitialItems());
   }, [isOpen, initialItems, catalogItems]);
@@ -104,14 +113,40 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!purpose.trim()) return alert('Please enter project purpose.');
-    if (!deadlineAt) return alert('Please choose a return deadline.');
-    if (new Date(deadlineAt).getTime() <= Date.now()) return alert('Deadline must be in the future.');
-
     const invalidCatalog = requestItems.some(
       (item) => item.kind === 'CATALOG' && (!item.catalog_item_id || item.requested_qty <= 0)
     );
     const invalidAsset = requestItems.some((item) => item.kind === 'ASSET' && !item.asset_id);
     if (invalidCatalog || invalidAsset) return alert('Please select valid items.');
+
+    const resourceAsset =
+      isResourceBooking
+        ? assets.find((asset) => asset.id === requestItems[0].asset_id)
+        : undefined;
+    if (resourceAsset) {
+      if (!bookingStartAt || !bookingEndAt) return alert('Choose a booking start and end time.');
+      setIsSubmitting(true);
+      try {
+        await createResourceBooking({
+          asset: resourceAsset,
+          user: activeUser,
+          purpose,
+          startsAt: new Date(bookingStartAt).toISOString(),
+          endsAt: new Date(bookingEndAt).toISOString(),
+          remarks,
+        });
+        onRefreshData();
+        onClose();
+      } catch (error) {
+        alert(error instanceof Error ? error.message : 'Failed to create booking.');
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
+
+    if (!deadlineAt) return alert('Please choose a return deadline.');
+    if (new Date(deadlineAt).getTime() <= Date.now()) return alert('Deadline must be in the future.');
 
     const requestNumber = `REQ-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
     setIsSubmitting(true);
@@ -166,6 +201,47 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
       bodyClassName="p-6 overflow-y-auto max-h-[80vh]"
     >
       <form onSubmit={handleSubmit} className="space-y-6">
+        {isResourceBooking && (
+          <section className="space-y-3 rounded-2xl border border-[var(--color-idea-border)] bg-[var(--color-idea-light-grey)]/30 p-4">
+            <div>
+              <h3 className="text-xs font-bold text-[var(--color-idea-text)]">Resource booking</h3>
+              <p className="mt-1 text-[10px] text-[var(--color-idea-muted)]">
+                Select a start and end time. The owner must approve the request before QR check-in is enabled.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Starts
+                <input
+                  type="datetime-local"
+                  required
+                  value={bookingStartAt}
+                  min={new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+                  onChange={(event) => setBookingStartAt(event.target.value)}
+                  className="idea-input mt-1 w-full p-2.5 text-xs normal-case"
+                />
+              </label>
+              <label className="text-[10px] font-semibold uppercase tracking-wider text-[var(--color-idea-muted)]">
+                Ends
+                <input
+                  type="datetime-local"
+                  required
+                  value={bookingEndAt}
+                  min={bookingStartAt || new Date(Date.now() + 60_000).toISOString().slice(0, 16)}
+                  onChange={(event) => setBookingEndAt(event.target.value)}
+                  className="idea-input mt-1 w-full p-2.5 text-xs normal-case"
+                />
+              </label>
+            </div>
+            {requestItems.length === 1 && requestItems[0].kind === 'ASSET' && (
+              <p className="text-[10px] text-[var(--color-idea-muted)]">
+                Slot length: {resourceAssetSlotMinutes(assets, requestItems[0].asset_id)} minutes · Maximum consecutive
+                booking applies.
+              </p>
+            )}
+          </section>
+        )}
+
         <div>
           <label className="text-[10px] font-medium text-[var(--color-idea-muted)] uppercase tracking-widest mb-2 block">
             Requester
@@ -192,7 +268,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
             />
           </div>
 
-          <div>
+          {!requestItems.some((item) => item.kind === 'ASSET') && <div>
             <label className="text-[10px] font-medium text-[var(--color-idea-muted)] uppercase tracking-widest mb-2 block">
               Return Date
             </label>
@@ -204,7 +280,7 @@ export const NewRequestModal: React.FC<NewRequestModalProps> = ({
               onChange={(e) => setDeadlineAt(e.target.value)}
               className="w-full px-4 py-3 bg-[var(--color-idea-light-grey)]/30 border border-[var(--color-idea-border)] rounded-2xl text-sm outline-none focus:border-[var(--color-idea-blue)] transition-colors"
             />
-          </div>
+          </div>}
 
           <div>
             <div className="flex items-center justify-between mb-3">

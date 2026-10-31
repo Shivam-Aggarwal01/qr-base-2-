@@ -381,7 +381,7 @@ export function App() {
   };
 
   const handleReviewAccountRequest = async (requestId: string, status: 'APPROVED' | 'REJECTED') => {
-    if (!currentUser || !isAdmin(effectiveRole)) return;
+    if (!currentUser || (!isAdmin(effectiveRole) && effectiveRole !== 'INSTITUTION_MANAGER')) return;
     try {
       await reviewAccountRequest(requestId, status, currentUser);
       await refreshAllData();
@@ -735,7 +735,7 @@ export function App() {
                 users={users}
                 requests={requests}
                 currentUser={currentUser}
-                onOpenNewRequest={() => openNewRequest()}
+                onOpenNewRequest={openNewRequest}
               />
             ) : (
               <StaffInventoryPage
@@ -754,6 +754,7 @@ export function App() {
               locations={locations}
               users={users}
               userRole={effectiveRole ?? currentUser.role}
+              activeUser={currentUser}
               onRefreshData={refreshAllData}
               onOpenQRGenerator={handleOpenQRGenerator}
             />
@@ -796,7 +797,7 @@ export function App() {
           )}
 
           {currentView === 'users' &&
-            (isAdmin(effectiveRole) ? (
+            (isAdmin(effectiveRole) || effectiveRole === 'INSTITUTION_MANAGER' ? (
               <UsersPage
                 users={users}
                 assets={assets}
@@ -808,6 +809,7 @@ export function App() {
                 onDeleteUser={handleDeleteUser}
                 accountRequests={accountRequests}
                 onReviewAccountRequest={handleReviewAccountRequest}
+                canReviewAccountRequests={effectiveRole === 'INSTITUTION_MANAGER'}
                 onRefreshData={refreshAllData}
               />
             ) : (
@@ -880,6 +882,7 @@ export function App() {
         catalogItems={catalogItems}
         stockLevels={stockLevels}
         assets={assets}
+        requests={requests}
         activeUser={currentUser}
         onOpenNewRequest={openNewRequest}
         onRefreshData={refreshAllData}

@@ -4,9 +4,11 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   runTransaction,
   serverTimestamp,
   updateDoc,
+  where,
   type QueryDocumentSnapshot,
 } from 'firebase/firestore';
 import { auth, db } from '../firebase';
@@ -23,16 +25,30 @@ function requireSignedInUser(): void {
   }
 }
 
+function timestampToMillis(value: unknown): number {
+  if (value && typeof value === 'object' && 'toMillis' in value && typeof value.toMillis === 'function') {
+    return value.toMillis();
+  }
+  return new Date(String(value ?? '')).getTime();
+}
+
 export function getStudentRequestBuckets(requests: Request[], userId: string) {
   const myRequests = requests.filter((r) => r.user_id === userId);
 
   return {
-    pending: myRequests.filter((r) => r.status === 'PENDING'),
-    approved: myRequests.filter((r) => r.status === 'APPROVED'),
-    completed: myRequests.filter((r) => r.status === 'COMPLETED' || r.status === 'HANDED_OVER'),
+    pending: myRequests.filter((r) => r.status === 'PENDING' || r.status === 'WAITLISTED'),
+    approved: myRequests.filter((r) => r.status === 'APPROVED' || r.status === 'CHECKED_IN'),
+    completed: myRequests.filter((r) => r.status === 'COMPLETED' || r.status === 'HANDED_OVER' || r.status === 'RETURNED'),
     total: myRequests,
     visible: myRequests.filter(
-      (r) => r.status === 'PENDING' || r.status === 'APPROVED' || r.status === 'HANDED_OVER' || r.status === 'COMPLETED'
+      (r) =>
+        r.status === 'PENDING' ||
+        r.status === 'WAITLISTED' ||
+        r.status === 'APPROVED' ||
+        r.status === 'CHECKED_IN' ||
+        r.status === 'RETURNED' ||
+        r.status === 'HANDED_OVER' ||
+        r.status === 'COMPLETED'
     ),
   };
 }
@@ -54,13 +70,57 @@ export async function requestLabReturn(request: Request): Promise<void> {
 
 export async function reviewLabRequest(
   request: Request,
-  status: 'APPROVED' | 'REJECTED',
+  status: 'APPROVED' | 'REJECTED' | 'WAITLISTED',
   staff: User,
   remarks?: string
 ): Promise<void> {
   requireSignedInUser();
-  if (request.status !== 'PENDING') {
-    throw new Error('Only pending requests can be approved or rejected.');
+  if (request.status !== 'PENDING' && !(status === 'REJECTED' && request.status === 'WAITLISTED')) {
+    throw new Error('Only pending requests can be reviewed.');
+  }
+
+  if (request.resource_asset_id) {
+    const requestRef = doc(db, 'requests', request.id);
+    const resourceBookingRef = doc(db, 'resource_bookings', request.id);
+    const eventRef = doc(collection(db, 'resource_events'));
+    const notificationRef = doc(collection(db, 'notifications'));
+    await runTransaction(db, async (transaction) => {
+      const requestSnapshot = await transaction.get(requestRef);
+      if (!requestSnapshot.exists()) throw new Error('The booking was not found.');
+      const currentRequest = requestSnapshot.data();
+      if (currentRequest.status !== 'PENDING' && !(status === 'REJECTED' && currentRequest.status === 'WAITLISTED')) {
+        throw new Error('This booking has already been reviewed.');
+      }
+      transaction.update(requestRef, {
+        status,
+        approved_by_user_id: staff.id,
+        remarks: remarks || currentRequest.remarks || '',
+        updated_at: serverTimestamp(),
+      });
+      transaction.update(resourceBookingRef, { status, updated_at: serverTimestamp() });
+      transaction.set(eventRef, {
+        action: status === 'REJECTED' ? 'BOOKING_REJECTED' : 'BOOKING_WAITLISTED',
+        actor_user_id: staff.id,
+        resource_id: request.resource_asset_id,
+        booking_id: request.id,
+        created_at: serverTimestamp(),
+      });
+      transaction.set(notificationRef, {
+        user_id: currentRequest.user_id,
+        actor_user_id: staff.id,
+        resource_id: request.resource_asset_id,
+        booking_id: request.id,
+        type: status === 'REJECTED' ? 'BOOKING_REJECTED' : 'BOOKING_WAITLISTED',
+        title: status === 'REJECTED' ? 'Booking request declined' : 'Booking added to waitlist',
+        message:
+          status === 'REJECTED'
+            ? `Your request ${currentRequest.request_number} was declined.`
+            : `Your request ${currentRequest.request_number} is waitlisted; the owner will review it when the slot clears.`,
+        read: false,
+        created_at: serverTimestamp(),
+      });
+    });
+    return;
   }
 
   await updateDoc(doc(db, 'requests', request.id), {
@@ -73,6 +133,114 @@ export async function reviewLabRequest(
 
 export async function approveAndHandoverLabRequest(request: Request, staff: User, remarks?: string): Promise<void> {
   requireSignedInUser();
+  if (request.resource_asset_id && request.booking_start_at) {
+    const requestRef = doc(db, 'requests', request.id);
+    const assetRef = doc(db, 'assets', request.resource_asset_id);
+    const resourceBookingRef = doc(db, 'resource_bookings', request.id);
+    const eventRef = doc(collection(db, 'resource_events'));
+    const initialAssetSnapshot = await getDoc(assetRef);
+    if (!initialAssetSnapshot.exists()) {
+      throw new Error('The requested resource was not found.');
+    }
+    const initialBookingRevision = Number(initialAssetSnapshot.data().booking_revision ?? 0);
+    const existingBookings = await getDocs(
+      query(collection(db, 'resource_bookings'), where('resource_id', '==', request.resource_asset_id))
+    );
+    await runTransaction(db, async (transaction) => {
+      const [requestSnapshot, assetSnapshot, resourceBookingSnapshot] = await Promise.all([
+        transaction.get(requestRef),
+        transaction.get(assetRef),
+        transaction.get(resourceBookingRef),
+      ]);
+      if (!requestSnapshot.exists() || !assetSnapshot.exists() || !resourceBookingSnapshot.exists()) {
+        throw new Error('The booking or resource could not be found.');
+      }
+      const currentRequest = requestSnapshot.data();
+      const asset = assetSnapshot.data();
+      if (Number(asset.booking_revision ?? 0) !== initialBookingRevision) {
+        throw new Error('The resource schedule changed while reviewing this request. Reload and try again.');
+      }
+      if (currentRequest.status !== 'PENDING' && currentRequest.status !== 'WAITLISTED') {
+        throw new Error('Only pending or waitlisted bookings can be approved.');
+      }
+      const bookingStart = timestampToMillis(currentRequest.booking_start_at);
+      const bookingEnd = timestampToMillis(currentRequest.booking_end_at);
+      const confirmedConflict = existingBookings.docs.some((snapshot) => {
+        if (snapshot.id === request.id) return false;
+        const other = snapshot.data();
+        if (!['APPROVED', 'CHECKED_IN', 'RETURNED', 'OVERDUE', 'UNDER_REVIEW'].includes(String(other.status))) {
+          return false;
+        }
+        const otherStart = timestampToMillis(other.starts_at);
+        const otherEnd = timestampToMillis(other.ends_at);
+        return (
+          Number.isFinite(bookingStart) &&
+          Number.isFinite(bookingEnd) &&
+          Number.isFinite(otherStart) &&
+          Number.isFinite(otherEnd) &&
+          bookingStart < otherEnd &&
+          bookingEnd > otherStart
+        );
+      });
+      if (confirmedConflict) {
+        throw new Error('Another booking already occupies this time. Keep this request waitlisted.');
+      }
+      const currentBookingCreatedAt = timestampToMillis(currentRequest.created_at);
+      const earlierWaitlist = existingBookings.docs.some((snapshot) => {
+        if (snapshot.id === request.id || snapshot.data().status !== 'WAITLISTED') return false;
+        const other = snapshot.data();
+        const otherCreatedAt = timestampToMillis(other.created_at);
+        const otherStart = timestampToMillis(other.starts_at);
+        const otherEnd = timestampToMillis(other.ends_at);
+        return (
+          otherCreatedAt < currentBookingCreatedAt &&
+          otherStart < bookingEnd &&
+          otherEnd > bookingStart
+        );
+      });
+      if (earlierWaitlist) {
+        throw new Error('An earlier request has priority for this time slot.');
+      }
+      if (
+        staff.id !== auth.currentUser?.uid ||
+        (asset.owner_id !== staff.id && !['ADMIN', 'INSTITUTION_MANAGER', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR'].includes(staff.role))
+      ) {
+        throw new Error('Only the resource owner or an institution manager can review this booking.');
+      }
+      transaction.update(requestRef, {
+        status: 'APPROVED' satisfies RequestStatus,
+        approved_by_user_id: staff.id,
+        remarks: remarks || currentRequest.remarks || '',
+        updated_at: serverTimestamp(),
+      });
+      transaction.update(resourceBookingRef, { status: 'APPROVED', updated_at: serverTimestamp() });
+      transaction.update(assetRef, {
+        booking_revision: (asset.booking_revision ?? 0) + 1,
+        last_booking_id: request.id,
+        updated_at: serverTimestamp(),
+      });
+      transaction.set(eventRef, {
+        action: 'BOOKING_APPROVED',
+        actor_user_id: staff.id,
+        resource_id: request.resource_asset_id,
+        booking_id: request.id,
+        created_at: serverTimestamp(),
+      });
+      transaction.set(doc(collection(db, 'notifications')), {
+        user_id: currentRequest.user_id,
+        actor_user_id: staff.id,
+        resource_id: request.resource_asset_id,
+        booking_id: request.id,
+        type: 'BOOKING_APPROVED',
+        title: 'Booking approved',
+        message: `Your booking ${currentRequest.request_number} has been approved. Scan the resource QR code to check in.`,
+        read: false,
+        created_at: serverTimestamp(),
+      });
+    });
+    return;
+  }
+
   if (request.status !== 'PENDING') {
     throw new Error('Only pending requests can be approved.');
   }
@@ -265,6 +433,67 @@ export async function completeLabRequest(
   returnLocationId?: string
 ): Promise<void> {
   requireSignedInUser();
+  if (request.resource_asset_id && request.booking_start_at) {
+    const requestRef = doc(db, 'requests', request.id);
+    const assetRef = doc(db, 'assets', request.resource_asset_id);
+    const resourceBookingRef = doc(db, 'resource_bookings', request.id);
+    const eventRef = doc(collection(db, 'resource_events'));
+    await runTransaction(db, async (transaction) => {
+      const [requestSnapshot, assetSnapshot, resourceBookingSnapshot] = await Promise.all([
+        transaction.get(requestRef),
+        transaction.get(assetRef),
+        transaction.get(resourceBookingRef),
+      ]);
+      if (!requestSnapshot.exists() || !assetSnapshot.exists() || !resourceBookingSnapshot.exists()) {
+        throw new Error('The booking or resource could not be found.');
+      }
+      if (!['RETURNED', 'UNDER_REVIEW'].includes(String(requestSnapshot.data().status))) {
+        throw new Error('The borrower must check out before the owner can verify the return.');
+      }
+      const asset = assetSnapshot.data();
+      if (
+        staff.id !== auth.currentUser?.uid ||
+        (asset.owner_id !== staff.id && !['ADMIN', 'INSTITUTION_MANAGER', 'STUDENT_LEAD', 'STUDENT_AMBASSADOR'].includes(staff.role))
+      ) {
+        throw new Error('Only the resource owner or an institution manager can verify this return.');
+      }
+      transaction.update(requestRef, {
+        status: 'COMPLETED' satisfies RequestStatus,
+        return_verified_by_user_id: staff.id,
+        completed_at: serverTimestamp(),
+        remarks: remarks || requestSnapshot.data().remarks || '',
+        updated_at: serverTimestamp(),
+      });
+      transaction.update(resourceBookingRef, { status: 'COMPLETED', updated_at: serverTimestamp() });
+      transaction.update(assetRef, {
+        status: requestSnapshot.data().damage_reported ? 'DAMAGED' : 'AVAILABLE',
+        assigned_to_user_id: null,
+        location_id: asset.checkout_location_id ?? asset.location_id ?? null,
+        checkout_location_id: null,
+        updated_at: serverTimestamp(),
+      });
+      transaction.set(eventRef, {
+        action: 'RETURN_VERIFIED',
+        actor_user_id: staff.id,
+        resource_id: request.resource_asset_id,
+        booking_id: request.id,
+        created_at: serverTimestamp(),
+      });
+      transaction.set(doc(collection(db, 'notifications')), {
+        user_id: requestSnapshot.data().user_id,
+        actor_user_id: staff.id,
+        resource_id: request.resource_asset_id,
+        booking_id: request.id,
+        type: 'RETURN_VERIFIED',
+        title: 'Return confirmed',
+        message: `The owner verified the return for booking ${requestSnapshot.data().request_number}.`,
+        read: false,
+        created_at: serverTimestamp(),
+      });
+    });
+    return;
+  }
+
   if (request.status !== 'HANDED_OVER' && request.status !== 'APPROVED' && request.status !== 'RETURN_REQUESTED') {
     throw new Error('Only handed-over requests can be marked completed.');
   }

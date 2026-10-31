@@ -1,8 +1,32 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { QrCode, ChevronDown, Menu, LogOut, Keyboard } from 'lucide-react';
+import { QrCode, ChevronDown, Menu, LogOut, Keyboard, Bell } from 'lucide-react';
 import { isStudent } from '../../../shared/lib';
 import { User } from '../../../shared/types/inventory';
 import { Link } from 'react-router-dom';
+import { collection, doc, onSnapshot, query, updateDoc, where } from 'firebase/firestore';
+import { db } from '../../../firebase';
+
+interface InAppNotification {
+  id: string;
+  title: string;
+  message: string;
+  created_at?: { toMillis?: () => number; toDate?: () => Date } | string;
+  read?: boolean;
+}
+
+function notificationTime(notification: InAppNotification): number {
+  const timestamp = notification.created_at;
+  if (timestamp && typeof timestamp === 'object') {
+    if (typeof timestamp.toMillis === 'function') return timestamp.toMillis();
+    if (typeof timestamp.toDate === 'function') return timestamp.toDate().getTime();
+  }
+  return new Date(String(timestamp ?? '')).getTime() || 0;
+}
+
+function formatNotificationTime(notification: InAppNotification): string {
+  const timestamp = notificationTime(notification);
+  return timestamp ? new Date(timestamp).toLocaleString() : 'Just now';
+}
 
 export interface NavbarProps {
   activeUser: User;
@@ -29,6 +53,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenShortcuts,
 }) => {
   const [showUserDropdown, setShowUserDropdown] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
@@ -43,6 +69,34 @@ export const Navbar: React.FC<NavbarProps> = ({
   };
 
   const studentAccount = isStudent(activeUser.role);
+  const unreadNotifications = notifications.filter((notification) => !notification.read).length;
+
+  useEffect(() => {
+    const notificationsQuery = query(collection(db, 'notifications'), where('user_id', '==', activeUser.id));
+    return onSnapshot(
+      notificationsQuery,
+      (snapshot) => {
+        setNotifications(
+          snapshot.docs
+            .map((notification) => ({ id: notification.id, ...notification.data() }) as InAppNotification)
+            .sort((a, b) => notificationTime(b) - notificationTime(a))
+            .slice(0, 20)
+        );
+      },
+      (error) => {
+        console.error('Could not load in-app notifications:', error);
+      }
+    );
+  }, [activeUser.id]);
+
+  const markNotificationRead = async (notification: InAppNotification) => {
+    if (notification.read) return;
+    try {
+      await updateDoc(doc(db, 'notifications', notification.id), { read: true });
+    } catch (error) {
+      console.error('Could not mark notification as read:', error);
+    }
+  };
 
   // Close dropdown on outside click or Escape
   useEffect(() => {
@@ -146,6 +200,48 @@ export const Navbar: React.FC<NavbarProps> = ({
           <QrCode className="w-4 h-4" />
           <span className="hidden sm:inline">Scan QR</span>
         </button>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowNotifications((shown) => !shown)}
+            aria-label={`Notifications${unreadNotifications ? `, ${unreadNotifications} unread` : ''}`}
+            aria-expanded={showNotifications}
+            className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50"
+          >
+            <Bell className="h-4 w-4" />
+            {unreadNotifications > 0 && (
+              <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[9px] font-bold text-white">
+                {unreadNotifications > 9 ? '9+' : unreadNotifications}
+              </span>
+            )}
+          </button>
+          {showNotifications && (
+            <div className="absolute right-0 top-[calc(100%+10px)] z-50 w-80 max-w-[90vw] overflow-hidden rounded-2xl border border-[var(--color-idea-border)] bg-white shadow-xl">
+              <div className="border-b border-[var(--color-idea-border)] px-4 py-3">
+                <p className="text-xs font-bold text-[var(--color-idea-text)]">Notifications</p>
+              </div>
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.length === 0 ? (
+                  <p className="p-5 text-center text-xs text-[var(--color-idea-muted)]">You’re all caught up.</p>
+                ) : (
+                  notifications.map((notification) => (
+                    <button
+                      key={notification.id}
+                      type="button"
+                      onClick={() => void markNotificationRead(notification)}
+                      className={`block w-full border-b border-[var(--color-idea-border)] px-4 py-3 text-left last:border-0 ${notification.read ? 'bg-white' : 'bg-blue-50/70'}`}
+                    >
+                      <p className="text-xs font-semibold text-[var(--color-idea-text)]">{notification.title}</p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-[var(--color-idea-muted)]">{notification.message}</p>
+                      <p className="mt-1 text-[9px] text-[var(--color-idea-muted)]">{formatNotificationTime(notification)}</p>
+                    </button>
+                  ))
+                )}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="hidden sm:block h-8 w-px bg-[var(--color-idea-border)]" />

@@ -11,26 +11,33 @@ import {
 import { InventoryStorage } from '../services/storage';
 import { getLocationFullPathString } from '../utils/locationHierarchy';
 import { LocationPathBreadcrumb } from './LocationsView';
+import { uploadResourceImage } from '../services/resourceUploads';
 
-// Mirrors Firestore rule: isStaff = ADMIN | STUDENT_LEAD | STUDENT_AMBASSADOR
-const isStaff = (role?: UserRole) => role === 'ADMIN' || role === 'STUDENT_LEAD' || role === 'STUDENT_AMBASSADOR';
+// Mirrors Firestore rule for users who can change operational asset status.
+const isStaff = (role?: UserRole) =>
+  role === 'ADMIN' ||
+  role === 'INSTITUTION_MANAGER' ||
+  role === 'STUDENT_LEAD' ||
+  role === 'STUDENT_AMBASSADOR';
 
 interface AssetsViewProps {
   assets: Asset[];
   locations: Location[];
   users: User[];
   userRole?: UserRole;
+  activeUser: User;
   onRefreshData: () => void;
   onOpenQRGenerator: (code: string, title: string, subtitle?: string) => void;
 }
 
-const EDITABLE_STATUSES: AssetStatus[] = ['AVAILABLE', 'UNDER_REPAIR', 'DAMAGED', 'LOST'];
+const EDITABLE_STATUSES: AssetStatus[] = ['AVAILABLE', 'UNDER_REVIEW', 'UNDER_REPAIR', 'DAMAGED', 'LOST'];
 
 export const AssetsView: React.FC<AssetsViewProps> = ({
   assets,
   locations,
   users,
   userRole,
+  activeUser,
   onRefreshData,
   onOpenQRGenerator,
 }) => {
@@ -42,6 +49,16 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
   const [newAssetName, setNewAssetName] = useState('');
   const [newLocationId, setNewLocationId] = useState(locations[0]?.id || '');
   const [newNotes, setNewNotes] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+  const [newCategory, setNewCategory] = useState('Equipment');
+  const [newEligibility, setNewEligibility] = useState('');
+  const [newTraining, setNewTraining] = useState('');
+  const [newSafety, setNewSafety] = useState('');
+  const [newRestrictions, setNewRestrictions] = useState('');
+  const [newInstitution, setNewInstitution] = useState('AICTE IDEA Lab');
+  const [newImageUrl, setNewImageUrl] = useState('');
+  const [newImageFile, setNewImageFile] = useState<File | null>(null);
+  const [newApprovalRequired, setNewApprovalRequired] = useState(true);
 
   // Edit Asset Modal — now the single source of truth for name, status, location, notes
   const [showEditAssetModal, setShowEditAssetModal] = useState(false);
@@ -95,8 +112,20 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
     }
 
     try {
-      await createAssetInFirestore({
+      const createdAsset = await createAssetInFirestore({
         name: newAssetName.trim(),
+        description: newDescription.trim(),
+        category: newCategory,
+        institution: newInstitution.trim(),
+        owner_id: activeUser.id,
+        image_urls: newImageUrl.trim() ? [newImageUrl.trim()] : [],
+        eligibility_requirements: newEligibility.trim(),
+        training_requirements: newTraining.trim(),
+        safety_instructions: newSafety.trim(),
+        usage_restrictions: newRestrictions.trim(),
+        approval_required: newApprovalRequired,
+        booking_slot_minutes: 60,
+        max_consecutive_bookings: 4,
         status: 'AVAILABLE',
         location_id: newLocationId,
         storage_location: null,
@@ -105,15 +134,36 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         is_box: false,
         notes: newNotes ? newNotes : '',
       });
+      const imageUrls = newImageUrl.trim() ? [newImageUrl.trim()] : [];
+      if (newImageFile) {
+        try {
+          imageUrls.push(await uploadResourceImage(createdAsset.id, newImageFile));
+          await updateFirestoreDocument(COLLECTIONS.ASSETS, createdAsset.id, { image_urls: imageUrls });
+        } catch (error) {
+          onRefreshData();
+          throw new Error(
+            `Resource created, but its image could not be uploaded: ${error instanceof Error ? error.message : 'upload failed'}`
+          );
+        }
+      }
 
       setShowAddModal(false);
       setNewAssetName('');
       setNewNotes('');
+      setNewDescription('');
+      setNewCategory('Equipment');
+      setNewEligibility('');
+      setNewTraining('');
+      setNewSafety('');
+      setNewRestrictions('');
+      setNewImageUrl('');
+      setNewImageFile(null);
 
       onRefreshData();
+      onOpenQRGenerator(createdAsset.asset_code, newAssetName.trim(), `Resource QR · ${createdAsset.asset_code}`);
     } catch (error) {
       console.error('Failed to create asset in Firestore:', error);
-      alert('Failed to create asset. Check Firebase permissions.');
+      alert(error instanceof Error ? error.message : 'Failed to create resource. Check Firebase permissions.');
     }
   };
 
@@ -123,6 +173,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         return 'idea-success';
       case 'ISSUED':
         return 'idea-info';
+      case 'UNDER_REVIEW':
+        return 'idea-warning';
       case 'UNDER_REPAIR':
         return 'idea-warning';
       case 'DAMAGED':
@@ -141,6 +193,8 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         return 'Available';
       case 'ISSUED':
         return 'Checked Out';
+      case 'UNDER_REVIEW':
+        return 'Return Under Review';
       case 'UNDER_REPAIR':
         return 'In Repair';
       case 'DAMAGED':
@@ -278,7 +332,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
         {/* Filter Toolbar */}
         <div className="idea-card p-3 sm:p-4 flex flex-col md:flex-row items-center justify-between gap-3 sm:gap-4">
           <div className="flex items-center gap-1.5 bg-[var(--color-idea-light-grey)] p-1 rounded-xl w-full md:w-auto overflow-x-auto border border-[var(--color-idea-border)]">
-            {(['ALL', 'AVAILABLE', 'ISSUED', 'UNDER_REPAIR', 'DAMAGED', 'LOST'] as const).map((m) => (
+            {(['ALL', 'AVAILABLE', 'ISSUED', 'UNDER_REVIEW', 'UNDER_REPAIR', 'DAMAGED', 'LOST'] as const).map((m) => (
               <button
                 key={m}
                 onClick={() => setStatusFilter(m)}
@@ -414,7 +468,7 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
           closeOnOutsideClick={true}
           closeOnEscape={true}
           maxWidth="md"
-          bodyClassName="p-6"
+          bodyClassName="max-h-[80vh] overflow-y-auto p-6"
         >
           {editingAsset && (
             <form onSubmit={handleEditAssetSubmit} className="space-y-4">
@@ -551,6 +605,40 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
               </div>
             </div>
 
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Category
+                <select
+                  value={newCategory}
+                  onChange={(event) => setNewCategory(event.target.value)}
+                  className="idea-input mt-1 w-full p-2.5 text-xs normal-case"
+                >
+                  {['Laboratory', 'Classroom', 'Computer', 'Camera', 'Projector', 'Electronics', 'Testing instrument', 'Workshop tool', 'Space', 'Other'].map((category) => (
+                    <option key={category}>{category}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Institution
+                <input
+                  value={newInstitution}
+                  onChange={(event) => setNewInstitution(event.target.value)}
+                  className="idea-input mt-1 w-full p-2.5 text-xs normal-case"
+                />
+              </label>
+            </div>
+
+            <label className="block text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Description
+              <textarea
+                value={newDescription}
+                onChange={(event) => setNewDescription(event.target.value)}
+                rows={2}
+                className="idea-input mt-1 w-full resize-y p-2.5 text-xs normal-case"
+                placeholder="What can people use this resource for?"
+              />
+            </label>
+
             <div>
               <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
                 Location
@@ -571,6 +659,71 @@ export const AssetsView: React.FC<AssetsViewProps> = ({
                 ))}
               </select>
             </div>
+
+            <label className="block text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Image URL (optional)
+              <input
+                type="url"
+                value={newImageUrl}
+                onChange={(event) => setNewImageUrl(event.target.value)}
+                className="idea-input mt-1 w-full p-2.5 text-xs normal-case"
+                placeholder="https://…"
+              />
+            </label>
+            <label className="block text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Or upload an image (5 MB max)
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => setNewImageFile(event.target.files?.[0] ?? null)}
+                className="mt-1 block w-full text-xs normal-case"
+              />
+            </label>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Eligibility
+                <input
+                  value={newEligibility}
+                  onChange={(event) => setNewEligibility(event.target.value)}
+                  className="idea-input mt-1 w-full p-2.5 text-xs normal-case"
+                  placeholder="Leave blank if open to all"
+                />
+              </label>
+              <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+                Training required
+                <input
+                  value={newTraining}
+                  onChange={(event) => setNewTraining(event.target.value)}
+                  className="idea-input mt-1 w-full p-2.5 text-xs normal-case"
+                />
+              </label>
+            </div>
+            <label className="block text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Safety instructions
+              <textarea
+                value={newSafety}
+                onChange={(event) => setNewSafety(event.target.value)}
+                rows={2}
+                className="idea-input mt-1 w-full resize-y p-2.5 text-xs normal-case"
+              />
+            </label>
+            <label className="block text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
+              Usage restrictions
+              <input
+                value={newRestrictions}
+                onChange={(event) => setNewRestrictions(event.target.value)}
+                className="idea-input mt-1 w-full p-2.5 text-xs normal-case"
+              />
+            </label>
+            <label className="flex items-center gap-2 text-xs text-[var(--color-idea-text)]">
+              <input
+                type="checkbox"
+                checked={newApprovalRequired}
+                onChange={(event) => setNewApprovalRequired(event.target.checked)}
+              />
+              Owner approval required before booking
+            </label>
 
             <div>
               <label className="text-[11px] font-medium uppercase text-[var(--color-idea-muted)] tracking-wider">
