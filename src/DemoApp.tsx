@@ -477,22 +477,22 @@ export default function DemoApp() {
   ];
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900">
+    <div className="h-[100dvh] w-full overflow-x-hidden overflow-y-auto bg-slate-50 text-slate-900">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6">
-          <div className="flex items-center gap-3">
+        <div className="mx-auto flex min-h-16 w-full max-w-[1440px] flex-col items-stretch justify-center gap-3 px-4 py-3 sm:h-16 sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:px-6 sm:py-0">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-900 text-white">
               <FlaskConical size={21} />
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-bold tracking-tight">IDEA Lab · Resource Share</p>
-              <p className="text-[11px] text-slate-500">Underused equipment, put to work</p>
+              <p className="hidden text-[11px] text-slate-500 min-[360px]:block">Underused equipment, put to work</p>
             </div>
-            <span className="ml-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-amber-800">
+            <span className="ml-auto hidden shrink-0 rounded-full bg-amber-100 px-2.5 py-1 text-[9px] font-bold uppercase tracking-wider text-amber-800 min-[360px]:inline-flex sm:ml-1 sm:text-[10px]">
               Hackathon demo
             </span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
             <label className="sr-only" htmlFor="demo-persona">Switch demo persona</label>
             <select
               id="demo-persona"
@@ -502,7 +502,7 @@ export default function DemoApp() {
                 setScannedAssetId(null);
                 setNotice(`Viewing as ${state.users.find((user) => user.id === event.target.value)?.name ?? 'demo user'}`);
               }}
-              className="max-w-[155px] rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold sm:max-w-none sm:text-sm"
+              className="w-0 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold sm:w-auto sm:max-w-[280px] sm:flex-none sm:text-sm"
             >
               {state.users.map((user) => (
                 <option key={user.id} value={user.id}>{user.name} · {roleLabels[user.role]}</option>
@@ -520,9 +520,9 @@ export default function DemoApp() {
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-[1440px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:py-8">
-        <aside className="lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]">
-          <div className="flex gap-2 overflow-x-auto rounded-2xl border border-slate-200 bg-white p-2 lg:flex-col lg:overflow-visible">
+      <div className="mx-auto grid w-full min-w-0 max-w-[1440px] gap-5 px-4 py-5 sm:gap-6 sm:px-6 sm:py-6 lg:grid-cols-[220px_minmax(0,1fr)] lg:py-8">
+        <aside className="min-w-0 lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)]">
+          <div className="grid min-w-0 grid-cols-2 gap-1 rounded-2xl border border-slate-200 bg-white p-1.5 sm:grid-cols-4 sm:gap-2 sm:p-2 lg:grid-cols-1">
             {([
               ['overview', LayoutDashboard, 'Overview'],
               ['resources', FlaskConical, 'Discover resources'],
@@ -533,7 +533,7 @@ export default function DemoApp() {
                 key={id}
                 type="button"
                 onClick={() => setView(id)}
-                className={`flex shrink-0 items-center gap-3 rounded-xl px-3 py-3 text-left text-sm font-semibold transition ${
+                className={`flex w-full min-w-0 items-center gap-2 rounded-xl px-2.5 py-2.5 text-left text-xs font-semibold transition sm:gap-3 sm:px-3 sm:py-3 sm:text-sm ${
                   view === id ? 'bg-blue-900 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
@@ -549,8 +549,8 @@ export default function DemoApp() {
           </div>
         </aside>
 
-        <main className="min-w-0">
-          <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+        <main className="w-full min-w-0">
+          <div className="mb-5 flex min-w-0 flex-col justify-between gap-4 sm:mb-6 sm:flex-row sm:items-end">
             <div>
               <p className="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">{roleLabels[activeUser.role]} view</p>
               <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">
@@ -567,8 +567,8 @@ export default function DemoApp() {
               </p>
             </div>
             {view === 'resources' && (
-              <div className="flex items-center gap-2">
-                <div className="relative">
+              <div className="flex min-w-0 items-center gap-2">
+                <div className="relative min-w-0 flex-1 sm:flex-none">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                   <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search resources" className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm sm:w-56" />
                 </div>
@@ -713,7 +713,7 @@ export default function DemoApp() {
                           <span className="inline-flex items-center gap-1.5"><Clock3 size={14} />{formatTime(booking.startsAt)} – {shortDateTime(booking.endsAt)}</span>
                         </div>
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap justify-start gap-2 sm:justify-end">
                         {canReview && ['PENDING', 'WAITLISTED'].includes(booking.status) && (
                           <>
                             <ActionButton onClick={() => updateBookingStatus(booking, 'APPROVED')} label="Approve" icon={<Check size={15} />} />
